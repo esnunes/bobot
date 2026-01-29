@@ -10,10 +10,6 @@ import (
 	"github.com/esnunes/bobot/db"
 )
 
-type contextKey string
-
-const userIDKey contextKey = "user_id"
-
 type AuthMiddleware struct {
 	jwt *auth.JWTService
 	db  *db.CoreDB
@@ -43,14 +39,13 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
+		ctx := auth.ContextWithUserID(r.Context(), claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
+// GetUserID extracts user ID from context.
+// Deprecated: Use auth.UserIDFromContext instead.
 func GetUserID(ctx context.Context) int64 {
-	if id, ok := ctx.Value(userIDKey).(int64); ok {
-		return id
-	}
-	return 0
+	return auth.UserIDFromContext(ctx)
 }

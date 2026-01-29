@@ -23,12 +23,11 @@ func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill) 
 	}
 }
 
-func (e *Engine) Chat(ctx context.Context, userID int64, message string) (string, error) {
+// Chat processes a user message and returns the assistant's response.
+// The context must contain the user ID (set by auth middleware).
+func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 	// Build system prompt
 	systemPrompt := BuildSystemPrompt(e.skills, e.registry.ToLLMTools())
-
-	// Add user_id to context for tools
-	ctx = context.WithValue(ctx, "user_id", userID)
 
 	// Start with user message
 	messages := []llm.Message{

@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/esnunes/bobot/auth"
 )
 
 type TaskTool struct {
@@ -51,8 +53,8 @@ func (t *TaskTool) Schema() interface{} {
 }
 
 func (t *TaskTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	userID, ok := ctx.Value("user_id").(int64)
-	if !ok {
+	userID := auth.UserIDFromContext(ctx)
+	if userID == 0 {
 		return "", fmt.Errorf("user_id not found in context")
 	}
 

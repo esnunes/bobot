@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/llm"
 	"github.com/esnunes/bobot/tools"
 )
@@ -44,7 +45,8 @@ func TestEngine_Chat_SimpleResponse(t *testing.T) {
 	registry := tools.NewRegistry()
 	engine := NewEngine(mockProvider, registry, nil)
 
-	result, err := engine.Chat(context.Background(), 1, "Hi")
+	ctx := auth.ContextWithUserID(context.Background(), 1)
+	result, err := engine.Chat(ctx, "Hi")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,7 +73,8 @@ func TestEngine_Chat_WithToolUse(t *testing.T) {
 
 	engine := NewEngine(mockProvider, registry, nil)
 
-	result, err := engine.Chat(context.Background(), 1, "What's on my list?")
+	ctx := auth.ContextWithUserID(context.Background(), 1)
+	result, err := engine.Chat(ctx, "What's on my list?")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
