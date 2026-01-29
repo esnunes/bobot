@@ -2,8 +2,7 @@
 package assistant
 
 import (
-	"os"
-	"path/filepath"
+	"io/fs"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -15,12 +14,11 @@ type Skill struct {
 	Content     string `yaml:"-"`
 }
 
-func LoadSkills(dir string) ([]Skill, error) {
-	entries, err := os.ReadDir(dir)
+// LoadSkills loads skills from an embedded filesystem.
+// The fsys should contain .md files with YAML frontmatter.
+func LoadSkills(fsys fs.FS) ([]Skill, error) {
+	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
 
@@ -30,7 +28,7 @@ func LoadSkills(dir string) ([]Skill, error) {
 			continue
 		}
 
-		skill, err := loadSkillFile(filepath.Join(dir, entry.Name()))
+		skill, err := loadSkillFile(fsys, entry.Name())
 		if err != nil {
 			return nil, err
 		}
@@ -40,8 +38,8 @@ func LoadSkills(dir string) ([]Skill, error) {
 	return skills, nil
 }
 
-func loadSkillFile(path string) (*Skill, error) {
-	data, err := os.ReadFile(path)
+func loadSkillFile(fsys fs.FS, name string) (*Skill, error) {
+	data, err := fs.ReadFile(fsys, name)
 	if err != nil {
 		return nil, err
 	}
