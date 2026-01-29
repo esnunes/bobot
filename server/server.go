@@ -31,6 +31,7 @@ func New(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTService) *Server {
 func (s *Server) routes() {
 	s.router.HandleFunc("GET /health", s.handleHealth)
 	s.router.HandleFunc("POST /api/login", s.handleLogin)
+	s.router.HandleFunc("POST /api/refresh", s.handleRefresh)
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
