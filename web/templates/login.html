@@ -1,0 +1,41 @@
+{{define "content"}}
+<div class="login-container">
+    <h1>bobot</h1>
+    <form id="login-form" class="login-form">
+        <input type="text" name="username" placeholder="Username" required autofocus>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+        <p id="error-message" class="error hidden"></p>
+    </form>
+</div>
+<script>
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const errorEl = document.getElementById('error-message');
+
+    try {
+        const resp = await fetch('/api/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: form.username.value,
+                password: form.password.value
+            })
+        });
+
+        if (!resp.ok) {
+            throw new Error('Invalid credentials');
+        }
+
+        const data = await resp.json();
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
+        window.location.href = '/chat';
+    } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.classList.remove('hidden');
+    }
+});
+</script>
+{{end}}

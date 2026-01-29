@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="chat-container">
+    <header class="chat-header">
+        <h1>bobot</h1>
+        <button id="menu-btn" class="menu-btn">&#9776;</button>
+    </header>
+
+    <main class="chat-messages" id="messages">
+    </main>
+
+    <footer class="chat-input">
+        <form id="chat-form">
+            <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+            <button type="submit">&#10148;</button>
+        </form>
+    </footer>
+</div>
+
+<div id="menu-overlay" class="menu-overlay hidden">
+    <div class="menu">
+        <button id="logout-btn">Logout</button>
+    </div>
+</div>
+
+<script src="/static/chat.js"></script>
+{{end}}

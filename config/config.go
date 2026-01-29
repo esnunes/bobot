@@ -12,6 +12,7 @@ type Config struct {
 	LLM      LLMConfig
 	JWT      JWTConfig
 	DataDir  string
+	WebDir   string
 	InitUser string
 	InitPass string
 }
@@ -46,6 +47,7 @@ func Load() (*Config, error) {
 			Secret: os.Getenv("BOBOT_JWT_SECRET"),
 		},
 		DataDir:  getEnvOrDefault("BOBOT_DATA_DIR", "./data"),
+		WebDir:   getEnvOrDefault("BOBOT_WEB_DIR", "./web"),
 		InitUser: os.Getenv("BOBOT_INIT_USER"),
 		InitPass: os.Getenv("BOBOT_INIT_PASS"),
 	}

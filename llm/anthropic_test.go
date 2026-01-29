@@ -14,8 +14,8 @@ func TestAnthropicClient_Chat_TextResponse(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/v1/messages" {
-			t.Errorf("expected /v1/messages, got %s", r.URL.Path)
+		if r.URL.Path != "/messages" {
+			t.Errorf("expected /messages, got %s", r.URL.Path)
 		}
 		if r.Header.Get("x-api-key") != "test-key" {
 			t.Error("expected x-api-key header")

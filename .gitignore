@@ -1,0 +1,21 @@
+# Data directory
+data/
+
+# Build output
+bobot-web
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage.out
+
+# Environment
+mise.local.toml
