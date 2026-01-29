@@ -139,3 +139,56 @@ func TestCoreDB_DeleteExpiredTokens(t *testing.T) {
 		t.Error("valid token should still exist")
 	}
 }
+
+func TestCoreDB_Messages(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("msguser", "hash")
+
+	// Create messages
+	msg1, err := db.CreateMessage(user.ID, "user", "Hello")
+	if err != nil {
+		t.Fatalf("failed to create message: %v", err)
+	}
+	if msg1.Content != "Hello" {
+		t.Errorf("expected content Hello, got %s", msg1.Content)
+	}
+
+	db.CreateMessage(user.ID, "assistant", "Hi there!")
+
+	// Get messages
+	messages, err := db.GetMessages(user.ID, 10)
+	if err != nil {
+		t.Fatalf("failed to get messages: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(messages))
+	}
+
+	// Messages should be in chronological order
+	if messages[0].Role != "user" {
+		t.Error("first message should be from user")
+	}
+	if messages[1].Role != "assistant" {
+		t.Error("second message should be from assistant")
+	}
+}
+
+func TestCoreDB_GetMessagesLimit(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("limituser", "hash")
+
+	for i := 0; i < 5; i++ {
+		db.CreateMessage(user.ID, "user", "msg")
+	}
+
+	messages, _ := db.GetMessages(user.ID, 3)
+	if len(messages) != 3 {
+		t.Errorf("expected 3 messages, got %d", len(messages))
+	}
+}

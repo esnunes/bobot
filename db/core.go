@@ -200,3 +200,73 @@ func (c *CoreDB) DeleteUserRefreshTokens(userID int64) error {
 	_, err := c.db.Exec("DELETE FROM refresh_tokens WHERE user_id = ?", userID)
 	return err
 }
+
+func (c *CoreDB) CreateMessage(userID int64, role, content string) (*Message, error) {
+	result, err := c.db.Exec(
+		"INSERT INTO messages (user_id, role, content) VALUES (?, ?, ?)",
+		userID, role, content,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Message{
+		ID:        id,
+		UserID:    userID,
+		Role:      role,
+		Content:   content,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, user_id, role, content, created_at
+		FROM messages
+		WHERE user_id = ?
+		ORDER BY created_at ASC
+		LIMIT ?
+	`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+func (c *CoreDB) GetRecentMessages(userID int64, limit int) ([]Message, error) {
+	// Get the most recent N messages, but return in chronological order
+	rows, err := c.db.Query(`
+		SELECT id, user_id, role, content, created_at FROM (
+			SELECT id, user_id, role, content, created_at
+			FROM messages
+			WHERE user_id = ?
+			ORDER BY created_at DESC
+			LIMIT ?
+		) ORDER BY created_at ASC
+	`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
