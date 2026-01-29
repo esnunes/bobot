@@ -161,3 +161,28 @@ func TestServer_Refresh_ExpiredToken(t *testing.T) {
 		t.Errorf("expected status 401, got %d", w.Code)
 	}
 }
+
+func TestServer_Logout(t *testing.T) {
+	srv := setupTestServer(t)
+
+	hash, _ := auth.HashPassword("testpass")
+	user, _ := srv.db.CreateUser("testuser", hash)
+	srv.db.CreateRefreshToken(user.ID, "logout-token", time.Now().Add(24*time.Hour))
+
+	body := `{"refresh_token":"logout-token"}`
+	req := httptest.NewRequest("POST", "/api/logout", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	// Token should be deleted
+	_, err := srv.db.GetRefreshToken("logout-token")
+	if err != db.ErrNotFound {
+		t.Error("expected token to be deleted")
+	}
+}

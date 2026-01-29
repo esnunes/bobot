@@ -102,3 +102,16 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		"access_token": accessToken,
 	})
 }
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	var req refreshRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	s.db.DeleteRefreshToken(req.RefreshToken)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
