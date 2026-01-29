@@ -4,6 +4,7 @@ package db
 import (
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestNewCoreDB_CreatesSchema(t *testing.T) {
@@ -72,5 +73,69 @@ func TestCoreDB_UserNotFound(t *testing.T) {
 	_, err := db.GetUserByUsername("nonexistent")
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestCoreDB_RefreshTokens(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("tokenuser", "hash")
+
+	// Create token
+	token, err := db.CreateRefreshToken(user.ID, "token123", time.Now().Add(24*time.Hour))
+	if err != nil {
+		t.Fatalf("failed to create token: %v", err)
+	}
+	if token.Token != "token123" {
+		t.Errorf("expected token token123, got %s", token.Token)
+	}
+
+	// Get token
+	found, err := db.GetRefreshToken("token123")
+	if err != nil {
+		t.Fatalf("failed to get token: %v", err)
+	}
+	if found.UserID != user.ID {
+		t.Errorf("expected user_id %d, got %d", user.ID, found.UserID)
+	}
+
+	// Delete token
+	err = db.DeleteRefreshToken("token123")
+	if err != nil {
+		t.Fatalf("failed to delete token: %v", err)
+	}
+
+	_, err = db.GetRefreshToken("token123")
+	if err != ErrNotFound {
+		t.Error("expected token to be deleted")
+	}
+}
+
+func TestCoreDB_DeleteExpiredTokens(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("expireuser", "hash")
+
+	// Create expired token
+	db.CreateRefreshToken(user.ID, "expired", time.Now().Add(-1*time.Hour))
+	// Create valid token
+	db.CreateRefreshToken(user.ID, "valid", time.Now().Add(1*time.Hour))
+
+	deleted, err := db.DeleteExpiredRefreshTokens()
+	if err != nil {
+		t.Fatalf("failed to delete expired: %v", err)
+	}
+	if deleted != 1 {
+		t.Errorf("expected 1 deleted, got %d", deleted)
+	}
+
+	// Valid token should still exist
+	_, err = db.GetRefreshToken("valid")
+	if err != nil {
+		t.Error("valid token should still exist")
 	}
 }

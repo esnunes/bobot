@@ -147,3 +147,56 @@ func (c *CoreDB) UserCount() (int, error) {
 	err := c.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 	return count, err
 }
+
+func (c *CoreDB) CreateRefreshToken(userID int64, token string, expiresAt time.Time) (*RefreshToken, error) {
+	result, err := c.db.Exec(
+		"INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
+		userID, token, expiresAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &RefreshToken{
+		ID:        id,
+		UserID:    userID,
+		Token:     token,
+		ExpiresAt: expiresAt,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+func (c *CoreDB) GetRefreshToken(token string) (*RefreshToken, error) {
+	var rt RefreshToken
+	err := c.db.QueryRow(
+		"SELECT id, user_id, token, expires_at, created_at FROM refresh_tokens WHERE token = ?",
+		token,
+	).Scan(&rt.ID, &rt.UserID, &rt.Token, &rt.ExpiresAt, &rt.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &rt, nil
+}
+
+func (c *CoreDB) DeleteRefreshToken(token string) error {
+	_, err := c.db.Exec("DELETE FROM refresh_tokens WHERE token = ?", token)
+	return err
+}
+
+func (c *CoreDB) DeleteExpiredRefreshTokens() (int64, error) {
+	result, err := c.db.Exec("DELETE FROM refresh_tokens WHERE expires_at < ?", time.Now())
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+func (c *CoreDB) DeleteUserRefreshTokens(userID int64) error {
+	_, err := c.db.Exec("DELETE FROM refresh_tokens WHERE user_id = ?", userID)
+	return err
+}
