@@ -49,6 +49,9 @@ func (s *JWTService) GenerateAccessToken(userID int64) (string, error) {
 
 func (s *JWTService) ValidateAccessToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, ErrInvalidToken
+		}
 		return s.secret, nil
 	})
 

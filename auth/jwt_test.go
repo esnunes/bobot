@@ -4,6 +4,8 @@ package auth
 import (
 	"testing"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestJWTService_GenerateAccessToken(t *testing.T) {
@@ -62,5 +64,35 @@ func TestJWTService_GenerateRefreshToken(t *testing.T) {
 	token := svc.GenerateRefreshToken()
 	if len(token) < 32 {
 		t.Error("refresh token should be at least 32 chars")
+	}
+}
+
+func TestJWTService_WrongSigningMethod(t *testing.T) {
+	svc := NewJWTService("test-secret-key-32-chars-min!!")
+
+	claims := &Claims{
+		UserID: 123,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	// Test "none" signing method (algorithm confusion attack)
+	tokenNone := jwt.NewWithClaims(jwt.SigningMethodNone, claims)
+	tokenStringNone, _ := tokenNone.SignedString(jwt.UnsafeAllowNoneSignatureType)
+
+	_, err := svc.ValidateAccessToken(tokenStringNone)
+	if err == nil {
+		t.Error("expected error for token with 'none' signing method")
+	}
+
+	// Test HS384 - should reject even though it's HMAC family
+	tokenHS384 := jwt.NewWithClaims(jwt.SigningMethodHS384, claims)
+	tokenStringHS384, _ := tokenHS384.SignedString([]byte("test-secret-key-32-chars-min!!"))
+
+	_, err = svc.ValidateAccessToken(tokenStringHS384)
+	if err == nil {
+		t.Error("expected error for token with HS384 signing method")
 	}
 }
