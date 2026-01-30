@@ -17,6 +17,9 @@ type User struct {
 	ID           int64
 	Username     string
 	PasswordHash string
+	DisplayName  string
+	Role         string // "admin" or "user"
+	Blocked      bool
 	CreatedAt    time.Time
 }
 
@@ -104,6 +107,21 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Migrate: add display_name column
+	if err := c.addColumnIfMissing("users", "display_name", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+
+	// Migrate: add role column
+	if err := c.addColumnIfMissing("users", "role", "TEXT NOT NULL DEFAULT 'user'"); err != nil {
+		return err
+	}
+
+	// Migrate: add blocked column
+	if err := c.addColumnIfMissing("users", "blocked", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
 	// Create indexes after columns exist
 	_, err = c.db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_messages_user_context
@@ -154,16 +172,39 @@ func (c *CoreDB) CreateUser(username, passwordHash string) (*User, error) {
 		ID:           id,
 		Username:     username,
 		PasswordHash: passwordHash,
+		Role:         "user",
+		CreatedAt:    time.Now(),
+	}, nil
+}
+
+func (c *CoreDB) CreateUserFull(username, passwordHash, displayName, role string) (*User, error) {
+	result, err := c.db.Exec(
+		"INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, ?)",
+		username, passwordHash, displayName, role,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &User{
+		ID:           id,
+		Username:     username,
+		PasswordHash: passwordHash,
+		DisplayName:  displayName,
+		Role:         role,
+		Blocked:      false,
 		CreatedAt:    time.Now(),
 	}, nil
 }
 
 func (c *CoreDB) GetUserByUsername(username string) (*User, error) {
 	var user User
+	var blocked int
 	err := c.db.QueryRow(
-		"SELECT id, username, password_hash, created_at FROM users WHERE username = ?",
+		"SELECT id, username, password_hash, display_name, role, blocked, created_at FROM users WHERE username = ?",
 		username,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -171,15 +212,17 @@ func (c *CoreDB) GetUserByUsername(username string) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	user.Blocked = blocked == 1
 	return &user, nil
 }
 
 func (c *CoreDB) GetUserByID(id int64) (*User, error) {
 	var user User
+	var blocked int
 	err := c.db.QueryRow(
-		"SELECT id, username, password_hash, created_at FROM users WHERE id = ?",
+		"SELECT id, username, password_hash, display_name, role, blocked, created_at FROM users WHERE id = ?",
 		id,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -187,6 +230,7 @@ func (c *CoreDB) GetUserByID(id int64) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	user.Blocked = blocked == 1
 	return &user, nil
 }
 

@@ -498,3 +498,24 @@ func TestCoreDB_GetRecentMessagesIncludesTokens(t *testing.T) {
 		t.Errorf("expected tokens=2, got %d", messages[0].Tokens)
 	}
 }
+
+func TestCoreDB_CreateUserWithRole(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, err := db.CreateUserFull("testuser", "hashedpass", "Test User", "admin")
+	if err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	if user.DisplayName != "Test User" {
+		t.Errorf("expected display name 'Test User', got %s", user.DisplayName)
+	}
+	if user.Role != "admin" {
+		t.Errorf("expected role 'admin', got %s", user.Role)
+	}
+	if user.Blocked {
+		t.Error("expected user not blocked")
+	}
+}
