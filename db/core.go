@@ -318,3 +318,83 @@ func (c *CoreDB) GetRecentMessages(userID int64, limit int) ([]Message, error) {
 	}
 	return messages, rows.Err()
 }
+
+func (c *CoreDB) CreateMessageWithContextThreshold(userID int64, role, content string, tokensStart, tokensMax int) (*Message, error) {
+	tokens := len(content) / 4
+
+	// Get the latest message's context state
+	var prevContextTokens, prevTokens int
+	err := c.db.QueryRow(`
+		SELECT tokens, context_tokens FROM messages
+		WHERE user_id = ? ORDER BY id DESC LIMIT 1
+	`, userID).Scan(&prevTokens, &prevContextTokens)
+
+	var contextTokens int
+	if err == sql.ErrNoRows {
+		// First message - starts a new chunk
+		contextTokens = 0
+	} else if err != nil {
+		return nil, err
+	} else {
+		// Calculate what context_tokens would be
+		contextTokens = prevContextTokens + prevTokens + tokens
+
+		// Check if we need to reset the chunk
+		if contextTokens > tokensMax {
+			targetThreshold := tokensMax - tokensStart
+
+			// Find the new chunk start
+			var newChunkStartID int64
+			var subtractValue int
+			err := c.db.QueryRow(`
+				SELECT id, context_tokens FROM messages
+				WHERE user_id = ? AND context_tokens < ?
+				ORDER BY id DESC LIMIT 1
+			`, userID, targetThreshold).Scan(&newChunkStartID, &subtractValue)
+
+			if err != nil && err != sql.ErrNoRows {
+				return nil, err
+			}
+
+			if err == nil {
+				// Slide the window
+				_, err = c.db.Exec(`
+					UPDATE messages SET context_tokens = context_tokens - ?
+					WHERE user_id = ? AND id >= ?
+				`, subtractValue, userID, newChunkStartID)
+				if err != nil {
+					return nil, err
+				}
+
+				// Recalculate contextTokens based on updated values
+				err = c.db.QueryRow(`
+					SELECT tokens, context_tokens FROM messages
+					WHERE user_id = ? ORDER BY id DESC LIMIT 1
+				`, userID).Scan(&prevTokens, &prevContextTokens)
+				if err != nil {
+					return nil, err
+				}
+				contextTokens = prevContextTokens + prevTokens + tokens
+			}
+		}
+	}
+
+	result, err := c.db.Exec(
+		"INSERT INTO messages (user_id, role, content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?)",
+		userID, role, content, tokens, contextTokens,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Message{
+		ID:            id,
+		UserID:        userID,
+		Role:          role,
+		Content:       content,
+		Tokens:        tokens,
+		ContextTokens: contextTokens,
+		CreatedAt:     time.Now(),
+	}, nil
+}
