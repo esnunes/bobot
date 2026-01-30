@@ -139,10 +139,16 @@ class ChatClient {
         this.ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             // Handle both user and assistant messages from broadcast
-            if (data.role === 'assistant') {
+            if (data.role === 'assistant' || data.role === 'system') {
                 this.removeTypingIndicator();
             }
-            this.addMessage(data.content, data.role);
+            // Show typing indicator after user message is displayed
+            if (data.role === 'user') {
+                this.addMessage(data.content, data.role);
+                this.showTypingIndicator();
+            } else {
+                this.addMessage(data.content, data.role);
+            }
             this.updateLastSeenTimestamp(new Date().toISOString());
         };
 
@@ -224,7 +230,7 @@ class ChatClient {
 
         // Don't add message locally - wait for server broadcast
         // This ensures consistency across all devices
-        this.showTypingIndicator();
+        // Typing indicator is shown after user message is displayed in onmessage
         this.ws.send(JSON.stringify({content: content}));
         this.input.value = '';
     }
