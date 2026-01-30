@@ -159,7 +159,20 @@ func TestChatWebSocket_SlashCommand(t *testing.T) {
 
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-	// Should receive system response with user list
+	// First: user message echo
+	var userResp map[string]string
+	err = conn.ReadJSON(&userResp)
+	if err != nil {
+		t.Fatalf("failed to read user message echo: %v", err)
+	}
+	if userResp["role"] != "user" {
+		t.Errorf("expected role 'user', got '%s'", userResp["role"])
+	}
+	if userResp["content"] != "/user list" {
+		t.Errorf("expected content '/user list', got '%s'", userResp["content"])
+	}
+
+	// Second: system response with user list
 	var resp map[string]string
 	err = conn.ReadJSON(&resp)
 	if err != nil {

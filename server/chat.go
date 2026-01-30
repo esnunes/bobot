@@ -68,6 +68,13 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 
 		// Check for slash commands
 		if response, handled := s.handleSlashCommand(ctx, msg.Content); handled {
+			// Broadcast user message first
+			userMsgJSON, _ := json.Marshal(map[string]interface{}{
+				"role":    "user",
+				"content": msg.Content,
+			})
+			s.connections.Broadcast(claims.UserID, userMsgJSON)
+
 			// Broadcast command response
 			respJSON, _ := json.Marshal(map[string]interface{}{
 				"role":    "system",
