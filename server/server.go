@@ -84,8 +84,10 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		ctx := auth.ContextWithUserID(r.Context(), claims.UserID)
-		ctx = auth.ContextWithRole(ctx, claims.Role)
+		ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
+			UserID: claims.UserID,
+			Role:   claims.Role,
+		})
 		next(w, r.WithContext(ctx))
 	}
 }

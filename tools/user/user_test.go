@@ -26,9 +26,10 @@ func TestUserTool_InviteCommand(t *testing.T) {
 	admin, _ := coreDB.CreateUserFull("admin", "hash", "Admin", "admin")
 	tool := NewUserTool(coreDB, "http://localhost:8080")
 
-	ctx := context.Background()
-	ctx = auth.ContextWithUserID(ctx, admin.ID)
-	ctx = auth.ContextWithRole(ctx, "admin")
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{
+		UserID: admin.ID,
+		Role:   "admin",
+	})
 
 	result, err := tool.Execute(ctx, map[string]interface{}{
 		"command": "invite",
@@ -50,9 +51,10 @@ func TestUserTool_BlockCommand(t *testing.T) {
 	user, _ := coreDB.CreateUserFull("victim", "hash", "Victim", "user")
 	tool := NewUserTool(coreDB, "http://localhost:8080")
 
-	ctx := context.Background()
-	ctx = auth.ContextWithUserID(ctx, admin.ID)
-	ctx = auth.ContextWithRole(ctx, "admin")
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{
+		UserID: admin.ID,
+		Role:   "admin",
+	})
 
 	result, err := tool.Execute(ctx, map[string]interface{}{
 		"command":  "block",
@@ -80,9 +82,10 @@ func TestUserTool_NonAdminDenied(t *testing.T) {
 	user, _ := coreDB.CreateUserFull("user", "hash", "User", "user")
 	tool := NewUserTool(coreDB, "http://localhost:8080")
 
-	ctx := context.Background()
-	ctx = auth.ContextWithUserID(ctx, user.ID)
-	ctx = auth.ContextWithRole(ctx, "user")
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{
+		UserID: user.ID,
+		Role:   "user",
+	})
 
 	_, err := tool.Execute(ctx, map[string]interface{}{
 		"command": "list",
@@ -102,9 +105,10 @@ func TestUserTool_CannotBlockSelf(t *testing.T) {
 	admin, _ := coreDB.CreateUserFull("admin", "hash", "Admin", "admin")
 	tool := NewUserTool(coreDB, "http://localhost:8080")
 
-	ctx := context.Background()
-	ctx = auth.ContextWithUserID(ctx, admin.ID)
-	ctx = auth.ContextWithRole(ctx, "admin")
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{
+		UserID: admin.ID,
+		Role:   "admin",
+	})
 
 	_, err := tool.Execute(ctx, map[string]interface{}{
 		"command":  "block",
@@ -123,9 +127,10 @@ func TestUserTool_ListCommand(t *testing.T) {
 	coreDB.CreateUserFull("user1", "hash", "User One", "user")
 	tool := NewUserTool(coreDB, "http://localhost:8080")
 
-	ctx := context.Background()
-	ctx = auth.ContextWithUserID(ctx, admin.ID)
-	ctx = auth.ContextWithRole(ctx, "admin")
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{
+		UserID: admin.ID,
+		Role:   "admin",
+	})
 
 	result, err := tool.Execute(ctx, map[string]interface{}{
 		"command": "list",
@@ -148,9 +153,10 @@ func TestUserTool_UnblockCommand(t *testing.T) {
 	coreDB.BlockUser(user.ID)
 	tool := NewUserTool(coreDB, "http://localhost:8080")
 
-	ctx := context.Background()
-	ctx = auth.ContextWithUserID(ctx, admin.ID)
-	ctx = auth.ContextWithRole(ctx, "admin")
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{
+		UserID: admin.ID,
+		Role:   "admin",
+	})
 
 	result, err := tool.Execute(ctx, map[string]interface{}{
 		"command":  "unblock",
@@ -180,9 +186,10 @@ func TestUserTool_InvitesCommand(t *testing.T) {
 	coreDB.CreateInvite(admin.ID, "invite2")
 	tool := NewUserTool(coreDB, "http://localhost:8080")
 
-	ctx := context.Background()
-	ctx = auth.ContextWithUserID(ctx, admin.ID)
-	ctx = auth.ContextWithRole(ctx, "admin")
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{
+		UserID: admin.ID,
+		Role:   "admin",
+	})
 
 	result, err := tool.Execute(ctx, map[string]interface{}{
 		"command": "invites",
@@ -204,9 +211,10 @@ func TestUserTool_RevokeCommand(t *testing.T) {
 	coreDB.CreateInvite(admin.ID, "torevoke")
 	tool := NewUserTool(coreDB, "http://localhost:8080")
 
-	ctx := context.Background()
-	ctx = auth.ContextWithUserID(ctx, admin.ID)
-	ctx = auth.ContextWithRole(ctx, "admin")
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{
+		UserID: admin.ID,
+		Role:   "admin",
+	})
 
 	result, err := tool.Execute(ctx, map[string]interface{}{
 		"command": "revoke",

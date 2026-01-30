@@ -47,7 +47,7 @@ func TestEngine_Chat_SimpleResponse(t *testing.T) {
 	mockCtxProvider := &mockContextProvider{messages: nil}
 	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider)
 
-	ctx := auth.ContextWithUserID(context.Background(), 1)
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	result, err := engine.Chat(ctx, "Hi")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -76,7 +76,7 @@ func TestEngine_Chat_WithToolUse(t *testing.T) {
 	mockCtxProvider := &mockContextProvider{messages: nil}
 	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider)
 
-	ctx := auth.ContextWithUserID(context.Background(), 1)
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	result, err := engine.Chat(ctx, "What's on my list?")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -124,7 +124,7 @@ func TestEngine_ChatWithContext(t *testing.T) {
 	registry := tools.NewRegistry()
 	engine := NewEngine(mockProv, registry, nil, mockCtxProvider)
 
-	ctx := auth.ContextWithUserID(context.Background(), 1)
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	_, err := engine.Chat(ctx, "new question")
 	if err != nil {
 		t.Fatalf("chat failed: %v", err)

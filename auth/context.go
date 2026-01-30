@@ -3,34 +3,33 @@ package auth
 
 import "context"
 
-type contextKey string
+type userDataKey struct{}
 
-const userIDKey contextKey = "user_id"
+type UserData struct {
+	UserID int64
+	Role   string
+}
 
-// ContextWithUserID returns a new context with the user ID stored.
-func ContextWithUserID(ctx context.Context, userID int64) context.Context {
-	return context.WithValue(ctx, userIDKey, userID)
+// ContextWithUserData returns a new context with the user data stored.
+func ContextWithUserData(ctx context.Context, data UserData) context.Context {
+	return context.WithValue(ctx, userDataKey{}, data)
+}
+
+// UserDataFromContext extracts the user data from the context.
+// Returns zero values if no user data is present.
+func UserDataFromContext(ctx context.Context) UserData {
+	data, _ := ctx.Value(userDataKey{}).(UserData)
+	return data
 }
 
 // UserIDFromContext extracts the user ID from the context.
-// Returns 0 if no user ID is present.
+// Returns 0 if no user data is present.
 func UserIDFromContext(ctx context.Context) int64 {
-	if id, ok := ctx.Value(userIDKey).(int64); ok {
-		return id
-	}
-	return 0
-}
-
-type roleKey struct{}
-
-// ContextWithRole returns a new context with the role stored.
-func ContextWithRole(ctx context.Context, role string) context.Context {
-	return context.WithValue(ctx, roleKey{}, role)
+	return UserDataFromContext(ctx).UserID
 }
 
 // RoleFromContext extracts the role from the context.
-// Returns empty string if no role is present.
+// Returns empty string if no user data is present.
 func RoleFromContext(ctx context.Context) string {
-	role, _ := ctx.Value(roleKey{}).(string)
-	return role
+	return UserDataFromContext(ctx).Role
 }
