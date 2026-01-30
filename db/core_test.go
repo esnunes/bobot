@@ -629,3 +629,59 @@ func TestCoreDB_GetPendingInvites(t *testing.T) {
 		t.Errorf("expected 2 pending invites, got %d", len(invites))
 	}
 }
+
+func TestCoreDB_BlockUser(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUserFull("blockme", "hash", "Block Me", "user")
+
+	err := db.BlockUser(user.ID)
+	if err != nil {
+		t.Fatalf("failed to block user: %v", err)
+	}
+
+	updated, _ := db.GetUserByID(user.ID)
+	if !updated.Blocked {
+		t.Error("expected user to be blocked")
+	}
+}
+
+func TestCoreDB_UnblockUser(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUserFull("unblockme", "hash", "Unblock Me", "user")
+	db.BlockUser(user.ID)
+
+	err := db.UnblockUser(user.ID)
+	if err != nil {
+		t.Fatalf("failed to unblock user: %v", err)
+	}
+
+	updated, _ := db.GetUserByID(user.ID)
+	if updated.Blocked {
+		t.Error("expected user to be unblocked")
+	}
+}
+
+func TestCoreDB_ListUsers(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	db.CreateUserFull("admin", "hash", "Admin User", "admin")
+	db.CreateUserFull("user1", "hash", "User One", "user")
+	db.CreateUserFull("user2", "hash", "User Two", "user")
+
+	users, err := db.ListUsers()
+	if err != nil {
+		t.Fatalf("failed to list users: %v", err)
+	}
+
+	if len(users) != 3 {
+		t.Errorf("expected 3 users, got %d", len(users))
+	}
+}

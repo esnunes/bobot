@@ -700,3 +700,37 @@ func (c *CoreDB) GetPendingInvites() ([]Invite, error) {
 	}
 	return invites, rows.Err()
 }
+
+func (c *CoreDB) BlockUser(userID int64) error {
+	_, err := c.db.Exec("UPDATE users SET blocked = 1 WHERE id = ?", userID)
+	return err
+}
+
+func (c *CoreDB) UnblockUser(userID int64) error {
+	_, err := c.db.Exec("UPDATE users SET blocked = 0 WHERE id = ?", userID)
+	return err
+}
+
+func (c *CoreDB) ListUsers() ([]User, error) {
+	rows, err := c.db.Query(`
+		SELECT id, username, password_hash, display_name, role, blocked, created_at
+		FROM users
+		ORDER BY created_at ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		var blocked int
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &blocked, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		u.Blocked = blocked == 1
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
