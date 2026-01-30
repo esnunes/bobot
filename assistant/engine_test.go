@@ -43,7 +43,8 @@ func TestEngine_Chat_SimpleResponse(t *testing.T) {
 	}
 
 	registry := tools.NewRegistry()
-	engine := NewEngine(mockProvider, registry, nil)
+	mockCtxProvider := &mockContextProvider{messages: nil}
+	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider)
 
 	ctx := auth.ContextWithUserID(context.Background(), 1)
 	result, err := engine.Chat(ctx, "Hi")
@@ -71,7 +72,8 @@ func TestEngine_Chat_WithToolUse(t *testing.T) {
 	registry := tools.NewRegistry()
 	registry.Register(&mockTool{result: "Tasks: milk, eggs"})
 
-	engine := NewEngine(mockProvider, registry, nil)
+	mockCtxProvider := &mockContextProvider{messages: nil}
+	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider)
 
 	ctx := auth.ContextWithUserID(context.Background(), 1)
 	result, err := engine.Chat(ctx, "What's on my list?")
@@ -118,7 +120,8 @@ func TestEngine_ChatWithContext(t *testing.T) {
 		},
 	}
 
-	engine := NewEngineWithContext(mockProv, nil, nil, mockCtxProvider)
+	registry := tools.NewRegistry()
+	engine := NewEngine(mockProv, registry, nil, mockCtxProvider)
 
 	ctx := auth.ContextWithUserID(context.Background(), 1)
 	_, err := engine.Chat(ctx, "new question")

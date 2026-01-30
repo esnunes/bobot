@@ -25,6 +25,12 @@ func (m *mockLLMProvider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.
 	return &llm.ChatResponse{Content: "Hello from assistant!", StopType: "end_turn"}, nil
 }
 
+type mockContextProvider struct{}
+
+func (m *mockContextProvider) GetContextMessages(userID int64) ([]assistant.ContextMessage, error) {
+	return nil, nil
+}
+
 func setupChatTestServer(t *testing.T) (*Server, string) {
 	tmpDir := t.TempDir()
 	coreDB, _ := db.NewCoreDB(tmpDir + "/core.db")
@@ -35,7 +41,7 @@ func setupChatTestServer(t *testing.T) (*Server, string) {
 	}
 
 	registry := tools.NewRegistry()
-	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil)
+	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{})
 
 	srv := NewWithAssistant(cfg, coreDB, jwtSvc, engine)
 

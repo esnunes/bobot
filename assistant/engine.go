@@ -28,15 +28,7 @@ type Engine struct {
 	contextProvider ContextProvider
 }
 
-func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill) *Engine {
-	return &Engine{
-		provider: provider,
-		registry: registry,
-		skills:   skills,
-	}
-}
-
-func NewEngineWithContext(provider llm.Provider, registry *tools.Registry, skills []Skill, contextProvider ContextProvider) *Engine {
+func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill, contextProvider ContextProvider) *Engine {
 	return &Engine{
 		provider:        provider,
 		registry:        registry,
@@ -49,28 +41,21 @@ func NewEngineWithContext(provider llm.Provider, registry *tools.Registry, skill
 // The context must contain the user ID (set by auth middleware).
 func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 	// Build system prompt
-	var llmTools []llm.Tool
-	if e.registry != nil {
-		llmTools = e.registry.ToLLMTools()
-	}
+	llmTools := e.registry.ToLLMTools()
 	systemPrompt := BuildSystemPrompt(e.skills, llmTools)
 
 	// Build messages with context
 	var messages []llm.Message
 
-	// Get context messages if provider is set
-	if e.contextProvider != nil {
-		userID := auth.UserIDFromContext(ctx)
-		if userID != 0 {
-			contextMsgs, err := e.contextProvider.GetContextMessages(userID)
-			if err == nil {
-				for _, cm := range contextMsgs {
-					messages = append(messages, llm.Message{
-						Role:    cm.Role,
-						Content: cm.Content,
-					})
-				}
-			}
+	// Get context messages
+	userID := auth.UserIDFromContext(ctx)
+	contextMsgs, err := e.contextProvider.GetContextMessages(userID)
+	if err == nil {
+		for _, cm := range contextMsgs {
+			messages = append(messages, llm.Message{
+				Role:    cm.Role,
+				Content: cm.Content,
+			})
 		}
 	}
 
