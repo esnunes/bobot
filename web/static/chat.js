@@ -7,20 +7,123 @@ class ChatClient {
         this.menuBtn = document.getElementById('menu-btn');
         this.menuOverlay = document.getElementById('menu-overlay');
         this.logoutBtn = document.getElementById('logout-btn');
+        this.isLoadingHistory = false;
+        this.oldestMessageId = null;
+        this.hasMoreHistory = true;
 
         this.init();
     }
 
-    init() {
-        // Check auth
+    async init() {
         const token = localStorage.getItem('access_token');
         if (!token) {
             window.location.href = '/';
             return;
         }
 
+        // Load initial messages
+        await this.loadRecentMessages(token);
+
+        // Sync any missed messages
+        await this.syncMessages(token);
+
+        // Connect WebSocket
         this.connect(token);
         this.setupEventListeners();
+    }
+
+    async loadRecentMessages(token) {
+        try {
+            const resp = await fetch('/api/messages/recent?limit=50', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!resp.ok) {
+                if (resp.status === 401) {
+                    this.logout();
+                    return;
+                }
+                throw new Error('Failed to load messages');
+            }
+
+            const messages = await resp.json();
+            if (messages && messages.length > 0) {
+                messages.forEach(msg => this.addMessage(msg.Content, msg.Role, msg.ID, false));
+                this.oldestMessageId = messages[0].ID;
+                this.updateLastSeenTimestamp(messages[messages.length - 1].CreatedAt);
+            }
+            this.scrollToBottom();
+        } catch (err) {
+            console.error('Failed to load messages:', err);
+        }
+    }
+
+    async loadMoreHistory() {
+        if (this.isLoadingHistory || !this.hasMoreHistory || !this.oldestMessageId) {
+            return;
+        }
+
+        this.isLoadingHistory = true;
+        const token = localStorage.getItem('access_token');
+
+        try {
+            const resp = await fetch(`/api/messages/history?before=${this.oldestMessageId}&limit=50`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!resp.ok) throw new Error('Failed to load history');
+
+            const messages = await resp.json();
+            if (messages && messages.length > 0) {
+                // Remember scroll position
+                const scrollHeight = this.messagesEl.scrollHeight;
+                const scrollTop = this.messagesEl.scrollTop;
+
+                // Prepend messages (they come in DESC order, so reverse for display)
+                messages.reverse().forEach(msg => this.prependMessage(msg.Content, msg.Role, msg.ID));
+                this.oldestMessageId = messages[0].ID;
+
+                // Restore scroll position
+                this.messagesEl.scrollTop = this.messagesEl.scrollHeight - scrollHeight + scrollTop;
+            } else {
+                this.hasMoreHistory = false;
+            }
+        } catch (err) {
+            console.error('Failed to load history:', err);
+        } finally {
+            this.isLoadingHistory = false;
+        }
+    }
+
+    async syncMessages(token) {
+        const lastSeen = localStorage.getItem('lastMessageTimestamp');
+        if (!lastSeen) return;
+
+        try {
+            const resp = await fetch(`/api/messages/sync?since=${encodeURIComponent(lastSeen)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!resp.ok) return;
+
+            const messages = await resp.json();
+            if (messages && messages.length > 0) {
+                messages.forEach(msg => {
+                    // Only add if not already displayed
+                    if (!document.querySelector(`[data-message-id="${msg.ID}"]`)) {
+                        this.addMessage(msg.Content, msg.Role, msg.ID, false);
+                    }
+                });
+                this.updateLastSeenTimestamp(messages[messages.length - 1].CreatedAt);
+                this.scrollToBottom();
+            }
+        } catch (err) {
+            console.error('Sync failed:', err);
+        }
+    }
+
+    updateLastSeenTimestamp(timestamp) {
+        localStorage.setItem('lastMessageTimestamp', timestamp);
     }
 
     connect(token) {
@@ -37,11 +140,11 @@ class ChatClient {
             const data = JSON.parse(event.data);
             this.removeTypingIndicator();
             this.addMessage(data.content, 'assistant');
+            this.updateLastSeenTimestamp(new Date().toISOString());
         };
 
         this.ws.onclose = () => {
             console.log('WebSocket disconnected');
-            // Try to refresh token and reconnect
             this.refreshAndReconnect();
         };
 
@@ -71,6 +174,9 @@ class ChatClient {
             const data = await resp.json();
             localStorage.setItem('access_token', data.access_token);
 
+            // Sync messages before reconnecting
+            await this.syncMessages(data.access_token);
+
             // Reconnect with new token
             setTimeout(() => this.connect(data.access_token), 1000);
         } catch (err) {
@@ -98,6 +204,13 @@ class ChatClient {
         this.logoutBtn.addEventListener('click', () => {
             this.logout();
         });
+
+        // Infinite scroll - load more when scrolling near top
+        this.messagesEl.addEventListener('scroll', () => {
+            if (this.messagesEl.scrollTop < 100) {
+                this.loadMoreHistory();
+            }
+        });
     }
 
     sendMessage() {
@@ -106,25 +219,34 @@ class ChatClient {
             return;
         }
 
-        // Add user message to UI
         this.addMessage(content, 'user');
-
-        // Show typing indicator
+        this.updateLastSeenTimestamp(new Date().toISOString());
         this.showTypingIndicator();
-
-        // Send to server
         this.ws.send(JSON.stringify({content: content}));
-
-        // Clear input
         this.input.value = '';
     }
 
-    addMessage(content, role) {
+    addMessage(content, role, id = null, scroll = true) {
         const msgEl = document.createElement('div');
         msgEl.className = `message ${role}`;
         msgEl.textContent = content;
+        if (id) {
+            msgEl.setAttribute('data-message-id', id);
+        }
         this.messagesEl.appendChild(msgEl);
-        this.scrollToBottom();
+        if (scroll) {
+            this.scrollToBottom();
+        }
+    }
+
+    prependMessage(content, role, id = null) {
+        const msgEl = document.createElement('div');
+        msgEl.className = `message ${role}`;
+        msgEl.textContent = content;
+        if (id) {
+            msgEl.setAttribute('data-message-id', id);
+        }
+        this.messagesEl.insertBefore(msgEl, this.messagesEl.firstChild);
     }
 
     showTypingIndicator() {
@@ -163,11 +285,11 @@ class ChatClient {
 
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        localStorage.removeItem('lastMessageTimestamp');
         window.location.href = '/';
     }
 }
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     new ChatClient();
 });
