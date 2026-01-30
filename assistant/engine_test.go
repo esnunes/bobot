@@ -43,7 +43,8 @@ func TestEngine_Chat_SimpleResponse(t *testing.T) {
 	}
 
 	registry := tools.NewRegistry()
-	engine := NewEngine(mockProvider, registry, nil)
+	mockCtxProvider := &mockContextProvider{messages: nil}
+	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider)
 
 	ctx := auth.ContextWithUserID(context.Background(), 1)
 	result, err := engine.Chat(ctx, "Hi")
@@ -71,7 +72,8 @@ func TestEngine_Chat_WithToolUse(t *testing.T) {
 	registry := tools.NewRegistry()
 	registry.Register(&mockTool{result: "Tasks: milk, eggs"})
 
-	engine := NewEngine(mockProvider, registry, nil)
+	mockCtxProvider := &mockContextProvider{messages: nil}
+	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider)
 
 	ctx := auth.ContextWithUserID(context.Background(), 1)
 	result, err := engine.Chat(ctx, "What's on my list?")
@@ -80,5 +82,60 @@ func TestEngine_Chat_WithToolUse(t *testing.T) {
 	}
 	if result != "Here are your tasks: milk, eggs" {
 		t.Errorf("unexpected result: %s", result)
+	}
+}
+
+// mockProvider with custom chatFunc for flexible testing
+type mockProvider struct {
+	chatFunc func(ctx context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error)
+}
+
+func (m *mockProvider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+	return m.chatFunc(ctx, req)
+}
+
+type mockContextProvider struct {
+	messages []ContextMessage
+}
+
+func (m *mockContextProvider) GetContextMessages(userID int64) ([]ContextMessage, error) {
+	return m.messages, nil
+}
+
+func TestEngine_ChatWithContext(t *testing.T) {
+	// Create a mock provider that captures the messages sent
+	var capturedMessages []llm.Message
+	mockProv := &mockProvider{
+		chatFunc: func(ctx context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedMessages = req.Messages
+			return &llm.ChatResponse{Content: "response"}, nil
+		},
+	}
+
+	// Create mock context provider with context messages
+	mockCtxProvider := &mockContextProvider{
+		messages: []ContextMessage{
+			{Role: "user", Content: "previous question"},
+			{Role: "assistant", Content: "previous answer"},
+		},
+	}
+
+	registry := tools.NewRegistry()
+	engine := NewEngine(mockProv, registry, nil, mockCtxProvider)
+
+	ctx := auth.ContextWithUserID(context.Background(), 1)
+	_, err := engine.Chat(ctx, "new question")
+	if err != nil {
+		t.Fatalf("chat failed: %v", err)
+	}
+
+	// Should have 3 messages: 2 from context + 1 new
+	if len(capturedMessages) != 3 {
+		t.Errorf("expected 3 messages, got %d", len(capturedMessages))
+	}
+
+	// Last message should be the new question
+	if capturedMessages[2].Content != "new question" {
+		t.Errorf("expected last message to be 'new question', got %v", capturedMessages[2].Content)
 	}
 }

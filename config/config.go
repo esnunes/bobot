@@ -5,12 +5,16 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"time"
 )
 
 type Config struct {
 	Server   ServerConfig
 	LLM      LLMConfig
 	JWT      JWTConfig
+	Context  ContextConfig
+	History  HistoryConfig
+	Sync     SyncConfig
 	DataDir  string
 	InitUser string
 	InitPass string
@@ -31,6 +35,20 @@ type JWTConfig struct {
 	Secret string
 }
 
+type ContextConfig struct {
+	TokensStart int
+	TokensMax   int
+}
+
+type HistoryConfig struct {
+	DefaultLimit int
+	MaxLimit     int
+}
+
+type SyncConfig struct {
+	MaxLookback time.Duration
+}
+
 func Load() (*Config, error) {
 	cfg := &Config{
 		Server: ServerConfig{
@@ -44,6 +62,17 @@ func Load() (*Config, error) {
 		},
 		JWT: JWTConfig{
 			Secret: os.Getenv("BOBOT_JWT_SECRET"),
+		},
+		Context: ContextConfig{
+			TokensStart: getEnvIntOrDefault("BOBOT_CONTEXT_TOKENS_START", 30000),
+			TokensMax:   getEnvIntOrDefault("BOBOT_CONTEXT_TOKENS_MAX", 80000),
+		},
+		History: HistoryConfig{
+			DefaultLimit: getEnvIntOrDefault("BOBOT_HISTORY_DEFAULT_LIMIT", 50),
+			MaxLimit:     getEnvIntOrDefault("BOBOT_HISTORY_MAX_LIMIT", 100),
+		},
+		Sync: SyncConfig{
+			MaxLookback: getEnvDurationOrDefault("BOBOT_SYNC_MAX_LOOKBACK", 24*time.Hour),
 		},
 		DataDir:  getEnvOrDefault("BOBOT_DATA_DIR", "./data"),
 		InitUser: os.Getenv("BOBOT_INIT_USER"),
@@ -84,6 +113,15 @@ func getEnvIntOrDefault(key string, defaultVal int) int {
 	if val := os.Getenv(key); val != "" {
 		if i, err := strconv.Atoi(val); err == nil {
 			return i
+		}
+	}
+	return defaultVal
+}
+
+func getEnvDurationOrDefault(key string, defaultVal time.Duration) time.Duration {
+	if val := os.Getenv(key); val != "" {
+		if d, err := time.ParseDuration(val); err == nil {
+			return d
 		}
 	}
 	return defaultVal

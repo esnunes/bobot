@@ -25,6 +25,12 @@ func (m *mockLLMProvider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.
 	return &llm.ChatResponse{Content: "Hello from assistant!", StopType: "end_turn"}, nil
 }
 
+type mockContextProvider struct{}
+
+func (m *mockContextProvider) GetContextMessages(userID int64) ([]assistant.ContextMessage, error) {
+	return nil, nil
+}
+
 func setupChatTestServer(t *testing.T) (*Server, string) {
 	tmpDir := t.TempDir()
 	coreDB, _ := db.NewCoreDB(tmpDir + "/core.db")
@@ -35,7 +41,7 @@ func setupChatTestServer(t *testing.T) (*Server, string) {
 	}
 
 	registry := tools.NewRegistry()
-	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil)
+	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{})
 
 	srv := NewWithAssistant(cfg, coreDB, jwtSvc, engine)
 
@@ -88,15 +94,25 @@ func TestChatWebSocket_SendMessage(t *testing.T) {
 		t.Fatalf("failed to send message: %v", err)
 	}
 
-	// Read response
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	var resp map[string]string
-	err = conn.ReadJSON(&resp)
+
+	// First broadcast: user message echo
+	var userResp map[string]string
+	err = conn.ReadJSON(&userResp)
 	if err != nil {
-		t.Fatalf("failed to read response: %v", err)
+		t.Fatalf("failed to read user message echo: %v", err)
+	}
+	if userResp["role"] != "user" || userResp["content"] != "Hello" {
+		t.Errorf("unexpected user echo: %v", userResp)
 	}
 
-	if resp["content"] != "Hello from assistant!" {
-		t.Errorf("unexpected response: %s", resp["content"])
+	// Second broadcast: assistant response
+	var assistantResp map[string]string
+	err = conn.ReadJSON(&assistantResp)
+	if err != nil {
+		t.Fatalf("failed to read assistant response: %v", err)
+	}
+	if assistantResp["role"] != "assistant" || assistantResp["content"] != "Hello from assistant!" {
+		t.Errorf("unexpected assistant response: %v", assistantResp)
 	}
 }

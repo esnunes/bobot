@@ -2,9 +2,14 @@
 package db
 
 import (
+	"database/sql"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestNewCoreDB_CreatesSchema(t *testing.T) {
@@ -28,6 +33,79 @@ func TestNewCoreDB_CreatesSchema(t *testing.T) {
 		if err != nil {
 			t.Errorf("table %s not found: %v", table, err)
 		}
+	}
+}
+
+func TestCoreDB_MigratesExistingDatabase(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "core.db")
+
+	// Create a database with old schema (without tokens/context_tokens columns)
+	rawDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("failed to create raw db: %v", err)
+	}
+
+	oldSchema := `
+	CREATE TABLE users (
+		id INTEGER PRIMARY KEY,
+		username TEXT UNIQUE NOT NULL,
+		password_hash TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE refresh_tokens (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		token TEXT UNIQUE NOT NULL,
+		expires_at DATETIME NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE messages (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		role TEXT NOT NULL,
+		content TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	`
+	_, err = rawDB.Exec(oldSchema)
+	if err != nil {
+		t.Fatalf("failed to create old schema: %v", err)
+	}
+
+	// Insert a test message with old schema
+	_, err = rawDB.Exec(`INSERT INTO users (username, password_hash) VALUES ('testuser', 'hash')`)
+	if err != nil {
+		t.Fatalf("failed to insert user: %v", err)
+	}
+	_, err = rawDB.Exec(`INSERT INTO messages (user_id, role, content) VALUES (1, 'user', 'hello')`)
+	if err != nil {
+		t.Fatalf("failed to insert message: %v", err)
+	}
+	rawDB.Close()
+
+	// Now open with NewCoreDB which should migrate
+	db, err := NewCoreDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open db with migration: %v", err)
+	}
+	defer db.Close()
+
+	// Verify the new columns exist by selecting them
+	var tokens, contextTokens int
+	err = db.db.QueryRow(`SELECT tokens, context_tokens FROM messages WHERE id = 1`).Scan(&tokens, &contextTokens)
+	if err != nil {
+		t.Fatalf("failed to select new columns: %v", err)
+	}
+
+	// Old messages should have default values
+	if tokens != 0 {
+		t.Errorf("expected tokens=0 for migrated row, got %d", tokens)
+	}
+	if contextTokens != 0 {
+		t.Errorf("expected context_tokens=0 for migrated row, got %d", contextTokens)
 	}
 }
 
@@ -190,5 +268,233 @@ func TestCoreDB_GetMessagesLimit(t *testing.T) {
 	messages, _ := db.GetMessages(user.ID, 3)
 	if len(messages) != 3 {
 		t.Errorf("expected 3 messages, got %d", len(messages))
+	}
+}
+
+func TestCoreDB_MessageTokenColumns(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	// Check that tokens and context_tokens columns exist
+	var tokens, contextTokens int
+	err := db.db.QueryRow(`
+		SELECT tokens, context_tokens FROM messages LIMIT 1
+	`).Scan(&tokens, &contextTokens)
+
+	// Should get no rows error, not column missing error
+	if err != nil && err.Error() != "sql: no rows in result set" {
+		t.Errorf("expected no rows error or success, got: %v", err)
+	}
+}
+
+func TestCoreDB_CreateMessageWithTokens(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("tokenuser", "hash")
+
+	// First message starts a chunk (context_tokens = 0)
+	msg1, err := db.CreateMessageWithContext(user.ID, "user", "Hello world")
+	if err != nil {
+		t.Fatalf("failed to create message: %v", err)
+	}
+
+	// "Hello world" = 11 chars / 4 = 2 tokens (integer division)
+	if msg1.Tokens != 2 {
+		t.Errorf("expected 2 tokens, got %d", msg1.Tokens)
+	}
+	if msg1.ContextTokens != 0 {
+		t.Errorf("first message should have context_tokens=0, got %d", msg1.ContextTokens)
+	}
+
+	// Second message continues the chunk
+	msg2, _ := db.CreateMessageWithContext(user.ID, "assistant", "Hi there, how can I help?")
+	// "Hi there, how can I help?" = 25 chars / 4 = 6 tokens
+	if msg2.Tokens != 6 {
+		t.Errorf("expected 6 tokens, got %d", msg2.Tokens)
+	}
+	// context_tokens = previous (0 + 2) + current (6) = 8
+	if msg2.ContextTokens != 8 {
+		t.Errorf("expected context_tokens=8, got %d", msg2.ContextTokens)
+	}
+}
+
+func TestCoreDB_ChunkReset(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("chunkuser", "hash")
+
+	// Use thresholds: start=10, max=30
+	// Formula: contextTokens = prevContextTokens + prevTokens + tokens
+	// Each 4 chars = 1 token (integer division)
+
+	// msg1: "aaaa" = 4 chars = 1 token, ctx=0 (first message)
+	db.CreateMessageWithContextThreshold(user.ID, "user", "aaaa", 10, 30)
+
+	// msg2: "bbbbbbbb" = 8 chars = 2 tokens, ctx = 0 + 1 + 2 = 3
+	db.CreateMessageWithContextThreshold(user.ID, "assistant", "bbbbbbbb", 10, 30)
+
+	// msg3: "cccccccccccc" = 12 chars = 3 tokens, ctx = 3 + 2 + 3 = 8
+	db.CreateMessageWithContextThreshold(user.ID, "user", "cccccccccccc", 10, 30)
+
+	// msg4: "dddddddddddddddd" = 16 chars = 4 tokens, ctx = 8 + 3 + 4 = 15
+	db.CreateMessageWithContextThreshold(user.ID, "assistant", "dddddddddddddddd", 10, 30)
+
+	// msg5: "eeeeeeeeeeeeeeeeeeee" = 20 chars = 5 tokens, ctx = 15 + 4 + 5 = 24
+	// 24 < 30, no reset yet
+	msg5, _ := db.CreateMessageWithContextThreshold(user.ID, "user", "eeeeeeeeeeeeeeeeeeee", 10, 30)
+
+	if msg5.ContextTokens != 24 {
+		t.Errorf("expected context_tokens=24, got %d", msg5.ContextTokens)
+	}
+
+	// msg6: "ffffffffffffffffffffffff" = 24 chars = 6 tokens
+	// Would be ctx = 24 + 5 + 6 = 35 > 30, triggers reset
+	// targetThreshold = 30 - 10 = 20
+	// Find most recent msg with ctx < 20: msg4 has ctx=15 < 20
+	// Subtract 15 from msg4 onwards:
+	//   msg4: 15 - 15 = 0
+	//   msg5: 24 - 15 = 9
+	// Then add msg6: ctx = 9 + 5 + 6 = 20
+	msg6, _ := db.CreateMessageWithContextThreshold(user.ID, "assistant", "ffffffffffffffffffffffff", 10, 30)
+
+	if msg6.ContextTokens != 20 {
+		t.Errorf("expected context_tokens=20 after reset, got %d", msg6.ContextTokens)
+	}
+
+	// Verify msg4 is now chunk start (ctx=0)
+	var msg4Ctx int
+	db.db.QueryRow("SELECT context_tokens FROM messages WHERE user_id = ? ORDER BY id ASC LIMIT 1 OFFSET 3", user.ID).Scan(&msg4Ctx)
+	if msg4Ctx != 0 {
+		t.Errorf("expected msg4 context_tokens=0 (chunk start), got %d", msg4Ctx)
+	}
+
+	// Verify msg5 was updated (ctx=9)
+	var msg5Ctx int
+	db.db.QueryRow("SELECT context_tokens FROM messages WHERE user_id = ? ORDER BY id ASC LIMIT 1 OFFSET 4", user.ID).Scan(&msg5Ctx)
+	if msg5Ctx != 9 {
+		t.Errorf("expected msg5 context_tokens=9 after reset, got %d", msg5Ctx)
+	}
+}
+
+func TestCoreDB_GetContextMessages(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("ctxuser", "hash")
+
+	// Create some messages - small thresholds for testing
+	db.CreateMessageWithContextThreshold(user.ID, "user", "aaaa", 10, 20)         // msg1: ctx=0
+	db.CreateMessageWithContextThreshold(user.ID, "assistant", "bbbb", 10, 20)     // msg2: ctx=2
+	db.CreateMessageWithContextThreshold(user.ID, "user", "cccc", 10, 20)          // msg3: ctx=3
+
+	// Force a reset by adding messages that exceed threshold
+	db.CreateMessageWithContextThreshold(user.ID, "assistant", strings.Repeat("d", 40), 10, 20) // tokens=10, exceeds
+	db.CreateMessageWithContextThreshold(user.ID, "user", "eeee", 10, 20)          // msg5
+
+	// Get context messages (should only return from most recent chunk start)
+	messages, err := db.GetContextMessages(user.ID)
+	if err != nil {
+		t.Fatalf("failed to get context messages: %v", err)
+	}
+
+	// Should not include msg1 and msg2 (before chunk reset)
+	// First message in result should have context_tokens = 0
+	if len(messages) == 0 {
+		t.Fatal("expected at least one message")
+	}
+	if messages[0].ContextTokens != 0 {
+		t.Errorf("first context message should have context_tokens=0, got %d", messages[0].ContextTokens)
+	}
+}
+
+func TestCoreDB_GetMessagesBefore(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("pageuser", "hash")
+
+	// Create 5 messages
+	var lastID int64
+	for i := 0; i < 5; i++ {
+		msg, _ := db.CreateMessage(user.ID, "user", fmt.Sprintf("msg%d", i))
+		lastID = msg.ID
+	}
+
+	// Get 2 messages before the last one
+	messages, err := db.GetMessagesBefore(user.ID, lastID, 2)
+	if err != nil {
+		t.Fatalf("failed to get messages: %v", err)
+	}
+
+	if len(messages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(messages))
+	}
+
+	// Should be in DESC order (newest first of the older ones)
+	if messages[0].Content != "msg3" {
+		t.Errorf("expected msg3, got %s", messages[0].Content)
+	}
+	if messages[1].Content != "msg2" {
+		t.Errorf("expected msg2, got %s", messages[1].Content)
+	}
+}
+
+func TestCoreDB_GetMessagesSince(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("sinceuser", "hash")
+
+	// Create messages with time gaps
+	// Note: SQLite CURRENT_TIMESTAMP has second precision, so we need >1s gap
+	db.CreateMessage(user.ID, "user", "old message")
+	time.Sleep(1100 * time.Millisecond)
+
+	since := time.Now()
+	time.Sleep(1100 * time.Millisecond)
+
+	db.CreateMessage(user.ID, "assistant", "new message 1")
+	db.CreateMessage(user.ID, "user", "new message 2")
+
+	messages, err := db.GetMessagesSince(user.ID, since)
+	if err != nil {
+		t.Fatalf("failed to get messages: %v", err)
+	}
+
+	if len(messages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(messages))
+	}
+}
+
+func TestCoreDB_GetRecentMessagesIncludesTokens(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("recentuser", "hash")
+
+	// Create message with context tracking
+	db.CreateMessageWithContext(user.ID, "user", "Hello world")
+
+	messages, err := db.GetRecentMessages(user.ID, 10)
+	if err != nil {
+		t.Fatalf("failed to get messages: %v", err)
+	}
+
+	if len(messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(messages))
+	}
+
+	// Tokens should be populated
+	if messages[0].Tokens != 2 { // "Hello world" = 11 chars / 4 = 2
+		t.Errorf("expected tokens=2, got %d", messages[0].Tokens)
 	}
 }

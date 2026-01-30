@@ -29,11 +29,13 @@ type RefreshToken struct {
 }
 
 type Message struct {
-	ID        int64
-	UserID    int64
-	Role      string
-	Content   string
-	CreatedAt time.Time
+	ID            int64
+	UserID        int64
+	Role          string
+	Content       string
+	Tokens        int
+	ContextTokens int
+	CreatedAt     time.Time
 }
 
 type CoreDB struct {
@@ -60,7 +62,8 @@ func NewCoreDB(dbPath string) (*CoreDB, error) {
 }
 
 func (c *CoreDB) migrate() error {
-	schema := `
+	// Create tables first (without indexes that depend on new columns)
+	tables := `
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY,
 		username TEXT UNIQUE NOT NULL,
@@ -81,11 +84,56 @@ func (c *CoreDB) migrate() error {
 		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		role TEXT NOT NULL,
 		content TEXT NOT NULL,
+		tokens INTEGER NOT NULL DEFAULT 0,
+		context_tokens INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`
-	_, err := c.db.Exec(schema)
-	return err
+	_, err := c.db.Exec(tables)
+	if err != nil {
+		return err
+	}
+
+	// Migrate existing databases: add tokens column if missing
+	if err := c.addColumnIfMissing("messages", "tokens", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Migrate existing databases: add context_tokens column if missing
+	if err := c.addColumnIfMissing("messages", "context_tokens", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Create indexes after columns exist
+	_, err = c.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_messages_user_context
+		ON messages(user_id, id) WHERE context_tokens = 0;
+	`)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *CoreDB) addColumnIfMissing(table, column, definition string) error {
+	var count int
+	err := c.db.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info(?)
+		WHERE name = ?
+	`, table, column).Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		_, err = c.db.Exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *CoreDB) Close() error {
@@ -220,9 +268,50 @@ func (c *CoreDB) CreateMessage(userID int64, role, content string) (*Message, er
 	}, nil
 }
 
+func (c *CoreDB) CreateMessageWithContext(userID int64, role, content string) (*Message, error) {
+	tokens := len(content) / 4
+
+	// Get the latest message's context state
+	var prevContextTokens, prevTokens int
+	err := c.db.QueryRow(`
+		SELECT tokens, context_tokens FROM messages
+		WHERE user_id = ? ORDER BY id DESC LIMIT 1
+	`, userID).Scan(&prevTokens, &prevContextTokens)
+
+	var contextTokens int
+	if err == sql.ErrNoRows {
+		// First message - starts a new chunk
+		contextTokens = 0
+	} else if err != nil {
+		return nil, err
+	} else {
+		// Continue the chunk
+		contextTokens = prevContextTokens + prevTokens + tokens
+	}
+
+	result, err := c.db.Exec(
+		"INSERT INTO messages (user_id, role, content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?)",
+		userID, role, content, tokens, contextTokens,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Message{
+		ID:            id,
+		UserID:        userID,
+		Role:          role,
+		Content:       content,
+		Tokens:        tokens,
+		ContextTokens: contextTokens,
+		CreatedAt:     time.Now(),
+	}, nil
+}
+
 func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, user_id, role, content, created_at
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE user_id = ?
 		ORDER BY created_at ASC
@@ -236,7 +325,7 @@ func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, m)
@@ -247,8 +336,8 @@ func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
 func (c *CoreDB) GetRecentMessages(userID int64, limit int) ([]Message, error) {
 	// Get the most recent N messages, but return in chronological order
 	rows, err := c.db.Query(`
-		SELECT id, user_id, role, content, created_at FROM (
-			SELECT id, user_id, role, content, created_at
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at FROM (
+			SELECT id, user_id, role, content, tokens, context_tokens, created_at
 			FROM messages
 			WHERE user_id = ?
 			ORDER BY created_at DESC
@@ -263,7 +352,173 @@ func (c *CoreDB) GetRecentMessages(userID int64, limit int) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+func (c *CoreDB) CreateMessageWithContextThreshold(userID int64, role, content string, tokensStart, tokensMax int) (*Message, error) {
+	tokens := len(content) / 4
+
+	// Get the latest message's context state
+	var prevContextTokens, prevTokens int
+	err := c.db.QueryRow(`
+		SELECT tokens, context_tokens FROM messages
+		WHERE user_id = ? ORDER BY id DESC LIMIT 1
+	`, userID).Scan(&prevTokens, &prevContextTokens)
+
+	var contextTokens int
+	if err == sql.ErrNoRows {
+		// First message - starts a new chunk
+		contextTokens = 0
+	} else if err != nil {
+		return nil, err
+	} else {
+		// Calculate what context_tokens would be
+		contextTokens = prevContextTokens + prevTokens + tokens
+
+		// Check if we need to reset the chunk
+		if contextTokens > tokensMax {
+			targetThreshold := tokensMax - tokensStart
+
+			// Find the new chunk start
+			var newChunkStartID int64
+			var subtractValue int
+			err := c.db.QueryRow(`
+				SELECT id, context_tokens FROM messages
+				WHERE user_id = ? AND context_tokens < ?
+				ORDER BY id DESC LIMIT 1
+			`, userID, targetThreshold).Scan(&newChunkStartID, &subtractValue)
+
+			if err != nil && err != sql.ErrNoRows {
+				return nil, err
+			}
+
+			if err == nil {
+				// Slide the window
+				_, err = c.db.Exec(`
+					UPDATE messages SET context_tokens = context_tokens - ?
+					WHERE user_id = ? AND id >= ?
+				`, subtractValue, userID, newChunkStartID)
+				if err != nil {
+					return nil, err
+				}
+
+				// Recalculate contextTokens based on updated values
+				err = c.db.QueryRow(`
+					SELECT tokens, context_tokens FROM messages
+					WHERE user_id = ? ORDER BY id DESC LIMIT 1
+				`, userID).Scan(&prevTokens, &prevContextTokens)
+				if err != nil {
+					return nil, err
+				}
+				contextTokens = prevContextTokens + prevTokens + tokens
+			}
+		}
+	}
+
+	result, err := c.db.Exec(
+		"INSERT INTO messages (user_id, role, content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?)",
+		userID, role, content, tokens, contextTokens,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Message{
+		ID:            id,
+		UserID:        userID,
+		Role:          role,
+		Content:       content,
+		Tokens:        tokens,
+		ContextTokens: contextTokens,
+		CreatedAt:     time.Now(),
+	}, nil
+}
+
+func (c *CoreDB) GetContextMessages(userID int64) ([]Message, error) {
+	// Find the most recent chunk start
+	var chunkStartID int64
+	err := c.db.QueryRow(`
+		SELECT id FROM messages
+		WHERE user_id = ? AND context_tokens = 0
+		ORDER BY id DESC LIMIT 1
+	`, userID).Scan(&chunkStartID)
+
+	if err == sql.ErrNoRows {
+		return []Message{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch all messages from chunk start to present
+	rows, err := c.db.Query(`
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE user_id = ? AND id >= ?
+		ORDER BY id ASC
+	`, userID, chunkStartID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+func (c *CoreDB) GetMessagesBefore(userID, beforeID int64, limit int) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE user_id = ? AND id < ?
+		ORDER BY id DESC
+		LIMIT ?
+	`, userID, beforeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+func (c *CoreDB) GetMessagesSince(userID int64, since time.Time) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE user_id = ? AND created_at > ?
+		ORDER BY id ASC
+	`, userID, since.UTC())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, m)

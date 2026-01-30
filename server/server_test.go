@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -184,5 +185,40 @@ func TestServer_Logout(t *testing.T) {
 	_, err := srv.db.GetRefreshToken("logout-token")
 	if err != db.ErrNotFound {
 		t.Error("expected token to be deleted")
+	}
+}
+
+func TestMessageEndpointsRequireAuth(t *testing.T) {
+	tmpDir := t.TempDir()
+	coreDB, _ := db.NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer coreDB.Close()
+
+	cfg := &config.Config{
+		JWT: config.JWTConfig{Secret: "testsecret"},
+		History: config.HistoryConfig{
+			DefaultLimit: 50,
+			MaxLimit:     100,
+		},
+		Sync: config.SyncConfig{
+			MaxLookback: 24 * time.Hour,
+		},
+	}
+	jwt := auth.NewJWTService(cfg.JWT.Secret)
+	srv := New(cfg, coreDB, jwt)
+
+	endpoints := []string{
+		"/api/messages/recent",
+		"/api/messages/history?before=1",
+		"/api/messages/sync?since=2020-01-01T00:00:00Z",
+	}
+
+	for _, endpoint := range endpoints {
+		req := httptest.NewRequest("GET", endpoint, nil)
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("%s: expected 401, got %d", endpoint, rec.Code)
+		}
 	}
 }

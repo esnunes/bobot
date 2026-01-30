@@ -10,6 +10,7 @@ import (
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/config"
+	bobotcontext "github.com/esnunes/bobot/context"
 	"github.com/esnunes/bobot/db"
 	"github.com/esnunes/bobot/llm"
 	"github.com/esnunes/bobot/server"
@@ -71,8 +72,11 @@ func main() {
 	// Initialize LLM provider
 	llmProvider := llm.NewAnthropicClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model)
 
-	// Initialize assistant engine
-	engine := assistant.NewEngine(llmProvider, registry, loadedSkills)
+	// Create context adapter
+	contextAdapter := bobotcontext.NewCoreDBAdapter(coreDB)
+
+	// Initialize assistant engine with context
+	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter)
 
 	// Initialize HTTP server
 	srv := server.NewWithAssistant(cfg, coreDB, jwtSvc, engine)

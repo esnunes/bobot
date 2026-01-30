@@ -5,21 +5,35 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/llm"
 	"github.com/esnunes/bobot/tools"
 )
 
-type Engine struct {
-	provider llm.Provider
-	registry *tools.Registry
-	skills   []Skill
+// ContextProvider retrieves context messages for a user.
+type ContextProvider interface {
+	GetContextMessages(userID int64) ([]ContextMessage, error)
 }
 
-func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill) *Engine {
+// ContextMessage represents a message for context (simplified from db.Message).
+type ContextMessage struct {
+	Role    string
+	Content string
+}
+
+type Engine struct {
+	provider        llm.Provider
+	registry        *tools.Registry
+	skills          []Skill
+	contextProvider ContextProvider
+}
+
+func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill, contextProvider ContextProvider) *Engine {
 	return &Engine{
-		provider: provider,
-		registry: registry,
-		skills:   skills,
+		provider:        provider,
+		registry:        registry,
+		skills:          skills,
+		contextProvider: contextProvider,
 	}
 }
 
@@ -27,12 +41,29 @@ func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill) 
 // The context must contain the user ID (set by auth middleware).
 func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 	// Build system prompt
-	systemPrompt := BuildSystemPrompt(e.skills, e.registry.ToLLMTools())
+	llmTools := e.registry.ToLLMTools()
+	systemPrompt := BuildSystemPrompt(e.skills, llmTools)
 
-	// Start with user message
-	messages := []llm.Message{
-		{Role: "user", Content: message},
+	// Build messages with context
+	var messages []llm.Message
+
+	// Get context messages
+	userID := auth.UserIDFromContext(ctx)
+	contextMsgs, err := e.contextProvider.GetContextMessages(userID)
+	if err == nil {
+		for _, cm := range contextMsgs {
+			messages = append(messages, llm.Message{
+				Role:    cm.Role,
+				Content: cm.Content,
+			})
+		}
 	}
+
+	// Add the new user message
+	messages = append(messages, llm.Message{
+		Role:    "user",
+		Content: message,
+	})
 
 	// Loop for tool use
 	maxIterations := 10
@@ -40,7 +71,7 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 		resp, err := e.provider.Chat(ctx, &llm.ChatRequest{
 			SystemPrompt: systemPrompt,
 			Messages:     messages,
-			Tools:        e.registry.ToLLMTools(),
+			Tools:        llmTools,
 		})
 		if err != nil {
 			return "", fmt.Errorf("LLM error: %w", err)

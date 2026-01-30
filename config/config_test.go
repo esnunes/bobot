@@ -4,6 +4,7 @@ package config
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 func TestLoad_RequiredFields(t *testing.T) {
@@ -61,5 +62,40 @@ func TestLoad_MissingRequired(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Error("expected error for missing required fields")
+	}
+}
+
+func TestLoad_ContextConfig_Defaults(t *testing.T) {
+	// Set required env vars
+	os.Setenv("BOBOT_LLM_BASE_URL", "http://test")
+	os.Setenv("BOBOT_LLM_API_KEY", "key")
+	os.Setenv("BOBOT_LLM_MODEL", "model")
+	os.Setenv("BOBOT_JWT_SECRET", "secret")
+	defer func() {
+		os.Unsetenv("BOBOT_LLM_BASE_URL")
+		os.Unsetenv("BOBOT_LLM_API_KEY")
+		os.Unsetenv("BOBOT_LLM_MODEL")
+		os.Unsetenv("BOBOT_JWT_SECRET")
+	}()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.Context.TokensStart != 30000 {
+		t.Errorf("expected TokensStart 30000, got %d", cfg.Context.TokensStart)
+	}
+	if cfg.Context.TokensMax != 80000 {
+		t.Errorf("expected TokensMax 80000, got %d", cfg.Context.TokensMax)
+	}
+	if cfg.History.DefaultLimit != 50 {
+		t.Errorf("expected DefaultLimit 50, got %d", cfg.History.DefaultLimit)
+	}
+	if cfg.History.MaxLimit != 100 {
+		t.Errorf("expected MaxLimit 100, got %d", cfg.History.MaxLimit)
+	}
+	if cfg.Sync.MaxLookback != 24*time.Hour {
+		t.Errorf("expected MaxLookback 24h, got %v", cfg.Sync.MaxLookback)
 	}
 }
