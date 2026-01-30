@@ -62,7 +62,8 @@ func NewCoreDB(dbPath string) (*CoreDB, error) {
 }
 
 func (c *CoreDB) migrate() error {
-	schema := `
+	// Create tables first (without indexes that depend on new columns)
+	tables := `
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY,
 		username TEXT UNIQUE NOT NULL,
@@ -87,12 +88,52 @@ func (c *CoreDB) migrate() error {
 		context_tokens INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
-
-	CREATE INDEX IF NOT EXISTS idx_messages_user_context
-	ON messages(user_id, id) WHERE context_tokens = 0;
 	`
-	_, err := c.db.Exec(schema)
-	return err
+	_, err := c.db.Exec(tables)
+	if err != nil {
+		return err
+	}
+
+	// Migrate existing databases: add tokens column if missing
+	if err := c.addColumnIfMissing("messages", "tokens", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Migrate existing databases: add context_tokens column if missing
+	if err := c.addColumnIfMissing("messages", "context_tokens", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Create indexes after columns exist
+	_, err = c.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_messages_user_context
+		ON messages(user_id, id) WHERE context_tokens = 0;
+	`)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *CoreDB) addColumnIfMissing(table, column, definition string) error {
+	var count int
+	err := c.db.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info(?)
+		WHERE name = ?
+	`, table, column).Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		_, err = c.db.Exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *CoreDB) Close() error {

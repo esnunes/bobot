@@ -2,11 +2,14 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestNewCoreDB_CreatesSchema(t *testing.T) {
@@ -30,6 +33,79 @@ func TestNewCoreDB_CreatesSchema(t *testing.T) {
 		if err != nil {
 			t.Errorf("table %s not found: %v", table, err)
 		}
+	}
+}
+
+func TestCoreDB_MigratesExistingDatabase(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "core.db")
+
+	// Create a database with old schema (without tokens/context_tokens columns)
+	rawDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("failed to create raw db: %v", err)
+	}
+
+	oldSchema := `
+	CREATE TABLE users (
+		id INTEGER PRIMARY KEY,
+		username TEXT UNIQUE NOT NULL,
+		password_hash TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE refresh_tokens (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		token TEXT UNIQUE NOT NULL,
+		expires_at DATETIME NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE messages (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		role TEXT NOT NULL,
+		content TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	`
+	_, err = rawDB.Exec(oldSchema)
+	if err != nil {
+		t.Fatalf("failed to create old schema: %v", err)
+	}
+
+	// Insert a test message with old schema
+	_, err = rawDB.Exec(`INSERT INTO users (username, password_hash) VALUES ('testuser', 'hash')`)
+	if err != nil {
+		t.Fatalf("failed to insert user: %v", err)
+	}
+	_, err = rawDB.Exec(`INSERT INTO messages (user_id, role, content) VALUES (1, 'user', 'hello')`)
+	if err != nil {
+		t.Fatalf("failed to insert message: %v", err)
+	}
+	rawDB.Close()
+
+	// Now open with NewCoreDB which should migrate
+	db, err := NewCoreDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open db with migration: %v", err)
+	}
+	defer db.Close()
+
+	// Verify the new columns exist by selecting them
+	var tokens, contextTokens int
+	err = db.db.QueryRow(`SELECT tokens, context_tokens FROM messages WHERE id = 1`).Scan(&tokens, &contextTokens)
+	if err != nil {
+		t.Fatalf("failed to select new columns: %v", err)
+	}
+
+	// Old messages should have default values
+	if tokens != 0 {
+		t.Errorf("expected tokens=0 for migrated row, got %d", tokens)
+	}
+	if contextTokens != 0 {
+		t.Errorf("expected context_tokens=0 for migrated row, got %d", contextTokens)
 	}
 }
 
