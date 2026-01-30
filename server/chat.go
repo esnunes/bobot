@@ -128,19 +128,25 @@ func (s *Server) handleSlashCommand(ctx context.Context, content string) (string
 	}
 
 	parts := strings.Fields(content)
-	if len(parts) < 2 {
+	if len(parts) < 1 {
 		return "", false
 	}
 
 	// Extract tool name (without leading /)
 	toolName := parts[0][1:]
-	command := parts[1]
 
-	// Get the tool from registry
+	// Check if tool exists
 	tool, ok := s.registry.Get(toolName)
 	if !ok {
-		return "", false
+		return "Error: unknown command /" + toolName, true
 	}
+
+	// Check if command is provided
+	if len(parts) < 2 {
+		return "Error: missing command. Usage: /" + toolName + " <command>", true
+	}
+
+	command := parts[1]
 
 	// Build input for the tool
 	input := map[string]interface{}{
