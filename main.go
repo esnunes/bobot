@@ -17,6 +17,7 @@ import (
 	"github.com/esnunes/bobot/skills"
 	"github.com/esnunes/bobot/tools"
 	"github.com/esnunes/bobot/tools/task"
+	"github.com/esnunes/bobot/tools/user"
 )
 
 func main() {
@@ -62,6 +63,7 @@ func main() {
 	// Initialize tool registry
 	registry := tools.NewRegistry()
 	registry.Register(task.NewTaskTool(taskDB))
+	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
 
 	// Load embedded skills
 	loadedSkills, err := assistant.LoadSkills(skills.FS)
