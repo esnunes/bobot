@@ -2,6 +2,7 @@
 package db
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -333,5 +334,66 @@ func TestCoreDB_GetContextMessages(t *testing.T) {
 	}
 	if messages[0].ContextTokens != 0 {
 		t.Errorf("first context message should have context_tokens=0, got %d", messages[0].ContextTokens)
+	}
+}
+
+func TestCoreDB_GetMessagesBefore(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("pageuser", "hash")
+
+	// Create 5 messages
+	var lastID int64
+	for i := 0; i < 5; i++ {
+		msg, _ := db.CreateMessage(user.ID, "user", fmt.Sprintf("msg%d", i))
+		lastID = msg.ID
+	}
+
+	// Get 2 messages before the last one
+	messages, err := db.GetMessagesBefore(user.ID, lastID, 2)
+	if err != nil {
+		t.Fatalf("failed to get messages: %v", err)
+	}
+
+	if len(messages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(messages))
+	}
+
+	// Should be in DESC order (newest first of the older ones)
+	if messages[0].Content != "msg3" {
+		t.Errorf("expected msg3, got %s", messages[0].Content)
+	}
+	if messages[1].Content != "msg2" {
+		t.Errorf("expected msg2, got %s", messages[1].Content)
+	}
+}
+
+func TestCoreDB_GetMessagesSince(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("sinceuser", "hash")
+
+	// Create messages with time gaps
+	// Note: SQLite CURRENT_TIMESTAMP has second precision, so we need >1s gap
+	db.CreateMessage(user.ID, "user", "old message")
+	time.Sleep(1100 * time.Millisecond)
+
+	since := time.Now()
+	time.Sleep(1100 * time.Millisecond)
+
+	db.CreateMessage(user.ID, "assistant", "new message 1")
+	db.CreateMessage(user.ID, "user", "new message 2")
+
+	messages, err := db.GetMessagesSince(user.ID, since)
+	if err != nil {
+		t.Fatalf("failed to get messages: %v", err)
+	}
+
+	if len(messages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(messages))
 	}
 }

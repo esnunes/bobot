@@ -437,3 +437,50 @@ func (c *CoreDB) GetContextMessages(userID int64) ([]Message, error) {
 	}
 	return messages, rows.Err()
 }
+
+func (c *CoreDB) GetMessagesBefore(userID, beforeID int64, limit int) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE user_id = ? AND id < ?
+		ORDER BY id DESC
+		LIMIT ?
+	`, userID, beforeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+func (c *CoreDB) GetMessagesSince(userID int64, since time.Time) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE user_id = ? AND created_at > ?
+		ORDER BY id ASC
+	`, userID, since.UTC())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
