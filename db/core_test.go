@@ -192,3 +192,20 @@ func TestCoreDB_GetMessagesLimit(t *testing.T) {
 		t.Errorf("expected 3 messages, got %d", len(messages))
 	}
 }
+
+func TestCoreDB_MessageTokenColumns(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	// Check that tokens and context_tokens columns exist
+	var tokens, contextTokens int
+	err := db.db.QueryRow(`
+		SELECT tokens, context_tokens FROM messages LIMIT 1
+	`).Scan(&tokens, &contextTokens)
+
+	// Should get no rows error, not column missing error
+	if err != nil && err.Error() != "sql: no rows in result set" {
+		t.Errorf("expected no rows error or success, got: %v", err)
+	}
+}

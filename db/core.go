@@ -81,8 +81,13 @@ func (c *CoreDB) migrate() error {
 		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		role TEXT NOT NULL,
 		content TEXT NOT NULL,
+		tokens INTEGER NOT NULL DEFAULT 0,
+		context_tokens INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE INDEX IF NOT EXISTS idx_messages_user_context
+	ON messages(user_id, id) WHERE context_tokens = 0;
 	`
 	_, err := c.db.Exec(schema)
 	return err
