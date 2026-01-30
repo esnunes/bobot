@@ -50,6 +50,11 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /api/logout", s.handleLogout)
 	s.router.HandleFunc("GET /ws/chat", s.handleChat)
 
+	// Message routes (require auth)
+	s.router.HandleFunc("GET /api/messages/recent", s.authMiddleware(s.handleRecentMessages))
+	s.router.HandleFunc("GET /api/messages/history", s.authMiddleware(s.handleMessageHistory))
+	s.router.HandleFunc("GET /api/messages/sync", s.authMiddleware(s.handleMessageSync))
+
 	// Page routes
 	s.router.HandleFunc("GET /", s.handleLoginPage)
 	s.router.HandleFunc("GET /chat", s.handleChatPage)
@@ -57,6 +62,27 @@ func (s *Server) routes() {
 	// Static files
 	staticFS, _ := fs.Sub(web.FS, "static")
 	s.router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+}
+
+func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get token from Authorization header
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" || len(authHeader) < 8 || authHeader[:7] != "Bearer " {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		token := authHeader[7:]
+		claims, err := s.jwt.ValidateAccessToken(token)
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := auth.ContextWithUserID(r.Context(), claims.UserID)
+		next(w, r.WithContext(ctx))
+	}
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
