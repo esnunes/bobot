@@ -48,11 +48,11 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to hash initial password: %v", err)
 			}
-			_, err = coreDB.CreateUser(cfg.InitUser, hash)
+			_, err = coreDB.CreateUserFull(cfg.InitUser, hash, cfg.InitUser, "admin")
 			if err != nil {
 				log.Fatalf("Failed to create initial user: %v", err)
 			}
-			log.Printf("Created initial user: %s", cfg.InitUser)
+			log.Printf("Created initial admin user: %s", cfg.InitUser)
 		}
 	}
 
