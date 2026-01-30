@@ -81,7 +81,7 @@ func main() {
 	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter)
 
 	// Initialize HTTP server
-	srv := server.NewWithAssistant(cfg, coreDB, jwtSvc, engine)
+	srv := server.NewWithAssistant(cfg, coreDB, jwtSvc, engine, registry)
 
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

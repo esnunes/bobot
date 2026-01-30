@@ -2,9 +2,11 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 
@@ -64,6 +66,17 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
+		// Check for slash commands
+		if response, handled := s.handleSlashCommand(ctx, msg.Content); handled {
+			// Broadcast command response
+			respJSON, _ := json.Marshal(map[string]interface{}{
+				"role":    "system",
+				"content": response,
+			})
+			s.connections.Broadcast(claims.UserID, respJSON)
+			continue
+		}
+
 		// Save user message with context tracking
 		s.db.CreateMessageWithContextThreshold(
 			claims.UserID, "user", msg.Content,
@@ -97,4 +110,51 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		})
 		s.connections.Broadcast(claims.UserID, assistantMsgJSON)
 	}
+}
+
+// handleSlashCommand processes slash commands and returns the response.
+// Returns (response, true) if the message was a slash command, ("", false) otherwise.
+func (s *Server) handleSlashCommand(ctx context.Context, content string) (string, bool) {
+	content = strings.TrimSpace(content)
+	if !strings.HasPrefix(content, "/") {
+		return "", false
+	}
+
+	parts := strings.Fields(content)
+	if len(parts) < 2 {
+		return "", false
+	}
+
+	// Extract tool name (without leading /)
+	toolName := parts[0][1:]
+	command := parts[1]
+
+	// Get the tool from registry
+	tool, ok := s.registry.Get(toolName)
+	if !ok {
+		return "", false
+	}
+
+	// Build input for the tool
+	input := map[string]interface{}{
+		"command": command,
+	}
+
+	// Add additional arguments based on command
+	if len(parts) > 2 {
+		switch command {
+		case "block", "unblock":
+			input["username"] = parts[2]
+		case "revoke":
+			input["code"] = parts[2]
+		}
+	}
+
+	// Execute the tool
+	result, err := tool.Execute(ctx, input)
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
+
+	return result, true
 }
