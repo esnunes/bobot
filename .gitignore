@@ -22,3 +22,6 @@ coverage.out
 
 # Environment
 mise.local.toml
+
+# Worktrees
+.worktrees/
