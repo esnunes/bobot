@@ -237,7 +237,9 @@ class ChatClient {
 
     addMessage(content, role, id = null, scroll = true) {
         const msgEl = document.createElement('div');
-        msgEl.className = `message ${role}`;
+        // Map command to user styling for display
+        const displayRole = role === 'command' ? 'user' : role;
+        msgEl.className = `message ${displayRole}`;
         msgEl.textContent = content;
         if (id) {
             msgEl.setAttribute('data-message-id', id);
@@ -250,7 +252,9 @@ class ChatClient {
 
     prependMessage(content, role, id = null) {
         const msgEl = document.createElement('div');
-        msgEl.className = `message ${role}`;
+        // Map command to user styling for display
+        const displayRole = role === 'command' ? 'user' : role;
+        msgEl.className = `message ${displayRole}`;
         msgEl.textContent = content;
         if (id) {
             msgEl.setAttribute('data-message-id', id);

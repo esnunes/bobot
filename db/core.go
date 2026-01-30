@@ -526,11 +526,11 @@ func (c *CoreDB) GetContextMessages(userID int64) ([]Message, error) {
 		return nil, err
 	}
 
-	// Fetch all messages from chunk start to present
+	// Fetch all messages from chunk start to present, excluding command/system roles
 	rows, err := c.db.Query(`
 		SELECT id, user_id, role, content, tokens, context_tokens, created_at
 		FROM messages
-		WHERE user_id = ? AND id >= ?
+		WHERE user_id = ? AND id >= ? AND role IN ('user', 'assistant')
 		ORDER BY id ASC
 	`, userID, chunkStartID)
 	if err != nil {
