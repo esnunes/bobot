@@ -20,3 +20,17 @@ func UserIDFromContext(ctx context.Context) int64 {
 	}
 	return 0
 }
+
+type roleKey struct{}
+
+// ContextWithRole returns a new context with the role stored.
+func ContextWithRole(ctx context.Context, role string) context.Context {
+	return context.WithValue(ctx, roleKey{}, role)
+}
+
+// RoleFromContext extracts the role from the context.
+// Returns empty string if no role is present.
+func RoleFromContext(ctx context.Context) string {
+	role, _ := ctx.Value(roleKey{}).(string)
+	return role
+}
