@@ -52,6 +52,10 @@ func (t *TaskTool) Schema() interface{} {
 	}
 }
 
+func (t *TaskTool) AdminOnly() bool {
+	return false
+}
+
 func (t *TaskTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	userID := auth.UserIDFromContext(ctx)
 	if userID == 0 {

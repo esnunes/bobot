@@ -34,6 +34,7 @@ func (m *mockTool) Schema() interface{}         { return map[string]interface{}{
 func (m *mockTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	return m.result, nil
 }
+func (m *mockTool) AdminOnly() bool { return false }
 
 func TestEngine_Chat_SimpleResponse(t *testing.T) {
 	mockProvider := &mockLLM{

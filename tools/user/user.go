@@ -50,6 +50,10 @@ func (t *UserTool) Schema() interface{} {
 	}
 }
 
+func (t *UserTool) AdminOnly() bool {
+	return true
+}
+
 func (t *UserTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	// Check admin role
 	role := auth.RoleFromContext(ctx)
