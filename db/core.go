@@ -398,3 +398,42 @@ func (c *CoreDB) CreateMessageWithContextThreshold(userID int64, role, content s
 		CreatedAt:     time.Now(),
 	}, nil
 }
+
+func (c *CoreDB) GetContextMessages(userID int64) ([]Message, error) {
+	// Find the most recent chunk start
+	var chunkStartID int64
+	err := c.db.QueryRow(`
+		SELECT id FROM messages
+		WHERE user_id = ? AND context_tokens = 0
+		ORDER BY id DESC LIMIT 1
+	`, userID).Scan(&chunkStartID)
+
+	if err == sql.ErrNoRows {
+		return []Message{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch all messages from chunk start to present
+	rows, err := c.db.Query(`
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE user_id = ? AND id >= ?
+		ORDER BY id ASC
+	`, userID, chunkStartID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}

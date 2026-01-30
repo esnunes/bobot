@@ -3,6 +3,7 @@ package db
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -300,5 +301,37 @@ func TestCoreDB_ChunkReset(t *testing.T) {
 	db.db.QueryRow("SELECT context_tokens FROM messages WHERE user_id = ? ORDER BY id ASC LIMIT 1 OFFSET 4", user.ID).Scan(&msg5Ctx)
 	if msg5Ctx != 9 {
 		t.Errorf("expected msg5 context_tokens=9 after reset, got %d", msg5Ctx)
+	}
+}
+
+func TestCoreDB_GetContextMessages(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("ctxuser", "hash")
+
+	// Create some messages - small thresholds for testing
+	db.CreateMessageWithContextThreshold(user.ID, "user", "aaaa", 10, 20)         // msg1: ctx=0
+	db.CreateMessageWithContextThreshold(user.ID, "assistant", "bbbb", 10, 20)     // msg2: ctx=2
+	db.CreateMessageWithContextThreshold(user.ID, "user", "cccc", 10, 20)          // msg3: ctx=3
+
+	// Force a reset by adding messages that exceed threshold
+	db.CreateMessageWithContextThreshold(user.ID, "assistant", strings.Repeat("d", 40), 10, 20) // tokens=10, exceeds
+	db.CreateMessageWithContextThreshold(user.ID, "user", "eeee", 10, 20)          // msg5
+
+	// Get context messages (should only return from most recent chunk start)
+	messages, err := db.GetContextMessages(user.ID)
+	if err != nil {
+		t.Fatalf("failed to get context messages: %v", err)
+	}
+
+	// Should not include msg1 and msg2 (before chunk reset)
+	// First message in result should have context_tokens = 0
+	if len(messages) == 0 {
+		t.Fatal("expected at least one message")
+	}
+	if messages[0].ContextTokens != 0 {
+		t.Errorf("first context message should have context_tokens=0, got %d", messages[0].ContextTokens)
 	}
 }
