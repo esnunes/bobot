@@ -9,6 +9,12 @@
     </form>
 </div>
 <script>
+// Check if already logged in
+const existingToken = localStorage.getItem('access_token');
+if (existingToken) {
+    window.location.href = '/chat';
+}
+
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
