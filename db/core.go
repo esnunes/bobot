@@ -270,7 +270,7 @@ func (c *CoreDB) CreateMessageWithContext(userID int64, role, content string) (*
 
 func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, user_id, role, content, created_at
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE user_id = ?
 		ORDER BY created_at ASC
@@ -284,7 +284,7 @@ func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, m)
@@ -295,8 +295,8 @@ func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
 func (c *CoreDB) GetRecentMessages(userID int64, limit int) ([]Message, error) {
 	// Get the most recent N messages, but return in chronological order
 	rows, err := c.db.Query(`
-		SELECT id, user_id, role, content, created_at FROM (
-			SELECT id, user_id, role, content, created_at
+		SELECT id, user_id, role, content, tokens, context_tokens, created_at FROM (
+			SELECT id, user_id, role, content, tokens, context_tokens, created_at
 			FROM messages
 			WHERE user_id = ?
 			ORDER BY created_at DESC
@@ -311,7 +311,7 @@ func (c *CoreDB) GetRecentMessages(userID int64, limit int) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, m)

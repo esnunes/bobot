@@ -397,3 +397,28 @@ func TestCoreDB_GetMessagesSince(t *testing.T) {
 		t.Errorf("expected 2 messages, got %d", len(messages))
 	}
 }
+
+func TestCoreDB_GetRecentMessagesIncludesTokens(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("recentuser", "hash")
+
+	// Create message with context tracking
+	db.CreateMessageWithContext(user.ID, "user", "Hello world")
+
+	messages, err := db.GetRecentMessages(user.ID, 10)
+	if err != nil {
+		t.Fatalf("failed to get messages: %v", err)
+	}
+
+	if len(messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(messages))
+	}
+
+	// Tokens should be populated
+	if messages[0].Tokens != 2 { // "Hello world" = 11 chars / 4 = 2
+		t.Errorf("expected tokens=2, got %d", messages[0].Tokens)
+	}
+}
