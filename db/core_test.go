@@ -209,3 +209,36 @@ func TestCoreDB_MessageTokenColumns(t *testing.T) {
 		t.Errorf("expected no rows error or success, got: %v", err)
 	}
 }
+
+func TestCoreDB_CreateMessageWithTokens(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("tokenuser", "hash")
+
+	// First message starts a chunk (context_tokens = 0)
+	msg1, err := db.CreateMessageWithContext(user.ID, "user", "Hello world")
+	if err != nil {
+		t.Fatalf("failed to create message: %v", err)
+	}
+
+	// "Hello world" = 11 chars / 4 = 2 tokens (integer division)
+	if msg1.Tokens != 2 {
+		t.Errorf("expected 2 tokens, got %d", msg1.Tokens)
+	}
+	if msg1.ContextTokens != 0 {
+		t.Errorf("first message should have context_tokens=0, got %d", msg1.ContextTokens)
+	}
+
+	// Second message continues the chunk
+	msg2, _ := db.CreateMessageWithContext(user.ID, "assistant", "Hi there, how can I help?")
+	// "Hi there, how can I help?" = 25 chars / 4 = 6 tokens
+	if msg2.Tokens != 6 {
+		t.Errorf("expected 6 tokens, got %d", msg2.Tokens)
+	}
+	// context_tokens = previous (0 + 2) + current (6) = 8
+	if msg2.ContextTokens != 8 {
+		t.Errorf("expected context_tokens=8, got %d", msg2.ContextTokens)
+	}
+}

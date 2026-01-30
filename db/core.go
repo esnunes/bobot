@@ -29,11 +29,13 @@ type RefreshToken struct {
 }
 
 type Message struct {
-	ID        int64
-	UserID    int64
-	Role      string
-	Content   string
-	CreatedAt time.Time
+	ID            int64
+	UserID        int64
+	Role          string
+	Content       string
+	Tokens        int
+	ContextTokens int
+	CreatedAt     time.Time
 }
 
 type CoreDB struct {
@@ -222,6 +224,47 @@ func (c *CoreDB) CreateMessage(userID int64, role, content string) (*Message, er
 		Role:      role,
 		Content:   content,
 		CreatedAt: time.Now(),
+	}, nil
+}
+
+func (c *CoreDB) CreateMessageWithContext(userID int64, role, content string) (*Message, error) {
+	tokens := len(content) / 4
+
+	// Get the latest message's context state
+	var prevContextTokens, prevTokens int
+	err := c.db.QueryRow(`
+		SELECT tokens, context_tokens FROM messages
+		WHERE user_id = ? ORDER BY id DESC LIMIT 1
+	`, userID).Scan(&prevTokens, &prevContextTokens)
+
+	var contextTokens int
+	if err == sql.ErrNoRows {
+		// First message - starts a new chunk
+		contextTokens = 0
+	} else if err != nil {
+		return nil, err
+	} else {
+		// Continue the chunk
+		contextTokens = prevContextTokens + prevTokens + tokens
+	}
+
+	result, err := c.db.Exec(
+		"INSERT INTO messages (user_id, role, content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?)",
+		userID, role, content, tokens, contextTokens,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Message{
+		ID:            id,
+		UserID:        userID,
+		Role:          role,
+		Content:       content,
+		Tokens:        tokens,
+		ContextTokens: contextTokens,
+		CreatedAt:     time.Now(),
 	}, nil
 }
 
