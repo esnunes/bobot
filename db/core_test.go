@@ -519,3 +519,113 @@ func TestCoreDB_CreateUserWithRole(t *testing.T) {
 		t.Error("expected user not blocked")
 	}
 }
+
+func TestCoreDB_CreateInvite(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	admin, _ := db.CreateUserFull("admin", "hash", "Admin", "admin")
+
+	invite, err := db.CreateInvite(admin.ID, "abc123")
+	if err != nil {
+		t.Fatalf("failed to create invite: %v", err)
+	}
+
+	if invite.Code != "abc123" {
+		t.Errorf("expected code 'abc123', got %s", invite.Code)
+	}
+	if invite.CreatedBy != admin.ID {
+		t.Errorf("expected created_by %d, got %d", admin.ID, invite.CreatedBy)
+	}
+	if invite.UsedBy != nil {
+		t.Error("expected used_by to be nil")
+	}
+	if invite.Revoked {
+		t.Error("expected invite not revoked")
+	}
+}
+
+func TestCoreDB_GetInviteByCode(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	admin, _ := db.CreateUserFull("admin", "hash", "Admin", "admin")
+	db.CreateInvite(admin.ID, "findme")
+
+	invite, err := db.GetInviteByCode("findme")
+	if err != nil {
+		t.Fatalf("failed to get invite: %v", err)
+	}
+	if invite.Code != "findme" {
+		t.Errorf("expected code 'findme', got %s", invite.Code)
+	}
+}
+
+func TestCoreDB_UseInvite(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	admin, _ := db.CreateUserFull("admin", "hash", "Admin", "admin")
+	db.CreateInvite(admin.ID, "useme")
+
+	user, _ := db.CreateUserFull("newuser", "hash", "New User", "user")
+	err := db.UseInvite("useme", user.ID)
+	if err != nil {
+		t.Fatalf("failed to use invite: %v", err)
+	}
+
+	invite, _ := db.GetInviteByCode("useme")
+	if invite.UsedBy == nil || *invite.UsedBy != user.ID {
+		t.Error("expected invite to be marked as used")
+	}
+	if invite.UsedAt == nil {
+		t.Error("expected used_at to be set")
+	}
+}
+
+func TestCoreDB_RevokeInvite(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	admin, _ := db.CreateUserFull("admin", "hash", "Admin", "admin")
+	db.CreateInvite(admin.ID, "revokeme")
+
+	err := db.RevokeInvite("revokeme")
+	if err != nil {
+		t.Fatalf("failed to revoke invite: %v", err)
+	}
+
+	invite, _ := db.GetInviteByCode("revokeme")
+	if !invite.Revoked {
+		t.Error("expected invite to be revoked")
+	}
+}
+
+func TestCoreDB_GetPendingInvites(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	admin, _ := db.CreateUserFull("admin", "hash", "Admin", "admin")
+	db.CreateInvite(admin.ID, "pending1")
+	db.CreateInvite(admin.ID, "pending2")
+	db.CreateInvite(admin.ID, "used")
+	db.CreateInvite(admin.ID, "revoked")
+
+	user, _ := db.CreateUserFull("user", "hash", "User", "user")
+	db.UseInvite("used", user.ID)
+	db.RevokeInvite("revoked")
+
+	invites, err := db.GetPendingInvites()
+	if err != nil {
+		t.Fatalf("failed to get pending invites: %v", err)
+	}
+
+	if len(invites) != 2 {
+		t.Errorf("expected 2 pending invites, got %d", len(invites))
+	}
+}
