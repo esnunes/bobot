@@ -48,8 +48,9 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	s.connections.Add(claims.UserID, conn)
 	defer s.connections.Remove(claims.UserID, conn)
 
-	// Create context with user ID
+	// Create context with user ID and role
 	ctx := auth.ContextWithUserID(r.Context(), claims.UserID)
+	ctx = auth.ContextWithRole(ctx, claims.Role)
 
 	// Handle messages
 	for {
