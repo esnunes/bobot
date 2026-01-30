@@ -56,8 +56,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Save user message
-		s.db.CreateMessage(claims.UserID, "user", msg.Content)
+		// Save user message with context tracking
+		s.db.CreateMessageWithContextThreshold(
+			claims.UserID, "user", msg.Content,
+			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+		)
 
 		// Get assistant response
 		response, err := s.engine.Chat(ctx, msg.Content)
@@ -66,8 +69,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			response = "Sorry, I encountered an error. Please try again."
 		}
 
-		// Save assistant message
-		s.db.CreateMessage(claims.UserID, "assistant", response)
+		// Save assistant message with context tracking
+		s.db.CreateMessageWithContextThreshold(
+			claims.UserID, "assistant", response,
+			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+		)
 
 		// Send response
 		if err := conn.WriteJSON(chatMessage{Content: response}); err != nil {
