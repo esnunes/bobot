@@ -46,7 +46,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := s.jwt.GenerateAccessToken(user.ID)
+	// Check if user is blocked
+	if user.Blocked {
+		http.Error(w, "account blocked", http.StatusForbidden)
+		return
+	}
+
+	accessToken, err := s.jwt.GenerateAccessTokenWithRole(user.ID, user.Role)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -91,7 +97,19 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := s.jwt.GenerateAccessToken(token.UserID)
+	// Check if user is blocked
+	user, err := s.db.GetUserByID(token.UserID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if user.Blocked {
+		s.db.DeleteRefreshToken(req.RefreshToken)
+		http.Error(w, "account blocked", http.StatusForbidden)
+		return
+	}
+
+	accessToken, err := s.jwt.GenerateAccessTokenWithRole(user.ID, user.Role)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

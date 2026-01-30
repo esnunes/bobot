@@ -222,3 +222,50 @@ func TestMessageEndpointsRequireAuth(t *testing.T) {
 		}
 	}
 }
+
+func TestLogin_BlockedUser(t *testing.T) {
+	srv := setupTestServer(t)
+
+	// Create and block a user
+	hash, _ := auth.HashPassword("password")
+	user, _ := srv.db.CreateUserFull("blocked", hash, "Blocked User", "user")
+	srv.db.BlockUser(user.ID)
+
+	// Try to login
+	body := `{"username":"blocked","password":"password"}`
+	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestRefresh_BlockedUser(t *testing.T) {
+	srv := setupTestServer(t)
+
+	// Create user and get tokens
+	hash, _ := auth.HashPassword("password")
+	user, _ := srv.db.CreateUserFull("toblock", hash, "To Block", "user")
+
+	// Create refresh token
+	srv.db.CreateRefreshToken(user.ID, "block-test-token", time.Now().Add(24*time.Hour))
+
+	// Block the user
+	srv.db.BlockUser(user.ID)
+
+	// Try to refresh
+	body := `{"refresh_token":"block-test-token"}`
+	req := httptest.NewRequest("POST", "/api/refresh", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", w.Code)
+	}
+}
