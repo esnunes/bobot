@@ -17,6 +17,9 @@ type User struct {
 	ID           int64
 	Username     string
 	PasswordHash string
+	DisplayName  string
+	Role         string // "admin" or "user"
+	Blocked      bool
 	CreatedAt    time.Time
 }
 
@@ -36,6 +39,16 @@ type Message struct {
 	Tokens        int
 	ContextTokens int
 	CreatedAt     time.Time
+}
+
+type Invite struct {
+	ID        int64
+	Code      string
+	CreatedBy int64
+	UsedBy    *int64
+	UsedAt    *time.Time
+	Revoked   bool
+	CreatedAt time.Time
 }
 
 type CoreDB struct {
@@ -104,6 +117,37 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Migrate: add display_name column
+	if err := c.addColumnIfMissing("users", "display_name", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+
+	// Migrate: add role column
+	if err := c.addColumnIfMissing("users", "role", "TEXT NOT NULL DEFAULT 'user'"); err != nil {
+		return err
+	}
+
+	// Migrate: add blocked column
+	if err := c.addColumnIfMissing("users", "blocked", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Create invites table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS invites (
+			id INTEGER PRIMARY KEY,
+			code TEXT UNIQUE NOT NULL,
+			created_by INTEGER NOT NULL REFERENCES users(id),
+			used_by INTEGER REFERENCES users(id),
+			used_at DATETIME,
+			revoked INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	// Create indexes after columns exist
 	_, err = c.db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_messages_user_context
@@ -154,16 +198,39 @@ func (c *CoreDB) CreateUser(username, passwordHash string) (*User, error) {
 		ID:           id,
 		Username:     username,
 		PasswordHash: passwordHash,
+		Role:         "user",
+		CreatedAt:    time.Now(),
+	}, nil
+}
+
+func (c *CoreDB) CreateUserFull(username, passwordHash, displayName, role string) (*User, error) {
+	result, err := c.db.Exec(
+		"INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, ?)",
+		username, passwordHash, displayName, role,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &User{
+		ID:           id,
+		Username:     username,
+		PasswordHash: passwordHash,
+		DisplayName:  displayName,
+		Role:         role,
+		Blocked:      false,
 		CreatedAt:    time.Now(),
 	}, nil
 }
 
 func (c *CoreDB) GetUserByUsername(username string) (*User, error) {
 	var user User
+	var blocked int
 	err := c.db.QueryRow(
-		"SELECT id, username, password_hash, created_at FROM users WHERE username = ?",
+		"SELECT id, username, password_hash, display_name, role, blocked, created_at FROM users WHERE username = ?",
 		username,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -171,15 +238,17 @@ func (c *CoreDB) GetUserByUsername(username string) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	user.Blocked = blocked == 1
 	return &user, nil
 }
 
 func (c *CoreDB) GetUserByID(id int64) (*User, error) {
 	var user User
+	var blocked int
 	err := c.db.QueryRow(
-		"SELECT id, username, password_hash, created_at FROM users WHERE id = ?",
+		"SELECT id, username, password_hash, display_name, role, blocked, created_at FROM users WHERE id = ?",
 		id,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -187,6 +256,7 @@ func (c *CoreDB) GetUserByID(id int64) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	user.Blocked = blocked == 1
 	return &user, nil
 }
 
@@ -456,11 +526,11 @@ func (c *CoreDB) GetContextMessages(userID int64) ([]Message, error) {
 		return nil, err
 	}
 
-	// Fetch all messages from chunk start to present
+	// Fetch all messages from chunk start to present, excluding command/system roles
 	rows, err := c.db.Query(`
 		SELECT id, user_id, role, content, tokens, context_tokens, created_at
 		FROM messages
-		WHERE user_id = ? AND id >= ?
+		WHERE user_id = ? AND id >= ? AND role IN ('user', 'assistant')
 		ORDER BY id ASC
 	`, userID, chunkStartID)
 	if err != nil {
@@ -524,4 +594,143 @@ func (c *CoreDB) GetMessagesSince(userID int64, since time.Time) ([]Message, err
 		messages = append(messages, m)
 	}
 	return messages, rows.Err()
+}
+
+func (c *CoreDB) CreateInvite(createdBy int64, code string) (*Invite, error) {
+	result, err := c.db.Exec(
+		"INSERT INTO invites (code, created_by) VALUES (?, ?)",
+		code, createdBy,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Invite{
+		ID:        id,
+		Code:      code,
+		CreatedBy: createdBy,
+		Revoked:   false,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+func (c *CoreDB) GetInviteByCode(code string) (*Invite, error) {
+	var invite Invite
+	var usedBy sql.NullInt64
+	var usedAt sql.NullTime
+	var revoked int
+
+	err := c.db.QueryRow(
+		"SELECT id, code, created_by, used_by, used_at, revoked, created_at FROM invites WHERE code = ?",
+		code,
+	).Scan(&invite.ID, &invite.Code, &invite.CreatedBy, &usedBy, &usedAt, &revoked, &invite.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if usedBy.Valid {
+		invite.UsedBy = &usedBy.Int64
+	}
+	if usedAt.Valid {
+		invite.UsedAt = &usedAt.Time
+	}
+	invite.Revoked = revoked == 1
+
+	return &invite, nil
+}
+
+func (c *CoreDB) UseInvite(code string, userID int64) error {
+	result, err := c.db.Exec(
+		"UPDATE invites SET used_by = ?, used_at = CURRENT_TIMESTAMP WHERE code = ? AND used_by IS NULL AND revoked = 0",
+		userID, code,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (c *CoreDB) RevokeInvite(code string) error {
+	result, err := c.db.Exec(
+		"UPDATE invites SET revoked = 1 WHERE code = ? AND used_by IS NULL",
+		code,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (c *CoreDB) GetPendingInvites() ([]Invite, error) {
+	rows, err := c.db.Query(`
+		SELECT i.id, i.code, i.created_by, i.revoked, i.created_at
+		FROM invites i
+		WHERE i.used_by IS NULL AND i.revoked = 0
+		ORDER BY i.created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var invites []Invite
+	for rows.Next() {
+		var inv Invite
+		var revoked int
+		if err := rows.Scan(&inv.ID, &inv.Code, &inv.CreatedBy, &revoked, &inv.CreatedAt); err != nil {
+			return nil, err
+		}
+		inv.Revoked = revoked == 1
+		invites = append(invites, inv)
+	}
+	return invites, rows.Err()
+}
+
+func (c *CoreDB) BlockUser(userID int64) error {
+	_, err := c.db.Exec("UPDATE users SET blocked = 1 WHERE id = ?", userID)
+	return err
+}
+
+func (c *CoreDB) UnblockUser(userID int64) error {
+	_, err := c.db.Exec("UPDATE users SET blocked = 0 WHERE id = ?", userID)
+	return err
+}
+
+func (c *CoreDB) ListUsers() ([]User, error) {
+	rows, err := c.db.Query(`
+		SELECT id, username, password_hash, display_name, role, blocked, created_at
+		FROM users
+		ORDER BY created_at ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		var blocked int
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &blocked, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		u.Blocked = blocked == 1
+		users = append(users, u)
+	}
+	return users, rows.Err()
 }

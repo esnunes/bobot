@@ -139,10 +139,16 @@ class ChatClient {
         this.ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             // Handle both user and assistant messages from broadcast
-            if (data.role === 'assistant') {
+            if (data.role === 'assistant' || data.role === 'system') {
                 this.removeTypingIndicator();
             }
-            this.addMessage(data.content, data.role);
+            // Show typing indicator after user message is displayed
+            if (data.role === 'user') {
+                this.addMessage(data.content, data.role);
+                this.showTypingIndicator();
+            } else {
+                this.addMessage(data.content, data.role);
+            }
             this.updateLastSeenTimestamp(new Date().toISOString());
         };
 
@@ -224,14 +230,16 @@ class ChatClient {
 
         // Don't add message locally - wait for server broadcast
         // This ensures consistency across all devices
-        this.showTypingIndicator();
+        // Typing indicator is shown after user message is displayed in onmessage
         this.ws.send(JSON.stringify({content: content}));
         this.input.value = '';
     }
 
     addMessage(content, role, id = null, scroll = true) {
         const msgEl = document.createElement('div');
-        msgEl.className = `message ${role}`;
+        // Map command to user styling for display
+        const displayRole = role === 'command' ? 'user' : role;
+        msgEl.className = `message ${displayRole}`;
         msgEl.textContent = content;
         if (id) {
             msgEl.setAttribute('data-message-id', id);
@@ -244,7 +252,9 @@ class ChatClient {
 
     prependMessage(content, role, id = null) {
         const msgEl = document.createElement('div');
-        msgEl.className = `message ${role}`;
+        // Map command to user styling for display
+        const displayRole = role === 'command' ? 'user' : role;
+        msgEl.className = `message ${displayRole}`;
         msgEl.textContent = content;
         if (id) {
             msgEl.setAttribute('data-message-id', id);

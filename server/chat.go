@@ -2,9 +2,11 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 
@@ -48,8 +50,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	s.connections.Add(claims.UserID, conn)
 	defer s.connections.Remove(claims.UserID, conn)
 
-	// Create context with user ID
-	ctx := auth.ContextWithUserID(r.Context(), claims.UserID)
+	// Create context with user data
+	ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
+		UserID: claims.UserID,
+		Role:   claims.Role,
+	})
 
 	// Handle messages
 	for {
@@ -59,6 +64,36 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 				log.Printf("websocket error: %v", err)
 			}
 			break
+		}
+
+		// Check for slash commands
+		if response, handled := s.handleSlashCommand(ctx, msg.Content); handled {
+			// Store command message
+			s.db.CreateMessageWithContextThreshold(
+				claims.UserID, "command", msg.Content,
+				s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+			)
+
+			// Broadcast user message first
+			userMsgJSON, _ := json.Marshal(map[string]interface{}{
+				"role":    "command",
+				"content": msg.Content,
+			})
+			s.connections.Broadcast(claims.UserID, userMsgJSON)
+
+			// Store system response
+			s.db.CreateMessageWithContextThreshold(
+				claims.UserID, "system", response,
+				s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+			)
+
+			// Broadcast command response
+			respJSON, _ := json.Marshal(map[string]interface{}{
+				"role":    "system",
+				"content": response,
+			})
+			s.connections.Broadcast(claims.UserID, respJSON)
+			continue
 		}
 
 		// Save user message with context tracking
@@ -94,4 +129,57 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		})
 		s.connections.Broadcast(claims.UserID, assistantMsgJSON)
 	}
+}
+
+// handleSlashCommand processes slash commands and returns the response.
+// Returns (response, true) if the message was a slash command, ("", false) otherwise.
+func (s *Server) handleSlashCommand(ctx context.Context, content string) (string, bool) {
+	content = strings.TrimSpace(content)
+	if !strings.HasPrefix(content, "/") {
+		return "", false
+	}
+
+	parts := strings.Fields(content)
+	if len(parts) < 1 {
+		return "", false
+	}
+
+	// Extract tool name (without leading /)
+	toolName := parts[0][1:]
+
+	// Check if tool exists
+	tool, ok := s.registry.Get(toolName)
+	if !ok {
+		return "Error: unknown command /" + toolName, true
+	}
+
+	// Check if command is provided
+	if len(parts) < 2 {
+		return "Error: missing command. Usage: /" + toolName + " <command>", true
+	}
+
+	command := parts[1]
+
+	// Build input for the tool
+	input := map[string]interface{}{
+		"command": command,
+	}
+
+	// Add additional arguments based on command
+	if len(parts) > 2 {
+		switch command {
+		case "block", "unblock":
+			input["username"] = parts[2]
+		case "revoke":
+			input["code"] = parts[2]
+		}
+	}
+
+	// Execute the tool
+	result, err := tool.Execute(ctx, input)
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
+
+	return result, true
 }

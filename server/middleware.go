@@ -39,7 +39,10 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := auth.ContextWithUserID(r.Context(), claims.UserID)
+		ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
+			UserID: claims.UserID,
+			Role:   claims.Role,
+		})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

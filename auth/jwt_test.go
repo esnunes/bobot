@@ -96,3 +96,40 @@ func TestJWTService_WrongSigningMethod(t *testing.T) {
 		t.Error("expected error for token with HS384 signing method")
 	}
 }
+
+func TestJWTService_GenerateAccessTokenWithRole(t *testing.T) {
+	svc := NewJWTService("test-secret-key-32-chars-min!!")
+
+	token, err := svc.GenerateAccessTokenWithRole(123, "admin")
+	if err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+
+	claims, err := svc.ValidateAccessToken(token)
+	if err != nil {
+		t.Fatalf("failed to validate token: %v", err)
+	}
+
+	if claims.UserID != 123 {
+		t.Errorf("expected user_id 123, got %d", claims.UserID)
+	}
+	if claims.Role != "admin" {
+		t.Errorf("expected role 'admin', got %s", claims.Role)
+	}
+}
+
+func TestJWTService_RoleDefaultsToEmpty(t *testing.T) {
+	svc := NewJWTService("test-secret-key-32-chars-min!!")
+
+	// Old tokens without role should still work
+	token, _ := svc.GenerateAccessToken(456)
+	claims, err := svc.ValidateAccessToken(token)
+	if err != nil {
+		t.Fatalf("failed to validate token: %v", err)
+	}
+
+	// Role should be empty for backward compat
+	if claims.Role != "" {
+		t.Errorf("expected empty role for old token, got %s", claims.Role)
+	}
+}

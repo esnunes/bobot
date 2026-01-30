@@ -14,6 +14,7 @@ func (m *mockTool) Schema() interface{} { return map[string]string{"type": "obje
 func (m *mockTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	return "executed", nil
 }
+func (m *mockTool) AdminOnly() bool { return false }
 
 func TestRegistry_Register(t *testing.T) {
 	reg := NewRegistry()

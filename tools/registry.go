@@ -13,6 +13,7 @@ type Tool interface {
 	Description() string
 	Schema() interface{}
 	Execute(ctx context.Context, input map[string]interface{}) (string, error)
+	AdminOnly() bool
 }
 
 type Registry struct {
@@ -53,6 +54,21 @@ func (r *Registry) Execute(ctx context.Context, name string, input map[string]in
 func (r *Registry) ToLLMTools() []llm.Tool {
 	result := make([]llm.Tool, 0, len(r.tools))
 	for _, tool := range r.tools {
+		result = append(result, llm.Tool{
+			Name:        tool.Name(),
+			Description: tool.Description(),
+			InputSchema: tool.Schema(),
+		})
+	}
+	return result
+}
+
+func (r *Registry) ToLLMToolsForRole(role string) []llm.Tool {
+	result := make([]llm.Tool, 0, len(r.tools))
+	for _, tool := range r.tools {
+		if tool.AdminOnly() && role != "admin" {
+			continue
+		}
 		result = append(result, llm.Tool{
 			Name:        tool.Name(),
 			Description: tool.Description(),

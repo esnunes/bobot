@@ -16,6 +16,7 @@ type Config struct {
 	History  HistoryConfig
 	Sync     SyncConfig
 	DataDir  string
+	BaseURL  string
 	InitUser string
 	InitPass string
 }
@@ -75,6 +76,7 @@ func Load() (*Config, error) {
 			MaxLookback: getEnvDurationOrDefault("BOBOT_SYNC_MAX_LOOKBACK", 24*time.Hour),
 		},
 		DataDir:  getEnvOrDefault("BOBOT_DATA_DIR", "./data"),
+		BaseURL:  getEnvOrDefault("BOBOT_BASE_URL", "http://localhost:8080"),
 		InitUser: os.Getenv("BOBOT_INIT_USER"),
 		InitPass: os.Getenv("BOBOT_INIT_PASS"),
 	}

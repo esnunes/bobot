@@ -36,7 +36,7 @@ func TestHandleRecentMessages(t *testing.T) {
 
 	// Create request with auth context
 	req := httptest.NewRequest("GET", "/api/messages/recent?limit=10", nil)
-	req = req.WithContext(auth.ContextWithUserID(req.Context(), user.ID))
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
 	rec := httptest.NewRecorder()
 
 	srv.handleRecentMessages(rec, req)
@@ -77,7 +77,7 @@ func TestHandleMessageHistory(t *testing.T) {
 	srv := New(cfg, coreDB, jwt)
 
 	req := httptest.NewRequest("GET", "/api/messages/history?before=5&limit=2", nil)
-	req = req.WithContext(auth.ContextWithUserID(req.Context(), user.ID))
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
 	rec := httptest.NewRecorder()
 
 	srv.handleMessageHistory(rec, req)
@@ -111,7 +111,7 @@ func TestHandleMessageSync(t *testing.T) {
 	srv := New(cfg, coreDB, jwt)
 
 	req := httptest.NewRequest("GET", "/api/messages/sync?since="+since, nil)
-	req = req.WithContext(auth.ContextWithUserID(req.Context(), user.ID))
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
 	rec := httptest.NewRecorder()
 
 	srv.handleMessageSync(rec, req)

@@ -17,6 +17,7 @@ import (
 	"github.com/esnunes/bobot/skills"
 	"github.com/esnunes/bobot/tools"
 	"github.com/esnunes/bobot/tools/task"
+	"github.com/esnunes/bobot/tools/user"
 )
 
 func main() {
@@ -48,11 +49,11 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to hash initial password: %v", err)
 			}
-			_, err = coreDB.CreateUser(cfg.InitUser, hash)
+			_, err = coreDB.CreateUserFull(cfg.InitUser, hash, cfg.InitUser, "admin")
 			if err != nil {
 				log.Fatalf("Failed to create initial user: %v", err)
 			}
-			log.Printf("Created initial user: %s", cfg.InitUser)
+			log.Printf("Created initial admin user: %s", cfg.InitUser)
 		}
 	}
 
@@ -62,6 +63,7 @@ func main() {
 	// Initialize tool registry
 	registry := tools.NewRegistry()
 	registry.Register(task.NewTaskTool(taskDB))
+	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
 
 	// Load embedded skills
 	loadedSkills, err := assistant.LoadSkills(skills.FS)
@@ -79,7 +81,7 @@ func main() {
 	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter)
 
 	// Initialize HTTP server
-	srv := server.NewWithAssistant(cfg, coreDB, jwtSvc, engine)
+	srv := server.NewWithAssistant(cfg, coreDB, jwtSvc, engine, registry)
 
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

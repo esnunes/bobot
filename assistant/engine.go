@@ -40,8 +40,11 @@ func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill, 
 // Chat processes a user message and returns the assistant's response.
 // The context must contain the user ID (set by auth middleware).
 func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
-	// Build system prompt
-	llmTools := e.registry.ToLLMTools()
+	// Get role from context for tool filtering
+	role := auth.RoleFromContext(ctx)
+
+	// Build system prompt with role-filtered tools
+	llmTools := e.registry.ToLLMToolsForRole(role)
 	systemPrompt := BuildSystemPrompt(e.skills, llmTools)
 
 	// Build messages with context

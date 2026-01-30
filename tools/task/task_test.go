@@ -26,7 +26,7 @@ func TestTaskTool_Name(t *testing.T) {
 func TestTaskTool_Create(t *testing.T) {
 	tool := setupTestTool(t)
 
-	ctx := auth.ContextWithUserID(context.Background(), 1)
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	result, err := tool.Execute(ctx, map[string]interface{}{
 		"command": "create",
 		"project": "groceries",
@@ -44,7 +44,7 @@ func TestTaskTool_Create(t *testing.T) {
 func TestTaskTool_List(t *testing.T) {
 	tool := setupTestTool(t)
 
-	ctx := auth.ContextWithUserID(context.Background(), 1)
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	tool.Execute(ctx, map[string]interface{}{
 		"command": "create",
 		"project": "groceries",
@@ -72,7 +72,7 @@ func TestTaskTool_List(t *testing.T) {
 func TestTaskTool_Update(t *testing.T) {
 	tool := setupTestTool(t)
 
-	ctx := auth.ContextWithUserID(context.Background(), 1)
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	tool.Execute(ctx, map[string]interface{}{
 		"command": "create",
 		"project": "groceries",
@@ -97,7 +97,7 @@ func TestTaskTool_Update(t *testing.T) {
 func TestTaskTool_Delete(t *testing.T) {
 	tool := setupTestTool(t)
 
-	ctx := auth.ContextWithUserID(context.Background(), 1)
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	tool.Execute(ctx, map[string]interface{}{
 		"command": "create",
 		"project": "groceries",

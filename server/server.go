@@ -11,6 +11,7 @@ import (
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/config"
 	"github.com/esnunes/bobot/db"
+	"github.com/esnunes/bobot/tools"
 	"github.com/esnunes/bobot/web"
 )
 
@@ -19,21 +20,23 @@ type Server struct {
 	db          *db.CoreDB
 	jwt         *auth.JWTService
 	engine      *assistant.Engine
+	registry    *tools.Registry
 	connections *ConnectionRegistry
 	router      *http.ServeMux
 	templates   map[string]*template.Template
 }
 
 func New(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTService) *Server {
-	return NewWithAssistant(cfg, coreDB, jwt, nil)
+	return NewWithAssistant(cfg, coreDB, jwt, nil, nil)
 }
 
-func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTService, engine *assistant.Engine) *Server {
+func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTService, engine *assistant.Engine, registry *tools.Registry) *Server {
 	s := &Server{
 		cfg:         cfg,
 		db:          coreDB,
 		jwt:         jwt,
 		engine:      engine,
+		registry:    registry,
 		connections: NewConnectionRegistry(),
 		router:      http.NewServeMux(),
 		templates:   make(map[string]*template.Template),
@@ -48,6 +51,7 @@ func (s *Server) routes() {
 	// API routes
 	s.router.HandleFunc("GET /health", s.handleHealth)
 	s.router.HandleFunc("POST /api/login", s.handleLogin)
+	s.router.HandleFunc("POST /api/signup", s.handleSignup)
 	s.router.HandleFunc("POST /api/refresh", s.handleRefresh)
 	s.router.HandleFunc("POST /api/logout", s.handleLogout)
 	s.router.HandleFunc("GET /ws/chat", s.handleChat)
@@ -59,6 +63,7 @@ func (s *Server) routes() {
 
 	// Page routes
 	s.router.HandleFunc("GET /", s.handleLoginPage)
+	s.router.HandleFunc("GET /signup", s.handleSignupPage)
 	s.router.HandleFunc("GET /chat", s.handleChatPage)
 
 	// Static files
@@ -82,7 +87,10 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		ctx := auth.ContextWithUserID(r.Context(), claims.UserID)
+		ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
+			UserID: claims.UserID,
+			Role:   claims.Role,
+		})
 		next(w, r.WithContext(ctx))
 	}
 }
