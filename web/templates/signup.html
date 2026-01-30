@@ -1,0 +1,58 @@
+{{define "content"}}
+<div class="login-container">
+    <h1>bobot</h1>
+    {{if .Error}}
+    <p class="error">{{.Error}}</p>
+    {{else}}
+    <form id="signup-form" class="login-form">
+        <input type="hidden" name="code" value="{{.Code}}">
+        <input type="text" name="username" placeholder="Username" required autofocus
+               pattern="[a-zA-Z0-9_]+" minlength="3" title="Letters, numbers, and underscores only">
+        <input type="text" name="display_name" placeholder="Display Name" required>
+        <input type="password" name="password" placeholder="Password" required minlength="8">
+        <input type="password" name="confirm_password" placeholder="Confirm Password" required>
+        <button type="submit">Sign Up</button>
+        <p id="error-message" class="error hidden"></p>
+    </form>
+    {{end}}
+</div>
+<script>
+document.getElementById('signup-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const errorEl = document.getElementById('error-message');
+
+    if (form.password.value !== form.confirm_password.value) {
+        errorEl.textContent = 'Passwords do not match';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/signup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                code: form.code.value,
+                username: form.username.value,
+                display_name: form.display_name.value,
+                password: form.password.value
+            })
+        });
+
+        if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(text || 'Signup failed');
+        }
+
+        const data = await resp.json();
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
+        window.location.href = '/chat';
+    } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.classList.remove('hidden');
+    }
+});
+</script>
+{{end}}

@@ -269,3 +269,116 @@ func TestRefresh_BlockedUser(t *testing.T) {
 		t.Errorf("expected 403, got %d", w.Code)
 	}
 }
+
+func TestSignup_ValidInvite(t *testing.T) {
+	srv := setupTestServer(t)
+
+	// Create admin and invite
+	admin, _ := srv.db.CreateUserFull("admin", "hash", "Admin", "admin")
+	srv.db.CreateInvite(admin.ID, "validcode")
+
+	body := `{"code":"validcode","username":"newuser","display_name":"New User","password":"password123"}`
+	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify user was created
+	user, err := srv.db.GetUserByUsername("newuser")
+	if err != nil {
+		t.Fatalf("user not created: %v", err)
+	}
+	if user.DisplayName != "New User" {
+		t.Errorf("expected display name 'New User', got %s", user.DisplayName)
+	}
+	if user.Role != "user" {
+		t.Errorf("expected role 'user', got %s", user.Role)
+	}
+
+	// Verify invite was marked as used
+	invite, _ := srv.db.GetInviteByCode("validcode")
+	if invite.UsedBy == nil {
+		t.Error("invite should be marked as used")
+	}
+}
+
+func TestSignup_InvalidInvite(t *testing.T) {
+	srv := setupTestServer(t)
+
+	body := `{"code":"invalidcode","username":"newuser","display_name":"New User","password":"password123"}`
+	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestSignup_UsernameValidation(t *testing.T) {
+	srv := setupTestServer(t)
+
+	admin, _ := srv.db.CreateUserFull("admin", "hash", "Admin", "admin")
+	srv.db.CreateInvite(admin.ID, "testcode")
+
+	// Too short
+	body := `{"code":"testcode","username":"ab","display_name":"Test","password":"password123"}`
+	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for short username, got %d", w.Code)
+	}
+}
+
+func TestSignup_PasswordValidation(t *testing.T) {
+	srv := setupTestServer(t)
+
+	admin, _ := srv.db.CreateUserFull("admin", "hash", "Admin", "admin")
+	srv.db.CreateInvite(admin.ID, "testcode2")
+
+	// Too short
+	body := `{"code":"testcode2","username":"validuser","display_name":"Test","password":"short"}`
+	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for short password, got %d", w.Code)
+	}
+}
+
+func TestSignup_UsedInvite(t *testing.T) {
+	srv := setupTestServer(t)
+
+	admin, _ := srv.db.CreateUserFull("admin", "hash", "Admin", "admin")
+	srv.db.CreateInvite(admin.ID, "usedcode")
+
+	// Use the invite first
+	user, _ := srv.db.CreateUserFull("firstuser", "hash", "First", "user")
+	srv.db.UseInvite("usedcode", user.ID)
+
+	// Try to use it again
+	body := `{"code":"usedcode","username":"seconduser","display_name":"Second","password":"password123"}`
+	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for used invite, got %d", w.Code)
+	}
+}

@@ -48,6 +48,7 @@ func (s *Server) routes() {
 	// API routes
 	s.router.HandleFunc("GET /health", s.handleHealth)
 	s.router.HandleFunc("POST /api/login", s.handleLogin)
+	s.router.HandleFunc("POST /api/signup", s.handleSignup)
 	s.router.HandleFunc("POST /api/refresh", s.handleRefresh)
 	s.router.HandleFunc("POST /api/logout", s.handleLogout)
 	s.router.HandleFunc("GET /ws/chat", s.handleChat)
@@ -59,6 +60,7 @@ func (s *Server) routes() {
 
 	// Page routes
 	s.router.HandleFunc("GET /", s.handleLoginPage)
+	s.router.HandleFunc("GET /signup", s.handleSignupPage)
 	s.router.HandleFunc("GET /chat", s.handleChatPage)
 
 	// Static files
