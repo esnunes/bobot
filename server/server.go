@@ -4,13 +4,14 @@ package server
 import (
 	"encoding/json"
 	"html/template"
+	"io/fs"
 	"net/http"
-	"path/filepath"
 
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/config"
 	"github.com/esnunes/bobot/db"
+	"github.com/esnunes/bobot/web"
 )
 
 type Server struct {
@@ -36,10 +37,7 @@ func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTServic
 		templates: make(map[string]*template.Template),
 	}
 
-	if cfg.WebDir != "" {
-		s.loadTemplates()
-	}
-
+	s.loadTemplates()
 	s.routes()
 	return s
 }
@@ -57,10 +55,8 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /chat", s.handleChatPage)
 
 	// Static files
-	if s.cfg.WebDir != "" {
-		staticDir := filepath.Join(s.cfg.WebDir, "static")
-		s.router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
-	}
+	staticFS, _ := fs.Sub(web.FS, "static")
+	s.router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

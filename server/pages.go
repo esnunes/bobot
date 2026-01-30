@@ -4,7 +4,8 @@ package server
 import (
 	"html/template"
 	"net/http"
-	"path/filepath"
+
+	"github.com/esnunes/bobot/web"
 )
 
 type PageData struct {
@@ -12,15 +13,13 @@ type PageData struct {
 }
 
 func (s *Server) loadTemplates() error {
-	layout := filepath.Join(s.cfg.WebDir, "templates", "layout.html")
-
-	loginTmpl, err := template.ParseFiles(layout, filepath.Join(s.cfg.WebDir, "templates", "login.html"))
+	loginTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/login.html")
 	if err != nil {
 		return err
 	}
 	s.templates["login"] = loginTmpl
 
-	chatTmpl, err := template.ParseFiles(layout, filepath.Join(s.cfg.WebDir, "templates", "chat.html"))
+	chatTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/chat.html")
 	if err != nil {
 		return err
 	}
