@@ -2,6 +2,7 @@
 package server
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -43,6 +44,10 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	// Register connection for multi-device support
+	s.connections.Add(claims.UserID, conn)
+	defer s.connections.Remove(claims.UserID, conn)
+
 	// Create context with user ID
 	ctx := auth.ContextWithUserID(r.Context(), claims.UserID)
 
@@ -62,6 +67,13 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
+		// Broadcast user message to all connections
+		userMsgJSON, _ := json.Marshal(map[string]interface{}{
+			"role":    "user",
+			"content": msg.Content,
+		})
+		s.connections.Broadcast(claims.UserID, userMsgJSON)
+
 		// Get assistant response
 		response, err := s.engine.Chat(ctx, msg.Content)
 		if err != nil {
@@ -75,10 +87,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
-		// Send response
-		if err := conn.WriteJSON(chatMessage{Content: response}); err != nil {
-			log.Printf("websocket write error: %v", err)
-			break
-		}
+		// Broadcast assistant response to all connections
+		assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
+			"role":    "assistant",
+			"content": response,
+		})
+		s.connections.Broadcast(claims.UserID, assistantMsgJSON)
 	}
 }

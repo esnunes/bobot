@@ -94,15 +94,25 @@ func TestChatWebSocket_SendMessage(t *testing.T) {
 		t.Fatalf("failed to send message: %v", err)
 	}
 
-	// Read response
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	var resp map[string]string
-	err = conn.ReadJSON(&resp)
+
+	// First broadcast: user message echo
+	var userResp map[string]string
+	err = conn.ReadJSON(&userResp)
 	if err != nil {
-		t.Fatalf("failed to read response: %v", err)
+		t.Fatalf("failed to read user message echo: %v", err)
+	}
+	if userResp["role"] != "user" || userResp["content"] != "Hello" {
+		t.Errorf("unexpected user echo: %v", userResp)
 	}
 
-	if resp["content"] != "Hello from assistant!" {
-		t.Errorf("unexpected response: %s", resp["content"])
+	// Second broadcast: assistant response
+	var assistantResp map[string]string
+	err = conn.ReadJSON(&assistantResp)
+	if err != nil {
+		t.Fatalf("failed to read assistant response: %v", err)
+	}
+	if assistantResp["role"] != "assistant" || assistantResp["content"] != "Hello from assistant!" {
+		t.Errorf("unexpected assistant response: %v", assistantResp)
 	}
 }

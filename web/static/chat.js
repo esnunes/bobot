@@ -138,8 +138,11 @@ class ChatClient {
 
         this.ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            this.removeTypingIndicator();
-            this.addMessage(data.content, 'assistant');
+            // Handle both user and assistant messages from broadcast
+            if (data.role === 'assistant') {
+                this.removeTypingIndicator();
+            }
+            this.addMessage(data.content, data.role);
             this.updateLastSeenTimestamp(new Date().toISOString());
         };
 
@@ -219,8 +222,8 @@ class ChatClient {
             return;
         }
 
-        this.addMessage(content, 'user');
-        this.updateLastSeenTimestamp(new Date().toISOString());
+        // Don't add message locally - wait for server broadcast
+        // This ensures consistency across all devices
         this.showTypingIndicator();
         this.ws.send(JSON.stringify({content: content}));
         this.input.value = '';

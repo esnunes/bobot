@@ -15,12 +15,13 @@ import (
 )
 
 type Server struct {
-	cfg       *config.Config
-	db        *db.CoreDB
-	jwt       *auth.JWTService
-	engine    *assistant.Engine
-	router    *http.ServeMux
-	templates map[string]*template.Template
+	cfg         *config.Config
+	db          *db.CoreDB
+	jwt         *auth.JWTService
+	engine      *assistant.Engine
+	connections *ConnectionRegistry
+	router      *http.ServeMux
+	templates   map[string]*template.Template
 }
 
 func New(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTService) *Server {
@@ -29,12 +30,13 @@ func New(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTService) *Server {
 
 func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTService, engine *assistant.Engine) *Server {
 	s := &Server{
-		cfg:       cfg,
-		db:        coreDB,
-		jwt:       jwt,
-		engine:    engine,
-		router:    http.NewServeMux(),
-		templates: make(map[string]*template.Template),
+		cfg:         cfg,
+		db:          coreDB,
+		jwt:         jwt,
+		engine:      engine,
+		connections: NewConnectionRegistry(),
+		router:      http.NewServeMux(),
+		templates:   make(map[string]*template.Template),
 	}
 
 	s.loadTemplates()
