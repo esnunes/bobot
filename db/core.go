@@ -59,6 +59,13 @@ type Group struct {
 	CreatedAt time.Time
 }
 
+type GroupMember struct {
+	UserID      int64
+	Username    string
+	DisplayName string
+	JoinedAt    time.Time
+}
+
 type CoreDB struct {
 	db *sql.DB
 }
@@ -865,4 +872,38 @@ func (c *CoreDB) GetUserGroups(userID int64) ([]Group, error) {
 		groups = append(groups, g)
 	}
 	return groups, rows.Err()
+}
+
+// SoftDeleteGroup marks a group as deleted.
+func (c *CoreDB) SoftDeleteGroup(groupID int64) error {
+	_, err := c.db.Exec(
+		"UPDATE groups SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?",
+		groupID,
+	)
+	return err
+}
+
+// GetGroupMembers retrieves all members of a group.
+func (c *CoreDB) GetGroupMembers(groupID int64) ([]GroupMember, error) {
+	rows, err := c.db.Query(`
+		SELECT u.id, u.username, u.display_name, gm.joined_at
+		FROM group_members gm
+		JOIN users u ON gm.user_id = u.id
+		WHERE gm.group_id = ?
+		ORDER BY gm.joined_at ASC
+	`, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []GroupMember
+	for rows.Next() {
+		var m GroupMember
+		if err := rows.Scan(&m.UserID, &m.Username, &m.DisplayName, &m.JoinedAt); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, rows.Err()
 }

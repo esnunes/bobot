@@ -800,3 +800,43 @@ func TestGetUserGroups(t *testing.T) {
 		t.Errorf("expected 2 groups, got %d", len(groups))
 	}
 }
+
+func TestSoftDeleteGroup(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	err := db.SoftDeleteGroup(group.ID)
+	if err != nil {
+		t.Fatalf("SoftDeleteGroup failed: %v", err)
+	}
+
+	// Should not be found after soft delete
+	_, err = db.GetGroupByID(group.ID)
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound after soft delete, got %v", err)
+	}
+}
+
+func TestGetGroupMembers(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUserFull("owner", "hash", "Owner", "user")
+	member, _ := db.CreateUserFull("member", "hash", "Member", "user")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+	db.AddGroupMember(group.ID, owner.ID)
+	db.AddGroupMember(group.ID, member.ID)
+
+	members, err := db.GetGroupMembers(group.ID)
+	if err != nil {
+		t.Fatalf("GetGroupMembers failed: %v", err)
+	}
+	if len(members) != 2 {
+		t.Errorf("expected 2 members, got %d", len(members))
+	}
+}
