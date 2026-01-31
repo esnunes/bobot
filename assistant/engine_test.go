@@ -140,3 +140,43 @@ func TestEngine_ChatWithContext(t *testing.T) {
 		t.Errorf("expected last message to be 'new question', got %v", capturedMessages[2].Content)
 	}
 }
+
+func TestEngine_ChatWithConversation(t *testing.T) {
+	// Create a mock provider that captures the messages sent
+	var capturedMessages []llm.Message
+	var capturedSystemPrompt string
+	mockProv := &mockProvider{
+		chatFunc: func(ctx context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedMessages = req.Messages
+			capturedSystemPrompt = req.SystemPrompt
+			return &llm.ChatResponse{Content: "Test response"}, nil
+		},
+	}
+
+	mockCtxProvider := &mockContextProvider{messages: nil}
+	registry := tools.NewRegistry()
+	engine := NewEngine(mockProv, registry, nil, mockCtxProvider)
+
+	conversation := []string{
+		"[Alice]: Hello @assistant",
+		"[Bob]: Yes, please help us",
+	}
+
+	response, err := engine.ChatWithContext(context.Background(), conversation)
+	if err != nil {
+		t.Fatalf("ChatWithContext failed: %v", err)
+	}
+	if response == "" {
+		t.Error("expected non-empty response")
+	}
+
+	// Check system prompt contains group chat instructions
+	if capturedSystemPrompt == "" {
+		t.Error("expected non-empty system prompt")
+	}
+
+	// Should have 2 messages from conversation
+	if len(capturedMessages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(capturedMessages))
+	}
+}
