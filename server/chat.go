@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -67,68 +68,172 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Check for slash commands
-		if response, handled := s.handleSlashCommand(ctx, msg.Content); handled {
-			// Store command message
-			s.db.CreateMessageWithContextThreshold(
-				claims.UserID, "command", msg.Content,
-				s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
-			)
-
-			// Broadcast user message first
-			userMsgJSON, _ := json.Marshal(map[string]interface{}{
-				"role":    "command",
-				"content": msg.Content,
-			})
-			s.connections.Broadcast(claims.UserID, userMsgJSON)
-
-			// Store system response
-			s.db.CreateMessageWithContextThreshold(
-				claims.UserID, "system", response,
-				s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
-			)
-
-			// Broadcast command response
-			respJSON, _ := json.Marshal(map[string]interface{}{
-				"role":    "system",
-				"content": response,
-			})
-			s.connections.Broadcast(claims.UserID, respJSON)
-			continue
+		if msg.GroupID != nil {
+			// Handle group message
+			s.handleGroupChatMessage(ctx, claims.UserID, *msg.GroupID, msg.Content)
+		} else {
+			// Handle 1:1 message (existing logic)
+			s.handlePrivateChatMessage(ctx, claims.UserID, msg.Content)
 		}
+	}
+}
 
-		// Save user message with context tracking
+func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, content string) {
+	// Check for slash commands
+	if response, handled := s.handleSlashCommand(ctx, content); handled {
 		s.db.CreateMessageWithContextThreshold(
-			claims.UserID, "user", msg.Content,
+			userID, "command", content,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
-		// Broadcast user message to all connections
 		userMsgJSON, _ := json.Marshal(map[string]interface{}{
-			"role":    "user",
-			"content": msg.Content,
+			"role":    "command",
+			"content": content,
 		})
-		s.connections.Broadcast(claims.UserID, userMsgJSON)
+		s.connections.Broadcast(userID, userMsgJSON)
 
-		// Get assistant response
-		response, err := s.engine.Chat(ctx, msg.Content)
-		if err != nil {
-			log.Printf("assistant error: %v", err)
-			response = "Sorry, I encountered an error. Please try again."
-		}
-
-		// Save assistant message with context tracking
 		s.db.CreateMessageWithContextThreshold(
-			claims.UserID, "assistant", response,
+			userID, "system", response,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
-		// Broadcast assistant response to all connections
-		assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
-			"role":    "assistant",
+		respJSON, _ := json.Marshal(map[string]interface{}{
+			"role":    "system",
 			"content": response,
 		})
-		s.connections.Broadcast(claims.UserID, assistantMsgJSON)
+		s.connections.Broadcast(userID, respJSON)
+		return
+	}
+
+	// Save user message with context tracking
+	s.db.CreateMessageWithContextThreshold(
+		userID, "user", content,
+		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+	)
+
+	// Broadcast user message
+	userMsgJSON, _ := json.Marshal(map[string]interface{}{
+		"role":    "user",
+		"content": content,
+	})
+	s.connections.Broadcast(userID, userMsgJSON)
+
+	// Get assistant response
+	response, err := s.engine.Chat(ctx, content)
+	if err != nil {
+		log.Printf("assistant error: %v", err)
+		response = "Sorry, I encountered an error. Please try again."
+	}
+
+	// Save assistant message
+	s.db.CreateMessageWithContextThreshold(
+		userID, "assistant", response,
+		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+	)
+
+	// Broadcast assistant response
+	assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
+		"role":    "assistant",
+		"content": response,
+	})
+	s.connections.Broadcast(userID, assistantMsgJSON)
+}
+
+func (s *Server) handleGroupChatMessage(ctx context.Context, userID, groupID int64, content string) {
+	// Verify membership
+	isMember, err := s.db.IsGroupMember(groupID, userID)
+	if err != nil || !isMember {
+		log.Printf("user %d not member of group %d", userID, groupID)
+		return
+	}
+
+	// Get user info for display
+	user, err := s.db.GetUserByID(userID)
+	if err != nil {
+		log.Printf("failed to get user: %v", err)
+		return
+	}
+
+	// Save user message
+	s.db.CreateGroupMessageWithContext(
+		groupID, userID, "user", content,
+		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+	)
+
+	// Broadcast to all group members
+	userMsgJSON, _ := json.Marshal(map[string]interface{}{
+		"group_id":     groupID,
+		"role":         "user",
+		"content":      content,
+		"user_id":      userID,
+		"display_name": user.DisplayName,
+	})
+	s.broadcastToGroup(groupID, userMsgJSON)
+
+	// Check if assistant should respond
+	if shouldTriggerAssistant(content) {
+		s.handleGroupAssistantResponse(ctx, groupID)
+	}
+}
+
+func shouldTriggerAssistant(content string) bool {
+	return strings.Contains(strings.ToLower(content), "@assistant")
+}
+
+func (s *Server) handleGroupAssistantResponse(ctx context.Context, groupID int64) {
+	// Get context messages
+	messages, err := s.db.GetGroupContextMessages(groupID)
+	if err != nil {
+		log.Printf("failed to get group context: %v", err)
+		return
+	}
+
+	// Build conversation for LLM with user attribution
+	var conversation []string
+	for _, m := range messages {
+		if m.Role == "user" {
+			user, _ := s.db.GetUserByID(m.UserID)
+			name := "User"
+			if user != nil && user.DisplayName != "" {
+				name = user.DisplayName
+			}
+			conversation = append(conversation, fmt.Sprintf("[%s]: %s", name, m.Content))
+		} else {
+			conversation = append(conversation, fmt.Sprintf("[assistant]: %s", m.Content))
+		}
+	}
+
+	// Get response from engine
+	response, err := s.engine.ChatWithContext(ctx, conversation)
+	if err != nil {
+		log.Printf("assistant error: %v", err)
+		response = "Sorry, I encountered an error. Please try again."
+	}
+
+	// Save assistant message (userID 0 for assistant)
+	s.db.CreateGroupMessageWithContext(
+		groupID, 0, "assistant", response,
+		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+	)
+
+	// Broadcast to group
+	assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
+		"group_id": groupID,
+		"role":     "assistant",
+		"content":  response,
+	})
+	s.broadcastToGroup(groupID, assistantMsgJSON)
+}
+
+func (s *Server) broadcastToGroup(groupID int64, data []byte) {
+	members, err := s.db.GetGroupMembers(groupID)
+	if err != nil {
+		log.Printf("failed to get group members: %v", err)
+		return
+	}
+
+	for _, member := range members {
+		s.connections.Broadcast(member.UserID, data)
 	}
 }
 
