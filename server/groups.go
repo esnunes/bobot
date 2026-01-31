@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/esnunes/bobot/auth"
 )
@@ -234,4 +235,154 @@ func (s *Server) handleRemoveGroupMember(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleGroupRecentMessages(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	groupID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	// Check membership
+	isMember, err := s.db.IsGroupMember(groupID, userData.UserID)
+	if err != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+
+	messages, err := s.db.GetGroupRecentMessages(groupID, limit)
+	if err != nil {
+		http.Error(w, "failed to get messages", http.StatusInternalServerError)
+		return
+	}
+
+	// Enrich with user display names
+	result := make([]map[string]interface{}, 0, len(messages))
+	for _, m := range messages {
+		item := map[string]interface{}{
+			"ID":        m.ID,
+			"Role":      m.Role,
+			"Content":   m.Content,
+			"CreatedAt": m.CreatedAt,
+		}
+		if m.Role == "user" {
+			if user, err := s.db.GetUserByID(m.UserID); err == nil {
+				item["UserID"] = user.ID
+				item["DisplayName"] = user.DisplayName
+			}
+		}
+		result = append(result, item)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleGroupMessageHistory(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	groupID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	isMember, err := s.db.IsGroupMember(groupID, userData.UserID)
+	if err != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	beforeID, _ := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64)
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+
+	messages, err := s.db.GetGroupMessagesBefore(groupID, beforeID, limit)
+	if err != nil {
+		http.Error(w, "failed to get messages", http.StatusInternalServerError)
+		return
+	}
+
+	result := make([]map[string]interface{}, 0, len(messages))
+	for _, m := range messages {
+		item := map[string]interface{}{
+			"ID":        m.ID,
+			"Role":      m.Role,
+			"Content":   m.Content,
+			"CreatedAt": m.CreatedAt,
+		}
+		if m.Role == "user" {
+			if user, err := s.db.GetUserByID(m.UserID); err == nil {
+				item["UserID"] = user.ID
+				item["DisplayName"] = user.DisplayName
+			}
+		}
+		result = append(result, item)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleGroupMessageSync(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	groupID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	isMember, err := s.db.IsGroupMember(groupID, userData.UserID)
+	if err != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	sinceStr := r.URL.Query().Get("since")
+	since, err := time.Parse(time.RFC3339, sinceStr)
+	if err != nil {
+		http.Error(w, "invalid since parameter", http.StatusBadRequest)
+		return
+	}
+
+	messages, err := s.db.GetGroupMessagesSince(groupID, since)
+	if err != nil {
+		http.Error(w, "failed to get messages", http.StatusInternalServerError)
+		return
+	}
+
+	result := make([]map[string]interface{}, 0, len(messages))
+	for _, m := range messages {
+		item := map[string]interface{}{
+			"ID":        m.ID,
+			"Role":      m.Role,
+			"Content":   m.Content,
+			"CreatedAt": m.CreatedAt,
+		}
+		if m.Role == "user" {
+			if user, err := s.db.GetUserByID(m.UserID); err == nil {
+				item["UserID"] = user.ID
+				item["DisplayName"] = user.DisplayName
+			}
+		}
+		result = append(result, item)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }

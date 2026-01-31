@@ -68,6 +68,9 @@ func (s *Server) routes() {
 	s.router.HandleFunc("DELETE /api/groups/{id}", s.authMiddleware(s.handleDeleteGroup))
 	s.router.HandleFunc("POST /api/groups/{id}/members", s.authMiddleware(s.handleAddGroupMember))
 	s.router.HandleFunc("DELETE /api/groups/{id}/members/{userId}", s.authMiddleware(s.handleRemoveGroupMember))
+	s.router.HandleFunc("GET /api/groups/{id}/messages/recent", s.authMiddleware(s.handleGroupRecentMessages))
+	s.router.HandleFunc("GET /api/groups/{id}/messages/history", s.authMiddleware(s.handleGroupMessageHistory))
+	s.router.HandleFunc("GET /api/groups/{id}/messages/sync", s.authMiddleware(s.handleGroupMessageSync))
 
 	// Page routes
 	s.router.HandleFunc("GET /", s.handleLoginPage)
