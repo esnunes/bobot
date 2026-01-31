@@ -170,6 +170,19 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Create group_members table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS group_members (
+			group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (group_id, user_id)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	// Create indexes after columns exist
 	_, err = c.db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_messages_user_context
@@ -774,4 +787,13 @@ func (c *CoreDB) CreateGroup(name string, ownerID int64) (*Group, error) {
 		OwnerID:   ownerID,
 		CreatedAt: time.Now(),
 	}, nil
+}
+
+// AddGroupMember adds a user to a group.
+func (c *CoreDB) AddGroupMember(groupID, userID int64) error {
+	_, err := c.db.Exec(
+		"INSERT INTO group_members (group_id, user_id) VALUES (?, ?)",
+		groupID, userID,
+	)
+	return err
 }

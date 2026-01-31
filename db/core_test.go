@@ -711,3 +711,25 @@ func TestCreateGroup(t *testing.T) {
 		t.Error("expected nil deleted_at for new group")
 	}
 }
+
+func TestAddGroupMember(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	member, _ := db.CreateUser("member", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	err := db.AddGroupMember(group.ID, member.ID)
+	if err != nil {
+		t.Fatalf("AddGroupMember failed: %v", err)
+	}
+
+	// Adding same member again should fail or be idempotent
+	err = db.AddGroupMember(group.ID, member.ID)
+	// SQLite will error on duplicate primary key
+	if err == nil {
+		t.Error("expected error when adding duplicate member")
+	}
+}
