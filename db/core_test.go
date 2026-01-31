@@ -860,3 +860,44 @@ func TestCreateGroupMessage(t *testing.T) {
 		t.Errorf("expected content 'Hello group!', got %q", msg.Content)
 	}
 }
+
+func TestGetGroupRecentMessages(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	db.CreateGroupMessage(group.ID, owner.ID, "user", "Message 1")
+	db.CreateGroupMessage(group.ID, owner.ID, "assistant", "Response 1")
+	db.CreateGroupMessage(group.ID, owner.ID, "user", "Message 2")
+
+	msgs, err := db.GetGroupRecentMessages(group.ID, 10)
+	if err != nil {
+		t.Fatalf("GetGroupRecentMessages failed: %v", err)
+	}
+	if len(msgs) != 3 {
+		t.Errorf("expected 3 messages, got %d", len(msgs))
+	}
+}
+
+func TestGetGroupContextMessages(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	db.CreateGroupMessageWithContext(group.ID, owner.ID, "user", "Hello", 1000, 80000)
+	db.CreateGroupMessageWithContext(group.ID, owner.ID, "assistant", "Hi there", 1000, 80000)
+
+	msgs, err := db.GetGroupContextMessages(group.ID)
+	if err != nil {
+		t.Fatalf("GetGroupContextMessages failed: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Errorf("expected 2 context messages, got %d", len(msgs))
+	}
+}
