@@ -81,3 +81,74 @@ func TestListGroups(t *testing.T) {
 		t.Errorf("expected 1 group, got %d", len(groups))
 	}
 }
+
+func TestGetGroup(t *testing.T) {
+	s, coreDB, cleanup := setupGroupTestServer(t)
+	defer cleanup()
+
+	user, _ := coreDB.CreateUser("testuser", "hash")
+
+	group, _ := coreDB.CreateGroup("Test Group", user.ID)
+	coreDB.AddGroupMember(group.ID, user.ID)
+
+	req := httptest.NewRequest("GET", "/api/groups/1", nil)
+	req.SetPathValue("id", "1")
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
+	w := httptest.NewRecorder()
+
+	s.handleGetGroup(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDeleteGroup(t *testing.T) {
+	s, coreDB, cleanup := setupGroupTestServer(t)
+	defer cleanup()
+
+	user, _ := coreDB.CreateUser("testuser", "hash")
+
+	group, _ := coreDB.CreateGroup("Test Group", user.ID)
+	coreDB.AddGroupMember(group.ID, user.ID)
+
+	req := httptest.NewRequest("DELETE", "/api/groups/1", nil)
+	req.SetPathValue("id", "1")
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
+	w := httptest.NewRecorder()
+
+	s.handleDeleteGroup(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected status 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify soft deleted
+	_, err := coreDB.GetGroupByID(group.ID)
+	if err != db.ErrNotFound {
+		t.Error("expected group to be soft deleted")
+	}
+}
+
+func TestDeleteGroupNotOwner(t *testing.T) {
+	s, coreDB, cleanup := setupGroupTestServer(t)
+	defer cleanup()
+
+	owner, _ := coreDB.CreateUser("owner", "hash")
+	member, _ := coreDB.CreateUser("member", "hash")
+
+	group, _ := coreDB.CreateGroup("Test Group", owner.ID)
+	coreDB.AddGroupMember(group.ID, owner.ID)
+	coreDB.AddGroupMember(group.ID, member.ID)
+
+	req := httptest.NewRequest("DELETE", "/api/groups/1", nil)
+	req.SetPathValue("id", "1")
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: member.ID}))
+	w := httptest.NewRecorder()
+
+	s.handleDeleteGroup(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected status 403, got %d", w.Code)
+	}
+}

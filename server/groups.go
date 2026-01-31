@@ -4,6 +4,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/esnunes/bobot/auth"
@@ -71,4 +72,75 @@ func (s *Server) handleListGroups(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleGetGroup(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	groupID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	// Check membership
+	isMember, err := s.db.IsGroupMember(groupID, userData.UserID)
+	if err != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	group, err := s.db.GetGroupByID(groupID)
+	if err != nil {
+		http.Error(w, "group not found", http.StatusNotFound)
+		return
+	}
+
+	members, _ := s.db.GetGroupMembers(groupID)
+
+	memberList := make([]map[string]interface{}, 0, len(members))
+	for _, m := range members {
+		memberList = append(memberList, map[string]interface{}{
+			"user_id":      m.UserID,
+			"username":     m.Username,
+			"display_name": m.DisplayName,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":       group.ID,
+		"name":     group.Name,
+		"owner_id": group.OwnerID,
+		"members":  memberList,
+	})
+}
+
+func (s *Server) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	groupID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	group, err := s.db.GetGroupByID(groupID)
+	if err != nil {
+		http.Error(w, "group not found", http.StatusNotFound)
+		return
+	}
+
+	// Only owner can delete
+	if group.OwnerID != userData.UserID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := s.db.SoftDeleteGroup(groupID); err != nil {
+		http.Error(w, "failed to delete group", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
