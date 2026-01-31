@@ -21,6 +21,7 @@ var upgrader = websocket.Upgrader{
 
 type chatMessage struct {
 	Content string `json:"content"`
+	GroupID *int64 `json:"group_id"`
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {

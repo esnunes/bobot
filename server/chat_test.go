@@ -186,3 +186,18 @@ func TestChatWebSocket_SlashCommand(t *testing.T) {
 		t.Errorf("expected response to contain 'admin', got: %s", resp["content"])
 	}
 }
+
+func TestGroupMessage(t *testing.T) {
+	// This test verifies the message struct accepts group_id
+	msg := chatMessage{
+		Content: "Hello",
+		GroupID: ptr(int64(5)),
+	}
+	if msg.GroupID == nil || *msg.GroupID != 5 {
+		t.Error("expected group_id to be 5")
+	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
+}
