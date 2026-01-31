@@ -755,3 +755,48 @@ func TestRemoveGroupMember(t *testing.T) {
 		t.Error("expected member to be removed")
 	}
 }
+
+func TestGetGroupByID(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	created, _ := db.CreateGroup("Test Group", owner.ID)
+
+	group, err := db.GetGroupByID(created.ID)
+	if err != nil {
+		t.Fatalf("GetGroupByID failed: %v", err)
+	}
+	if group.Name != "Test Group" {
+		t.Errorf("expected name 'Test Group', got %q", group.Name)
+	}
+
+	// Test not found
+	_, err = db.GetGroupByID(9999)
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestGetUserGroups(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	member, _ := db.CreateUser("member", "hash")
+
+	group1, _ := db.CreateGroup("Group 1", owner.ID)
+	group2, _ := db.CreateGroup("Group 2", owner.ID)
+	db.AddGroupMember(group1.ID, member.ID)
+	db.AddGroupMember(group2.ID, member.ID)
+
+	groups, err := db.GetUserGroups(member.ID)
+	if err != nil {
+		t.Fatalf("GetUserGroups failed: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Errorf("expected 2 groups, got %d", len(groups))
+	}
+}

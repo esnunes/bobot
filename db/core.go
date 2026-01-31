@@ -816,3 +816,53 @@ func (c *CoreDB) IsGroupMember(groupID, userID int64) (bool, error) {
 	).Scan(&count)
 	return count > 0, err
 }
+
+// GetGroupByID retrieves a group by its ID.
+func (c *CoreDB) GetGroupByID(id int64) (*Group, error) {
+	var group Group
+	var deletedAt sql.NullTime
+	err := c.db.QueryRow(
+		"SELECT id, name, owner_id, deleted_at, created_at FROM groups WHERE id = ? AND deleted_at IS NULL",
+		id,
+	).Scan(&group.ID, &group.Name, &group.OwnerID, &deletedAt, &group.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if deletedAt.Valid {
+		group.DeletedAt = &deletedAt.Time
+	}
+	return &group, nil
+}
+
+// GetUserGroups retrieves all groups a user is a member of.
+func (c *CoreDB) GetUserGroups(userID int64) ([]Group, error) {
+	rows, err := c.db.Query(`
+		SELECT g.id, g.name, g.owner_id, g.deleted_at, g.created_at
+		FROM groups g
+		JOIN group_members gm ON g.id = gm.group_id
+		WHERE gm.user_id = ? AND g.deleted_at IS NULL
+		ORDER BY g.created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var groups []Group
+	for rows.Next() {
+		var g Group
+		var deletedAt sql.NullTime
+		if err := rows.Scan(&g.ID, &g.Name, &g.OwnerID, &deletedAt, &g.CreatedAt); err != nil {
+			return nil, err
+		}
+		if deletedAt.Valid {
+			g.DeletedAt = &deletedAt.Time
+		}
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
+}
