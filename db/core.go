@@ -51,6 +51,14 @@ type Invite struct {
 	CreatedAt time.Time
 }
 
+type Group struct {
+	ID        int64
+	Name      string
+	OwnerID   int64
+	DeletedAt *time.Time
+	CreatedAt time.Time
+}
+
 type CoreDB struct {
 	db *sql.DB
 }
@@ -141,6 +149,20 @@ func (c *CoreDB) migrate() error {
 			used_by INTEGER REFERENCES users(id),
 			used_at DATETIME,
 			revoked INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create groups table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS groups (
+			id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL,
+			owner_id INTEGER NOT NULL REFERENCES users(id),
+			deleted_at DATETIME,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
@@ -733,4 +755,23 @@ func (c *CoreDB) ListUsers() ([]User, error) {
 		users = append(users, u)
 	}
 	return users, rows.Err()
+}
+
+// CreateGroup creates a new group with the given name and owner.
+func (c *CoreDB) CreateGroup(name string, ownerID int64) (*Group, error) {
+	result, err := c.db.Exec(
+		"INSERT INTO groups (name, owner_id) VALUES (?, ?)",
+		name, ownerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Group{
+		ID:        id,
+		Name:      name,
+		OwnerID:   ownerID,
+		CreatedAt: time.Now(),
+	}, nil
 }

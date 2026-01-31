@@ -685,3 +685,29 @@ func TestCoreDB_ListUsers(t *testing.T) {
 		t.Errorf("expected 3 users, got %d", len(users))
 	}
 }
+
+func TestCreateGroup(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("owner", "hash")
+
+	group, err := db.CreateGroup("Test Group", user.ID)
+	if err != nil {
+		t.Fatalf("CreateGroup failed: %v", err)
+	}
+
+	if group.ID == 0 {
+		t.Error("expected non-zero group ID")
+	}
+	if group.Name != "Test Group" {
+		t.Errorf("expected name 'Test Group', got %q", group.Name)
+	}
+	if group.OwnerID != user.ID {
+		t.Errorf("expected owner_id %d, got %d", user.ID, group.OwnerID)
+	}
+	if group.DeletedAt != nil {
+		t.Error("expected nil deleted_at for new group")
+	}
+}
