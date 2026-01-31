@@ -152,3 +152,104 @@ func TestDeleteGroupNotOwner(t *testing.T) {
 		t.Errorf("expected status 403, got %d", w.Code)
 	}
 }
+
+func TestAddGroupMember(t *testing.T) {
+	s, coreDB, cleanup := setupGroupTestServer(t)
+	defer cleanup()
+
+	owner, _ := coreDB.CreateUser("owner", "hash")
+	newMember, _ := coreDB.CreateUser("newmember", "hash")
+
+	group, _ := coreDB.CreateGroup("Test Group", owner.ID)
+	coreDB.AddGroupMember(group.ID, owner.ID)
+
+	body := `{"username": "newmember"}`
+	req := httptest.NewRequest("POST", "/api/groups/1/members", bytes.NewBufferString(body))
+	req.SetPathValue("id", "1")
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: owner.ID}))
+	w := httptest.NewRecorder()
+
+	s.handleAddGroupMember(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("expected status 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify member was added
+	isMember, _ := coreDB.IsGroupMember(group.ID, newMember.ID)
+	if !isMember {
+		t.Error("expected new member to be added")
+	}
+}
+
+func TestRemoveGroupMember(t *testing.T) {
+	s, coreDB, cleanup := setupGroupTestServer(t)
+	defer cleanup()
+
+	owner, _ := coreDB.CreateUser("owner", "hash")
+	member, _ := coreDB.CreateUser("member", "hash")
+
+	group, _ := coreDB.CreateGroup("Test Group", owner.ID)
+	coreDB.AddGroupMember(group.ID, owner.ID)
+	coreDB.AddGroupMember(group.ID, member.ID)
+
+	req := httptest.NewRequest("DELETE", "/api/groups/1/members/2", nil)
+	req.SetPathValue("id", "1")
+	req.SetPathValue("userId", "2")
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: owner.ID}))
+	w := httptest.NewRecorder()
+
+	s.handleRemoveGroupMember(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected status 204, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestLeaveGroup(t *testing.T) {
+	s, coreDB, cleanup := setupGroupTestServer(t)
+	defer cleanup()
+
+	owner, _ := coreDB.CreateUser("owner", "hash")
+	member, _ := coreDB.CreateUser("member", "hash")
+
+	group, _ := coreDB.CreateGroup("Test Group", owner.ID)
+	coreDB.AddGroupMember(group.ID, owner.ID)
+	coreDB.AddGroupMember(group.ID, member.ID)
+
+	// Member removes self
+	req := httptest.NewRequest("DELETE", "/api/groups/1/members/2", nil)
+	req.SetPathValue("id", "1")
+	req.SetPathValue("userId", "2")
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: member.ID}))
+	w := httptest.NewRecorder()
+
+	s.handleRemoveGroupMember(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected status 204, got %d", w.Code)
+	}
+}
+
+func TestOwnerCannotLeave(t *testing.T) {
+	s, coreDB, cleanup := setupGroupTestServer(t)
+	defer cleanup()
+
+	owner, _ := coreDB.CreateUser("owner", "hash")
+
+	group, _ := coreDB.CreateGroup("Test Group", owner.ID)
+	coreDB.AddGroupMember(group.ID, owner.ID)
+
+	req := httptest.NewRequest("DELETE", "/api/groups/1/members/1", nil)
+	req.SetPathValue("id", "1")
+	req.SetPathValue("userId", "1")
+	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: owner.ID}))
+	w := httptest.NewRecorder()
+
+	s.handleRemoveGroupMember(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected status 403, got %d", w.Code)
+	}
+}

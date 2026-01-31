@@ -144,3 +144,94 @@ func (s *Server) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+type addMemberRequest struct {
+	Username string `json:"username"`
+}
+
+func (s *Server) handleAddGroupMember(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	groupID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	group, err := s.db.GetGroupByID(groupID)
+	if err != nil {
+		http.Error(w, "group not found", http.StatusNotFound)
+		return
+	}
+
+	// Only owner can add members
+	if group.OwnerID != userData.UserID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req addMemberRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	user, err := s.db.GetUserByUsername(req.Username)
+	if err != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	if err := s.db.AddGroupMember(groupID, user.ID); err != nil {
+		// Could be duplicate - treat as success (idempotent)
+		if strings.Contains(err.Error(), "UNIQUE constraint") {
+			w.WriteHeader(http.StatusCreated)
+			return
+		}
+		http.Error(w, "failed to add member", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleRemoveGroupMember(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	groupID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	targetUserID, err := strconv.ParseInt(r.PathValue("userId"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	group, err := s.db.GetGroupByID(groupID)
+	if err != nil {
+		http.Error(w, "group not found", http.StatusNotFound)
+		return
+	}
+
+	// Owner cannot leave (must delete group)
+	if targetUserID == group.OwnerID {
+		http.Error(w, "owner cannot leave group", http.StatusForbidden)
+		return
+	}
+
+	// Only owner or self can remove
+	if group.OwnerID != userData.UserID && targetUserID != userData.UserID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := s.db.RemoveGroupMember(groupID, targetUserID); err != nil {
+		http.Error(w, "failed to remove member", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
