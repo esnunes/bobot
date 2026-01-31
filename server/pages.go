@@ -33,6 +33,12 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["chat"] = chatTmpl
 
+	groupsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/groups.html")
+	if err != nil {
+		return err
+	}
+	s.templates["groups"] = groupsTmpl
+
 	return nil
 }
 
@@ -68,4 +74,8 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 	s.templates["chat"].Execute(w, PageData{Title: "Chat"})
+}
+
+func (s *Server) handleGroupsPage(w http.ResponseWriter, r *http.Request) {
+	s.templates["groups"].Execute(w, PageData{Title: "Groups"})
 }
