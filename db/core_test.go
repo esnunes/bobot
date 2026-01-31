@@ -840,3 +840,23 @@ func TestGetGroupMembers(t *testing.T) {
 		t.Errorf("expected 2 members, got %d", len(members))
 	}
 }
+
+func TestCreateGroupMessage(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	msg, err := db.CreateGroupMessage(group.ID, owner.ID, "user", "Hello group!")
+	if err != nil {
+		t.Fatalf("CreateGroupMessage failed: %v", err)
+	}
+	if msg.GroupID == nil || *msg.GroupID != group.ID {
+		t.Error("expected group_id to be set")
+	}
+	if msg.Content != "Hello group!" {
+		t.Errorf("expected content 'Hello group!', got %q", msg.Content)
+	}
+}
