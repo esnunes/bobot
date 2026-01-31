@@ -733,3 +733,25 @@ func TestAddGroupMember(t *testing.T) {
 		t.Error("expected error when adding duplicate member")
 	}
 }
+
+func TestRemoveGroupMember(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	member, _ := db.CreateUser("member", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+	db.AddGroupMember(group.ID, member.ID)
+
+	err := db.RemoveGroupMember(group.ID, member.ID)
+	if err != nil {
+		t.Fatalf("RemoveGroupMember failed: %v", err)
+	}
+
+	// Verify member is removed by checking membership
+	isMember, _ := db.IsGroupMember(group.ID, member.ID)
+	if isMember {
+		t.Error("expected member to be removed")
+	}
+}

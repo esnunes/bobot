@@ -797,3 +797,22 @@ func (c *CoreDB) AddGroupMember(groupID, userID int64) error {
 	)
 	return err
 }
+
+// RemoveGroupMember removes a user from a group.
+func (c *CoreDB) RemoveGroupMember(groupID, userID int64) error {
+	_, err := c.db.Exec(
+		"DELETE FROM group_members WHERE group_id = ? AND user_id = ?",
+		groupID, userID,
+	)
+	return err
+}
+
+// IsGroupMember checks if a user is a member of a group.
+func (c *CoreDB) IsGroupMember(groupID, userID int64) (bool, error) {
+	var count int
+	err := c.db.QueryRow(
+		"SELECT COUNT(*) FROM group_members WHERE group_id = ? AND user_id = ?",
+		groupID, userID,
+	).Scan(&count)
+	return count > 0, err
+}
