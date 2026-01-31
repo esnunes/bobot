@@ -61,6 +61,10 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /api/messages/history", s.authMiddleware(s.handleMessageHistory))
 	s.router.HandleFunc("GET /api/messages/sync", s.authMiddleware(s.handleMessageSync))
 
+	// Group routes (require auth)
+	s.router.HandleFunc("POST /api/groups", s.authMiddleware(s.handleCreateGroup))
+	s.router.HandleFunc("GET /api/groups", s.authMiddleware(s.handleListGroups))
+
 	// Page routes
 	s.router.HandleFunc("GET /", s.handleLoginPage)
 	s.router.HandleFunc("GET /signup", s.handleSignupPage)
