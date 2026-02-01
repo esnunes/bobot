@@ -11,8 +11,11 @@
     <title>{{.Title}} - bobot</title>
     <link rel="stylesheet" href="/static/style.css">
     <link ref="manifest" href="/static/manifest.json">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
-<body>
+<body hx-boost="true">
+    <div id="ws-connection" hx-preserve="true"></div>
+    <script src="/static/ws-manager.js"></script>
     {{template "content" .}}
 </body>
 </html>
