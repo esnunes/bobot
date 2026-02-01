@@ -36,6 +36,10 @@ type signupRequest struct {
 
 var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
+func isHTMXRequest(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true"
+}
+
 func validateUsername(username string) error {
 	if len(username) < 3 {
 		return fmt.Errorf("username must be at least 3 characters")
@@ -103,6 +107,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if isHTMXRequest(r) {
+		w.Header().Set("HX-Redirect", "/chat")
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tokenResponse{
 		AccessToken:  accessToken,
@@ -166,6 +173,9 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	s.db.DeleteRefreshToken(req.RefreshToken)
 
+	if isHTMXRequest(r) {
+		w.Header().Set("HX-Redirect", "/")
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
@@ -253,6 +263,9 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if isHTMXRequest(r) {
+		w.Header().Set("HX-Redirect", "/chat")
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tokenResponse{
 		AccessToken:  accessToken,

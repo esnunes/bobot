@@ -31,7 +31,10 @@ document.getElementById('signup-form')?.addEventListener('submit', async (e) => 
     try {
         const resp = await fetch('/api/signup', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'HX-Request': 'true'
+            },
             body: JSON.stringify({
                 code: form.code.value,
                 username: form.username.value,
@@ -48,7 +51,14 @@ document.getElementById('signup-form')?.addEventListener('submit', async (e) => 
         const data = await resp.json();
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
-        window.location.href = '/chat';
+
+        // Trigger WebSocket connection
+        document.dispatchEvent(new CustomEvent('bobot:token-updated'));
+
+        // Navigate via HTMX content swap
+        htmx.ajax('GET', '/chat', {target: 'body', swap: 'innerHTML'}).then(() => {
+            history.pushState({}, '', '/chat');
+        });
     } catch (err) {
         errorEl.textContent = err.message;
         errorEl.classList.remove('hidden');

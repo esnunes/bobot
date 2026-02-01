@@ -1,5 +1,5 @@
 {{define "content"}}
-<div class="groups-container">
+<div class="groups-container" data-page="groups">
     <header class="groups-header">
         <a href="/chat" class="back-link">&larr; Chat</a>
         <h1>Groups</h1>
@@ -15,7 +15,7 @@
     <div class="modal-content">
         <h2>Create Group</h2>
         <form id="create-group-form">
-            <input type="text" id="group-name" placeholder="Group name" required maxlength="100">
+            <input type="text" id="group-name" name="name" placeholder="Group name" required maxlength="100">
             <div class="modal-actions">
                 <button type="button" id="cancel-create">Cancel</button>
                 <button type="submit">Create</button>
@@ -25,114 +25,126 @@
 </div>
 
 <script>
-class GroupsPage {
-    constructor() {
-        this.listEl = document.getElementById('groups-list');
-        this.modal = document.getElementById('create-group-modal');
-        this.form = document.getElementById('create-group-form');
-        this.init();
-    }
-
-    async init() {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-            window.location.href = '/';
-            return;
+// Guard against re-declaration on HTMX swaps
+if (typeof GroupsPage === 'undefined') {
+    window.GroupsPage = class GroupsPage {
+        constructor() {
+            this.listEl = document.getElementById('groups-list');
+            this.modal = document.getElementById('create-group-modal');
+            this.init();
         }
 
-        await this.loadGroups(token);
-        this.setupEventListeners();
-    }
+        async init() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                htmx.ajax('GET', '/', {target: 'body', swap: 'innerHTML'}).then(() => {
+                    history.pushState({}, '', '/');
+                });
+                return;
+            }
 
-    async loadGroups(token) {
-        try {
-            const resp = await fetch('/api/groups', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            await this.loadGroups(token);
+            this.setupEventListeners();
+        }
 
-            if (!resp.ok) {
-                if (resp.status === 401) {
-                    window.location.href = '/';
-                    return;
+        async loadGroups(token) {
+            try {
+                const resp = await fetch('/api/groups', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!resp.ok) {
+                    if (resp.status === 401) {
+                        document.dispatchEvent(new CustomEvent('bobot:auth-expired'));
+                        return;
+                    }
+                    throw new Error('Failed to load groups');
                 }
-                throw new Error('Failed to load groups');
+
+                const groups = await resp.json();
+                this.renderGroups(groups);
+            } catch (err) {
+                console.error('Failed to load groups:', err);
+                this.listEl.innerHTML = '<div class="error">Failed to load groups</div>';
             }
-
-            const groups = await resp.json();
-            this.renderGroups(groups);
-        } catch (err) {
-            console.error('Failed to load groups:', err);
-            this.listEl.innerHTML = '<div class="error">Failed to load groups</div>';
-        }
-    }
-
-    renderGroups(groups) {
-        if (!groups || groups.length === 0) {
-            this.listEl.innerHTML = '<div class="empty">No groups yet. Create one!</div>';
-            return;
         }
 
-        this.listEl.innerHTML = groups.map(g => `
-            <a href="/groups/${g.id}" class="group-item">
-                <span class="group-name">${this.escapeHtml(g.name)}</span>
-                <span class="group-members">${g.member_count} member${g.member_count !== 1 ? 's' : ''}</span>
-            </a>
-        `).join('');
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    setupEventListeners() {
-        document.getElementById('create-group-btn').addEventListener('click', () => {
-            this.modal.classList.remove('hidden');
-        });
-
-        document.getElementById('cancel-create').addEventListener('click', () => {
-            this.modal.classList.add('hidden');
-        });
-
-        this.modal.addEventListener('click', (e) => {
-            if (e.target === this.modal) {
-                this.modal.classList.add('hidden');
+        renderGroups(groups) {
+            if (!groups || groups.length === 0) {
+                this.listEl.innerHTML = '<div class="empty">No groups yet. Create one!</div>';
+                return;
             }
-        });
 
-        this.form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await this.createGroup();
-        });
-    }
+            this.listEl.innerHTML = groups.map(g => `
+                <a href="/groups/${g.id}" class="group-item">
+                    <span class="group-name">${this.escapeHtml(g.name)}</span>
+                    <span class="group-members">${g.member_count} member${g.member_count !== 1 ? 's' : ''}</span>
+                </a>
+            `).join('');
+        }
 
-    async createGroup() {
-        const name = document.getElementById('group-name').value.trim();
-        if (!name) return;
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-        const token = localStorage.getItem('access_token');
-        try {
-            const resp = await fetch('/api/groups', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ name })
+        setupEventListeners() {
+            document.getElementById('create-group-btn').addEventListener('click', () => {
+                this.modal.classList.remove('hidden');
             });
 
-            if (!resp.ok) throw new Error('Failed to create group');
+            document.getElementById('cancel-create').addEventListener('click', () => {
+                this.modal.classList.add('hidden');
+            });
 
-            const group = await resp.json();
-            window.location.href = `/groups/${group.id}`;
-        } catch (err) {
-            console.error('Failed to create group:', err);
-            alert('Failed to create group');
+            this.modal.addEventListener('click', (e) => {
+                if (e.target === this.modal) {
+                    this.modal.classList.add('hidden');
+                }
+            });
+
+            document.getElementById('create-group-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.createGroup();
+            });
         }
-    }
+
+        async createGroup() {
+            const name = document.getElementById('group-name').value.trim();
+            if (!name) return;
+
+            const token = localStorage.getItem('access_token');
+            try {
+                const resp = await fetch('/api/groups', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'HX-Request': 'true'
+                    },
+                    body: JSON.stringify({ name })
+                });
+
+                if (!resp.ok) throw new Error('Failed to create group');
+
+                const group = await resp.json();
+
+                // Navigate via HTMX content swap
+                htmx.ajax('GET', `/groups/${group.id}`, {target: 'body', swap: 'innerHTML'}).then(() => {
+                    history.pushState({}, '', `/groups/${group.id}`);
+                });
+            } catch (err) {
+                console.error('Failed to create group:', err);
+                alert('Failed to create group');
+            }
+        }
+    };
 }
 
-document.addEventListener('DOMContentLoaded', () => new GroupsPage());
+(function() {
+    // Initialize immediately
+    new GroupsPage();
+})();
 </script>
 {{end}}

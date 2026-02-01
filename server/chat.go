@@ -154,6 +154,40 @@ func (s *Server) handleGroupChatMessage(ctx context.Context, userID, groupID int
 		return
 	}
 
+	// Check for slash commands
+	if response, handled := s.handleSlashCommand(ctx, content); handled {
+		// Save command message
+		s.db.CreateGroupMessageWithContext(
+			groupID, userID, "command", content,
+			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+		)
+
+		// Broadcast command to all group members
+		cmdMsgJSON, _ := json.Marshal(map[string]interface{}{
+			"group_id":     groupID,
+			"role":         "command",
+			"content":      content,
+			"user_id":      userID,
+			"display_name": user.DisplayName,
+		})
+		s.broadcastToGroup(groupID, cmdMsgJSON)
+
+		// Save system response
+		s.db.CreateGroupMessageWithContext(
+			groupID, userID, "system", response,
+			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+		)
+
+		// Broadcast system response to all group members
+		respJSON, _ := json.Marshal(map[string]interface{}{
+			"group_id": groupID,
+			"role":     "system",
+			"content":  response,
+		})
+		s.broadcastToGroup(groupID, respJSON)
+		return
+	}
+
 	// Save user message
 	s.db.CreateGroupMessageWithContext(
 		groupID, userID, "user", content,
