@@ -81,6 +81,18 @@ func (s *Server) routes() {
 
 	// Static files
 	staticFS, _ := fs.Sub(web.FS, "static")
+
+	// Serve manifest.json with correct content type
+	s.router.HandleFunc("GET /static/manifest.json", func(w http.ResponseWriter, r *http.Request) {
+		data, err := fs.ReadFile(staticFS, "manifest.json")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/manifest+json")
+		w.Write(data)
+	})
+
 	s.router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 }
 
