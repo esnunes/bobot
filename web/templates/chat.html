@@ -26,4 +26,15 @@
 </div>
 
 <script src="/static/chat.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    window.chatClient = new ChatClient();
+});
+// Re-initialize after HTMX swap
+document.body.addEventListener('htmx:afterSwap', (event) => {
+    if (event.detail.target === document.body && document.getElementById('messages')) {
+        window.chatClient = new ChatClient();
+    }
+});
+</script>
 {{end}}
