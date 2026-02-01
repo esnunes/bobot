@@ -1,5 +1,5 @@
 {{define "content"}}
-<div class="chat-container">
+<div class="chat-container" data-page="group-chat" data-group-id="{{.GroupID}}">
     <header class="chat-header">
         <a href="/groups" class="back-link">&larr;</a>
         <h1 id="group-name">Loading...</h1>
@@ -26,18 +26,12 @@
     </div>
 </div>
 
-<script>
-const GROUP_ID = {{.GroupID}};
-</script>
 <script src="/static/group_chat.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    window.groupChatClient = new GroupChatClient(GROUP_ID);
-});
-document.body.addEventListener('htmx:afterSwap', (event) => {
-    if (event.detail.target === document.body && document.getElementById('messages') && typeof GROUP_ID !== 'undefined') {
-        window.groupChatClient = new GroupChatClient(GROUP_ID);
-    }
-});
+(function() {
+    // Get group ID from data attribute to avoid re-declaration issues
+    var groupId = parseInt(document.querySelector('[data-group-id]').dataset.groupId, 10);
+    window.groupChatClient = new GroupChatClient(groupId);
+})();
 </script>
 {{end}}

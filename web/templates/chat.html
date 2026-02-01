@@ -1,5 +1,5 @@
 {{define "content"}}
-<div class="chat-container">
+<div class="chat-container" data-page="chat">
     <header class="chat-header">
         <h1>bobot</h1>
         <nav class="header-nav">
@@ -27,14 +27,9 @@
 
 <script src="/static/chat.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
+(function() {
+    // Initialize immediately - DOM is ready when inline scripts run
     window.chatClient = new ChatClient();
-});
-// Re-initialize after HTMX swap
-document.body.addEventListener('htmx:afterSwap', (event) => {
-    if (event.detail.target === document.body && document.getElementById('messages')) {
-        window.chatClient = new ChatClient();
-    }
-});
+})();
 </script>
 {{end}}

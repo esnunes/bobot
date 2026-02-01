@@ -2,6 +2,12 @@
 if (typeof GroupChatClient === 'undefined') {
     window.GroupChatClient = class GroupChatClient {
         constructor(groupId) {
+            // Clean up any previous page client
+            if (window.currentPageClient && window.currentPageClient.cleanup) {
+                window.currentPageClient.cleanup();
+            }
+            window.currentPageClient = this;
+
             this.groupId = groupId;
             this.messagesEl = document.getElementById('messages');
             this.form = document.getElementById('chat-form');
@@ -15,6 +21,7 @@ if (typeof GroupChatClient === 'undefined') {
             this.hasMoreHistory = true;
             this.currentUserId = null;
             this.wsContainer = document.getElementById('ws-connection');
+            this.handleGroupMessage = null;
 
             this.init();
         }
@@ -125,13 +132,13 @@ if (typeof GroupChatClient === 'undefined') {
                     this.loadMoreHistory();
                 }
             });
-
-            // Cleanup on page swap
-            document.body.addEventListener('htmx:beforeSwap', this.cleanup.bind(this), { once: true });
         }
 
         cleanup() {
-            document.removeEventListener('bobot:group-message', this.handleGroupMessage);
+            if (this.handleGroupMessage) {
+                document.removeEventListener('bobot:group-message', this.handleGroupMessage);
+                this.handleGroupMessage = null;
+            }
         }
 
         sendMessage() {

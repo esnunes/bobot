@@ -9,51 +9,54 @@
     </form>
 </div>
 <script>
-// Check if already logged in - redirect via HTMX content swap
-const existingToken = localStorage.getItem('access_token');
-if (existingToken) {
-    htmx.ajax('GET', '/chat', {target: 'body', swap: 'innerHTML'}).then(() => {
-        history.pushState({}, '', '/chat');
-    });
-}
-
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const errorEl = document.getElementById('error-message');
-
-    try {
-        const resp = await fetch('/api/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'HX-Request': 'true'
-            },
-            body: JSON.stringify({
-                username: form.username.value,
-                password: form.password.value
-            })
-        });
-
-        if (!resp.ok) {
-            throw new Error(resp.status === 401 ? 'Invalid credentials' : 'Login failed');
-        }
-
-        const data = await resp.json();
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
-
-        // Trigger WebSocket connection
-        document.dispatchEvent(new CustomEvent('bobot:token-updated'));
-
-        // Navigate via HTMX content swap
+(function() {
+    // Check if already logged in - redirect via HTMX content swap
+    const existingToken = localStorage.getItem('access_token');
+    if (existingToken) {
         htmx.ajax('GET', '/chat', {target: 'body', swap: 'innerHTML'}).then(() => {
             history.pushState({}, '', '/chat');
         });
-    } catch (err) {
-        errorEl.textContent = err.message;
-        errorEl.classList.remove('hidden');
+        return;
     }
-});
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const errorEl = document.getElementById('error-message');
+
+        try {
+            const resp = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'HX-Request': 'true'
+                },
+                body: JSON.stringify({
+                    username: form.username.value,
+                    password: form.password.value
+                })
+            });
+
+            if (!resp.ok) {
+                throw new Error(resp.status === 401 ? 'Invalid credentials' : 'Login failed');
+            }
+
+            const data = await resp.json();
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('refresh_token', data.refresh_token);
+
+            // Trigger WebSocket connection
+            document.dispatchEvent(new CustomEvent('bobot:token-updated'));
+
+            // Navigate via HTMX content swap
+            htmx.ajax('GET', '/chat', {target: 'body', swap: 'innerHTML'}).then(() => {
+                history.pushState({}, '', '/chat');
+            });
+        } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.classList.remove('hidden');
+        }
+    });
+})();
 </script>
 {{end}}

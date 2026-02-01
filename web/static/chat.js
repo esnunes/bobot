@@ -2,6 +2,12 @@
 if (typeof ChatClient === 'undefined') {
     window.ChatClient = class ChatClient {
         constructor() {
+            // Clean up any previous page client
+            if (window.currentPageClient && window.currentPageClient.cleanup) {
+                window.currentPageClient.cleanup();
+            }
+            window.currentPageClient = this;
+
             this.messagesEl = document.getElementById('messages');
             this.form = document.getElementById('chat-form');
             this.input = document.getElementById('message-input');
@@ -12,6 +18,7 @@ if (typeof ChatClient === 'undefined') {
             this.oldestMessageId = null;
             this.hasMoreHistory = true;
             this.wsContainer = document.getElementById('ws-connection');
+            this.handleChatMessage = null;
 
             this.init();
         }
@@ -121,7 +128,7 @@ if (typeof ChatClient === 'undefined') {
         }
 
         setupEventListeners() {
-            // WebSocket message events
+            // WebSocket message events - bind to instance for cleanup
             this.handleChatMessage = (event) => {
                 const data = event.detail;
                 if (data.role === 'assistant' || data.role === 'system') {
@@ -165,13 +172,13 @@ if (typeof ChatClient === 'undefined') {
                     this.loadMoreHistory();
                 }
             });
-
-            // Cleanup on page swap
-            document.body.addEventListener('htmx:beforeSwap', this.cleanup.bind(this), { once: true });
         }
 
         cleanup() {
-            document.removeEventListener('bobot:chat-message', this.handleChatMessage);
+            if (this.handleChatMessage) {
+                document.removeEventListener('bobot:chat-message', this.handleChatMessage);
+                this.handleChatMessage = null;
+            }
         }
 
         sendMessage() {

@@ -1,5 +1,5 @@
 {{define "content"}}
-<div class="groups-container">
+<div class="groups-container" data-page="groups">
     <header class="groups-header">
         <a href="/chat" class="back-link">&larr; Chat</a>
         <h1>Groups</h1>
@@ -142,13 +142,9 @@ if (typeof GroupsPage === 'undefined') {
     };
 }
 
-document.addEventListener('DOMContentLoaded', () => new GroupsPage());
-
-// Re-initialize after HTMX swap
-document.body.addEventListener('htmx:afterSwap', (event) => {
-    if (event.detail.target === document.body && document.getElementById('groups-list')) {
-        new GroupsPage();
-    }
-});
+(function() {
+    // Initialize immediately
+    new GroupsPage();
+})();
 </script>
 {{end}}
