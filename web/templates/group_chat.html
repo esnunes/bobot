@@ -30,4 +30,14 @@
 const GROUP_ID = {{.GroupID}};
 </script>
 <script src="/static/group_chat.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    window.groupChatClient = new GroupChatClient(GROUP_ID);
+});
+document.body.addEventListener('htmx:afterSwap', (event) => {
+    if (event.detail.target === document.body && document.getElementById('messages') && typeof GROUP_ID !== 'undefined') {
+        window.groupChatClient = new GroupChatClient(GROUP_ID);
+    }
+});
+</script>
 {{end}}
