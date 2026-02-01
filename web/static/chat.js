@@ -266,3 +266,8 @@ if (typeof ChatClient === 'undefined') {
         }
     };
 }
+
+// Auto-initialize when chat page is loaded
+if (document.querySelector('[data-page="chat"]')) {
+    window.chatClient = new ChatClient();
+}

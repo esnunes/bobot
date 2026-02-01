@@ -305,3 +305,12 @@ if (typeof GroupChatClient === 'undefined') {
         }
     };
 }
+
+// Auto-initialize when group chat page is loaded
+(function() {
+    var container = document.querySelector('[data-page="group-chat"]');
+    if (container) {
+        var groupId = parseInt(container.dataset.groupId, 10);
+        window.groupChatClient = new GroupChatClient(groupId);
+    }
+})();

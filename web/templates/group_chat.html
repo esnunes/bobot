@@ -27,11 +27,4 @@
 </div>
 
 <script src="/static/group_chat.js"></script>
-<script>
-(function() {
-    // Get group ID from data attribute to avoid re-declaration issues
-    var groupId = parseInt(document.querySelector('[data-group-id]').dataset.groupId, 10);
-    window.groupChatClient = new GroupChatClient(groupId);
-})();
-</script>
 {{end}}
