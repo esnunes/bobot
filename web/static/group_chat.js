@@ -159,9 +159,11 @@ if (typeof GroupChatClient === 'undefined') {
             const content = msg.content || msg.Content;
             const displayName = msg.display_name || msg.DisplayName;
 
-            msgEl.className = `message ${role}`;
+            // Map command to user styling, system to assistant styling
+            const displayRole = role === 'command' ? 'user' : (role === 'system' ? 'assistant' : role);
+            msgEl.className = `message ${displayRole}`;
 
-            if (role === 'user' && displayName) {
+            if ((role === 'user' || role === 'command') && displayName) {
                 const nameEl = document.createElement('div');
                 nameEl.className = 'message-sender';
                 nameEl.textContent = displayName;
@@ -235,9 +237,11 @@ if (typeof GroupChatClient === 'undefined') {
         prependMessage(msg) {
             const msgEl = document.createElement('div');
             const role = msg.Role;
-            msgEl.className = `message ${role}`;
+            // Map command to user styling, system to assistant styling
+            const displayRole = role === 'command' ? 'user' : (role === 'system' ? 'assistant' : role);
+            msgEl.className = `message ${displayRole}`;
 
-            if (role === 'user' && msg.DisplayName) {
+            if ((role === 'user' || role === 'command') && msg.DisplayName) {
                 const nameEl = document.createElement('div');
                 nameEl.className = 'message-sender';
                 nameEl.textContent = msg.DisplayName;
