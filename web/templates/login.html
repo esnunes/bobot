@@ -1,11 +1,7 @@
 {{define "content"}}
 <div class="login-container">
     <h1>bobot</h1>
-    <form id="login-form" class="login-form"
-          hx-post="/api/login"
-          hx-swap="none"
-          hx-on::before-request="prepareLoginRequest(event)"
-          hx-on::after-request="handleLoginResponse(event)">
+    <form id="login-form" class="login-form">
         <input type="text" name="username" placeholder="Username" required autofocus>
         <input type="password" name="password" placeholder="Password" required>
         <button type="submit">Login</button>
@@ -21,35 +17,43 @@ if (existingToken) {
     });
 }
 
-function prepareLoginRequest(event) {
-    const form = event.target;
-    event.detail.headers['Content-Type'] = 'application/json';
-    event.detail.xhr.send(JSON.stringify({
-        username: form.username.value,
-        password: form.password.value
-    }));
-    return false;
-}
-
-function handleLoginResponse(event) {
-    const xhr = event.detail.xhr;
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
     const errorEl = document.getElementById('error-message');
 
-    if (xhr.status === 200) {
-        // Store tokens before HTMX redirect happens
-        try {
-            const data = JSON.parse(xhr.responseText);
-            localStorage.setItem('access_token', data.access_token);
-            localStorage.setItem('refresh_token', data.refresh_token);
-            // Trigger WebSocket connection
-            document.dispatchEvent(new CustomEvent('bobot:token-updated'));
-        } catch (e) {
-            console.error('Failed to parse login response:', e);
+    try {
+        const resp = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'HX-Request': 'true'
+            },
+            body: JSON.stringify({
+                username: form.username.value,
+                password: form.password.value
+            })
+        });
+
+        if (!resp.ok) {
+            throw new Error(resp.status === 401 ? 'Invalid credentials' : 'Login failed');
         }
-    } else {
-        errorEl.textContent = xhr.status === 401 ? 'Invalid credentials' : 'Login failed';
+
+        const data = await resp.json();
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
+
+        // Trigger WebSocket connection
+        document.dispatchEvent(new CustomEvent('bobot:token-updated'));
+
+        // Navigate via HTMX content swap
+        htmx.ajax('GET', '/chat', {target: 'body', swap: 'innerHTML'}).then(() => {
+            history.pushState({}, '', '/chat');
+        });
+    } catch (err) {
+        errorEl.textContent = err.message;
         errorEl.classList.remove('hidden');
     }
-}
+});
 </script>
 {{end}}
