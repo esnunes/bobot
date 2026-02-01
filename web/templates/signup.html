@@ -4,7 +4,11 @@
     {{if .Error}}
     <p class="error">{{.Error}}</p>
     {{else}}
-    <form id="signup-form" class="login-form">
+    <form id="signup-form" class="login-form"
+          hx-post="/api/signup"
+          hx-swap="none"
+          hx-on::before-request="prepareSignupRequest(event)"
+          hx-on::after-request="handleSignupResponse(event)">
         <input type="hidden" name="code" value="{{.Code}}">
         <input type="text" name="username" placeholder="Username" required autofocus
                pattern="[a-zA-Z0-9_]+" minlength="3" title="Letters, numbers, and underscores only">
@@ -17,42 +21,46 @@
     {{end}}
 </div>
 <script>
-document.getElementById('signup-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
+function prepareSignupRequest(event) {
+    const form = event.target;
     const errorEl = document.getElementById('error-message');
 
     if (form.password.value !== form.confirm_password.value) {
+        event.preventDefault();
         errorEl.textContent = 'Passwords do not match';
         errorEl.classList.remove('hidden');
         return;
     }
 
-    try {
-        const resp = await fetch('/api/signup', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                code: form.code.value,
-                username: form.username.value,
-                display_name: form.display_name.value,
-                password: form.password.value
-            })
-        });
+    // HTMX sends form data, but we need JSON
+    event.detail.headers['Content-Type'] = 'application/json';
+    event.detail.xhr.send(JSON.stringify({
+        code: form.code.value,
+        username: form.username.value,
+        display_name: form.display_name.value,
+        password: form.password.value
+    }));
+    // Cancel default send since we did our own
+    return false;
+}
 
-        if (!resp.ok) {
-            const text = await resp.text();
-            throw new Error(text || 'Signup failed');
+function handleSignupResponse(event) {
+    const xhr = event.detail.xhr;
+    const errorEl = document.getElementById('error-message');
+
+    if (xhr.status === 200) {
+        try {
+            const data = JSON.parse(xhr.responseText);
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('refresh_token', data.refresh_token);
+            document.dispatchEvent(new CustomEvent('bobot:token-updated'));
+        } catch (e) {
+            console.error('Failed to parse signup response:', e);
         }
-
-        const data = await resp.json();
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
-        window.location.href = '/chat';
-    } catch (err) {
-        errorEl.textContent = err.message;
+    } else {
+        errorEl.textContent = xhr.responseText || 'Signup failed';
         errorEl.classList.remove('hidden');
     }
-});
+}
 </script>
 {{end}}
