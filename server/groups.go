@@ -42,6 +42,9 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if isHTMXRequest(r) {
+		w.Header().Set("HX-Redirect", "/groups/"+strconv.FormatInt(group.ID, 10))
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
