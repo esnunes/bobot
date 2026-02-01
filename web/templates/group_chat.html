@@ -1,0 +1,33 @@
+{{define "content"}}
+<div class="chat-container">
+    <header class="chat-header">
+        <a href="/groups" class="back-link">&larr;</a>
+        <h1 id="group-name">Loading...</h1>
+        <button id="menu-btn" class="menu-btn">&#9776;</button>
+    </header>
+
+    <main class="chat-messages" id="messages">
+    </main>
+
+    <footer class="chat-input">
+        <form id="chat-form">
+            <input type="text" id="message-input" placeholder="Type @assistant to ask..." autocomplete="off">
+            <button type="submit">&#10148;</button>
+        </form>
+    </footer>
+</div>
+
+<div id="menu-overlay" class="menu-overlay hidden">
+    <div class="menu">
+        <div id="members-list" class="members-list"></div>
+        <hr>
+        <button id="leave-btn" class="danger-btn">Leave Group</button>
+        <button id="delete-btn" class="danger-btn hidden">Delete Group</button>
+    </div>
+</div>
+
+<script>
+const GROUP_ID = {{.GroupID}};
+</script>
+<script src="/static/group_chat.js"></script>
+{{end}}

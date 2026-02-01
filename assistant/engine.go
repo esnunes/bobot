@@ -4,6 +4,7 @@ package assistant
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/llm"
@@ -120,4 +121,45 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 	}
 
 	return "", fmt.Errorf("max iterations reached")
+}
+
+// ChatWithContext processes a group conversation and returns the assistant's response.
+// The conversation is a list of lines formatted as "[Name]: message content" for users
+// or "[assistant]: message content" for assistant messages.
+func (e *Engine) ChatWithContext(ctx context.Context, conversation []string) (string, error) {
+	// Build messages from conversation
+	var messages []llm.Message
+
+	// Add conversation history
+	for _, line := range conversation {
+		if strings.HasPrefix(line, "[assistant]:") {
+			content := strings.TrimPrefix(line, "[assistant]: ")
+			messages = append(messages, llm.Message{
+				Role:    "assistant",
+				Content: content,
+			})
+		} else {
+			messages = append(messages, llm.Message{
+				Role:    "user",
+				Content: line,
+			})
+		}
+	}
+
+	// Add system prompt for group context
+	systemPrompt := `You are a helpful AI assistant participating in a group chat.
+Messages are formatted as [Name]: message content.
+Only respond when specifically addressed with @assistant.
+Keep responses concise and relevant to the conversation.`
+
+	resp, err := e.provider.Chat(ctx, &llm.ChatRequest{
+		SystemPrompt: systemPrompt,
+		Messages:     messages,
+		Tools:        nil, // No tools for group chat for now
+	})
+	if err != nil {
+		return "", fmt.Errorf("LLM error: %w", err)
+	}
+
+	return resp.Content, nil
 }

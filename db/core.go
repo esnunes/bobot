@@ -34,6 +34,7 @@ type RefreshToken struct {
 type Message struct {
 	ID            int64
 	UserID        int64
+	GroupID       *int64 // nil for 1:1 chats, set for group messages
 	Role          string
 	Content       string
 	Tokens        int
@@ -49,6 +50,21 @@ type Invite struct {
 	UsedAt    *time.Time
 	Revoked   bool
 	CreatedAt time.Time
+}
+
+type Group struct {
+	ID        int64
+	Name      string
+	OwnerID   int64
+	DeletedAt *time.Time
+	CreatedAt time.Time
+}
+
+type GroupMember struct {
+	UserID      int64
+	Username    string
+	DisplayName string
+	JoinedAt    time.Time
 }
 
 type CoreDB struct {
@@ -148,10 +164,51 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Create groups table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS groups (
+			id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL,
+			owner_id INTEGER NOT NULL REFERENCES users(id),
+			deleted_at DATETIME,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create group_members table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS group_members (
+			group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (group_id, user_id)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Migrate: add group_id column to messages
+	if err := c.addColumnIfMissing("messages", "group_id", "INTEGER REFERENCES groups(id)"); err != nil {
+		return err
+	}
+
 	// Create indexes after columns exist
 	_, err = c.db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_messages_user_context
 		ON messages(user_id, id) WHERE context_tokens = 0;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create index for group messages
+	_, err = c.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_messages_group
+		ON messages(group_id, id) WHERE group_id IS NOT NULL
 	`)
 	if err != nil {
 		return err
@@ -381,9 +438,9 @@ func (c *CoreDB) CreateMessageWithContext(userID int64, role, content string) (*
 
 func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at
 		FROM messages
-		WHERE user_id = ?
+		WHERE user_id = ? AND group_id IS NULL
 		ORDER BY created_at ASC
 		LIMIT ?
 	`, userID, limit)
@@ -395,8 +452,12 @@ func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+		var groupID sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.UserID, &groupID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
+		}
+		if groupID.Valid {
+			m.GroupID = &groupID.Int64
 		}
 		messages = append(messages, m)
 	}
@@ -406,10 +467,10 @@ func (c *CoreDB) GetMessages(userID int64, limit int) ([]Message, error) {
 func (c *CoreDB) GetRecentMessages(userID int64, limit int) ([]Message, error) {
 	// Get the most recent N messages, but return in chronological order
 	rows, err := c.db.Query(`
-		SELECT id, user_id, role, content, tokens, context_tokens, created_at FROM (
-			SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at FROM (
+			SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at
 			FROM messages
-			WHERE user_id = ?
+			WHERE user_id = ? AND group_id IS NULL
 			ORDER BY created_at DESC
 			LIMIT ?
 		) ORDER BY created_at ASC
@@ -422,8 +483,12 @@ func (c *CoreDB) GetRecentMessages(userID int64, limit int) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+		var groupID sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.UserID, &groupID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
+		}
+		if groupID.Valid {
+			m.GroupID = &groupID.Int64
 		}
 		messages = append(messages, m)
 	}
@@ -433,11 +498,11 @@ func (c *CoreDB) GetRecentMessages(userID int64, limit int) ([]Message, error) {
 func (c *CoreDB) CreateMessageWithContextThreshold(userID int64, role, content string, tokensStart, tokensMax int) (*Message, error) {
 	tokens := len(content) / 4
 
-	// Get the latest message's context state
+	// Get the latest message's context state (for 1:1 chats only)
 	var prevContextTokens, prevTokens int
 	err := c.db.QueryRow(`
 		SELECT tokens, context_tokens FROM messages
-		WHERE user_id = ? ORDER BY id DESC LIMIT 1
+		WHERE user_id = ? AND group_id IS NULL ORDER BY id DESC LIMIT 1
 	`, userID).Scan(&prevTokens, &prevContextTokens)
 
 	var contextTokens int
@@ -459,7 +524,7 @@ func (c *CoreDB) CreateMessageWithContextThreshold(userID int64, role, content s
 			var subtractValue int
 			err := c.db.QueryRow(`
 				SELECT id, context_tokens FROM messages
-				WHERE user_id = ? AND context_tokens < ?
+				WHERE user_id = ? AND group_id IS NULL AND context_tokens < ?
 				ORDER BY id DESC LIMIT 1
 			`, userID, targetThreshold).Scan(&newChunkStartID, &subtractValue)
 
@@ -471,7 +536,7 @@ func (c *CoreDB) CreateMessageWithContextThreshold(userID int64, role, content s
 				// Slide the window
 				_, err = c.db.Exec(`
 					UPDATE messages SET context_tokens = context_tokens - ?
-					WHERE user_id = ? AND id >= ?
+					WHERE user_id = ? AND group_id IS NULL AND id >= ?
 				`, subtractValue, userID, newChunkStartID)
 				if err != nil {
 					return nil, err
@@ -480,7 +545,7 @@ func (c *CoreDB) CreateMessageWithContextThreshold(userID int64, role, content s
 				// Recalculate contextTokens based on updated values
 				err = c.db.QueryRow(`
 					SELECT tokens, context_tokens FROM messages
-					WHERE user_id = ? ORDER BY id DESC LIMIT 1
+					WHERE user_id = ? AND group_id IS NULL ORDER BY id DESC LIMIT 1
 				`, userID).Scan(&prevTokens, &prevContextTokens)
 				if err != nil {
 					return nil, err
@@ -510,12 +575,36 @@ func (c *CoreDB) CreateMessageWithContextThreshold(userID int64, role, content s
 	}, nil
 }
 
+// CreateGroupMessage creates a message in a group chat.
+func (c *CoreDB) CreateGroupMessage(groupID, userID int64, role, content string) (*Message, error) {
+	tokens := len(content) / 4
+
+	result, err := c.db.Exec(
+		"INSERT INTO messages (group_id, user_id, role, content, tokens) VALUES (?, ?, ?, ?, ?)",
+		groupID, userID, role, content, tokens,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Message{
+		ID:        id,
+		UserID:    userID,
+		GroupID:   &groupID,
+		Role:      role,
+		Content:   content,
+		Tokens:    tokens,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
 func (c *CoreDB) GetContextMessages(userID int64) ([]Message, error) {
 	// Find the most recent chunk start
 	var chunkStartID int64
 	err := c.db.QueryRow(`
 		SELECT id FROM messages
-		WHERE user_id = ? AND context_tokens = 0
+		WHERE user_id = ? AND group_id IS NULL AND context_tokens = 0
 		ORDER BY id DESC LIMIT 1
 	`, userID).Scan(&chunkStartID)
 
@@ -528,9 +617,9 @@ func (c *CoreDB) GetContextMessages(userID int64) ([]Message, error) {
 
 	// Fetch all messages from chunk start to present, excluding command/system roles
 	rows, err := c.db.Query(`
-		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at
 		FROM messages
-		WHERE user_id = ? AND id >= ? AND role IN ('user', 'assistant')
+		WHERE user_id = ? AND group_id IS NULL AND id >= ? AND role IN ('user', 'assistant')
 		ORDER BY id ASC
 	`, userID, chunkStartID)
 	if err != nil {
@@ -541,8 +630,12 @@ func (c *CoreDB) GetContextMessages(userID int64) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+		var groupID sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.UserID, &groupID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
+		}
+		if groupID.Valid {
+			m.GroupID = &groupID.Int64
 		}
 		messages = append(messages, m)
 	}
@@ -551,9 +644,9 @@ func (c *CoreDB) GetContextMessages(userID int64) ([]Message, error) {
 
 func (c *CoreDB) GetMessagesBefore(userID, beforeID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at
 		FROM messages
-		WHERE user_id = ? AND id < ?
+		WHERE user_id = ? AND group_id IS NULL AND id < ?
 		ORDER BY id DESC
 		LIMIT ?
 	`, userID, beforeID, limit)
@@ -565,8 +658,12 @@ func (c *CoreDB) GetMessagesBefore(userID, beforeID int64, limit int) ([]Message
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+		var groupID sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.UserID, &groupID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
+		}
+		if groupID.Valid {
+			m.GroupID = &groupID.Int64
 		}
 		messages = append(messages, m)
 	}
@@ -575,9 +672,9 @@ func (c *CoreDB) GetMessagesBefore(userID, beforeID int64, limit int) ([]Message
 
 func (c *CoreDB) GetMessagesSince(userID int64, since time.Time) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, user_id, role, content, tokens, context_tokens, created_at
+		SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at
 		FROM messages
-		WHERE user_id = ? AND created_at > ?
+		WHERE user_id = ? AND group_id IS NULL AND created_at > ?
 		ORDER BY id ASC
 	`, userID, since.UTC())
 	if err != nil {
@@ -588,8 +685,12 @@ func (c *CoreDB) GetMessagesSince(userID int64, since time.Time) ([]Message, err
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+		var groupID sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.UserID, &groupID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
+		}
+		if groupID.Valid {
+			m.GroupID = &groupID.Int64
 		}
 		messages = append(messages, m)
 	}
@@ -733,4 +834,341 @@ func (c *CoreDB) ListUsers() ([]User, error) {
 		users = append(users, u)
 	}
 	return users, rows.Err()
+}
+
+// CreateGroup creates a new group with the given name and owner.
+func (c *CoreDB) CreateGroup(name string, ownerID int64) (*Group, error) {
+	result, err := c.db.Exec(
+		"INSERT INTO groups (name, owner_id) VALUES (?, ?)",
+		name, ownerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Group{
+		ID:        id,
+		Name:      name,
+		OwnerID:   ownerID,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+// AddGroupMember adds a user to a group.
+func (c *CoreDB) AddGroupMember(groupID, userID int64) error {
+	_, err := c.db.Exec(
+		"INSERT INTO group_members (group_id, user_id) VALUES (?, ?)",
+		groupID, userID,
+	)
+	return err
+}
+
+// RemoveGroupMember removes a user from a group.
+func (c *CoreDB) RemoveGroupMember(groupID, userID int64) error {
+	_, err := c.db.Exec(
+		"DELETE FROM group_members WHERE group_id = ? AND user_id = ?",
+		groupID, userID,
+	)
+	return err
+}
+
+// IsGroupMember checks if a user is a member of a group.
+func (c *CoreDB) IsGroupMember(groupID, userID int64) (bool, error) {
+	var count int
+	err := c.db.QueryRow(
+		"SELECT COUNT(*) FROM group_members WHERE group_id = ? AND user_id = ?",
+		groupID, userID,
+	).Scan(&count)
+	return count > 0, err
+}
+
+// GetGroupByID retrieves a group by its ID.
+func (c *CoreDB) GetGroupByID(id int64) (*Group, error) {
+	var group Group
+	var deletedAt sql.NullTime
+	err := c.db.QueryRow(
+		"SELECT id, name, owner_id, deleted_at, created_at FROM groups WHERE id = ? AND deleted_at IS NULL",
+		id,
+	).Scan(&group.ID, &group.Name, &group.OwnerID, &deletedAt, &group.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if deletedAt.Valid {
+		group.DeletedAt = &deletedAt.Time
+	}
+	return &group, nil
+}
+
+// GetUserGroups retrieves all groups a user is a member of.
+func (c *CoreDB) GetUserGroups(userID int64) ([]Group, error) {
+	rows, err := c.db.Query(`
+		SELECT g.id, g.name, g.owner_id, g.deleted_at, g.created_at
+		FROM groups g
+		JOIN group_members gm ON g.id = gm.group_id
+		WHERE gm.user_id = ? AND g.deleted_at IS NULL
+		ORDER BY g.created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var groups []Group
+	for rows.Next() {
+		var g Group
+		var deletedAt sql.NullTime
+		if err := rows.Scan(&g.ID, &g.Name, &g.OwnerID, &deletedAt, &g.CreatedAt); err != nil {
+			return nil, err
+		}
+		if deletedAt.Valid {
+			g.DeletedAt = &deletedAt.Time
+		}
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
+}
+
+// SoftDeleteGroup marks a group as deleted.
+func (c *CoreDB) SoftDeleteGroup(groupID int64) error {
+	_, err := c.db.Exec(
+		"UPDATE groups SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?",
+		groupID,
+	)
+	return err
+}
+
+// GetGroupMembers retrieves all members of a group.
+func (c *CoreDB) GetGroupMembers(groupID int64) ([]GroupMember, error) {
+	rows, err := c.db.Query(`
+		SELECT u.id, u.username, u.display_name, gm.joined_at
+		FROM group_members gm
+		JOIN users u ON gm.user_id = u.id
+		WHERE gm.group_id = ?
+		ORDER BY gm.joined_at ASC
+	`, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []GroupMember
+	for rows.Next() {
+		var m GroupMember
+		if err := rows.Scan(&m.UserID, &m.Username, &m.DisplayName, &m.JoinedAt); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, rows.Err()
+}
+
+// GetGroupRecentMessages returns the most recent messages for a group.
+func (c *CoreDB) GetGroupRecentMessages(groupID int64, limit int) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at FROM (
+			SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at
+			FROM messages
+			WHERE group_id = ?
+			ORDER BY created_at DESC
+			LIMIT ?
+		) ORDER BY created_at ASC
+	`, groupID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		var groupIDVal sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.UserID, &groupIDVal, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		if groupIDVal.Valid {
+			m.GroupID = &groupIDVal.Int64
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+// GetGroupMessagesBefore returns messages before a given ID for a group.
+func (c *CoreDB) GetGroupMessagesBefore(groupID, beforeID int64, limit int) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE group_id = ? AND id < ?
+		ORDER BY id DESC
+		LIMIT ?
+	`, groupID, beforeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		var groupIDVal sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.UserID, &groupIDVal, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		if groupIDVal.Valid {
+			m.GroupID = &groupIDVal.Int64
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+// GetGroupMessagesSince returns messages since a given time for a group.
+func (c *CoreDB) GetGroupMessagesSince(groupID int64, since time.Time) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE group_id = ? AND created_at > ?
+		ORDER BY id ASC
+	`, groupID, since.UTC())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		var groupIDVal sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.UserID, &groupIDVal, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		if groupIDVal.Valid {
+			m.GroupID = &groupIDVal.Int64
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
+}
+
+// CreateGroupMessageWithContext creates a group message with context tracking.
+func (c *CoreDB) CreateGroupMessageWithContext(groupID, userID int64, role, content string, tokensStart, tokensMax int) (*Message, error) {
+	tokens := len(content) / 4
+
+	// Get the latest group message's context state
+	var prevContextTokens, prevTokens int
+	err := c.db.QueryRow(`
+		SELECT tokens, context_tokens FROM messages
+		WHERE group_id = ? ORDER BY id DESC LIMIT 1
+	`, groupID).Scan(&prevTokens, &prevContextTokens)
+
+	var contextTokens int
+	if err == sql.ErrNoRows {
+		contextTokens = 0
+	} else if err != nil {
+		return nil, err
+	} else {
+		contextTokens = prevContextTokens + prevTokens + tokens
+
+		if contextTokens > tokensMax {
+			targetThreshold := tokensMax - tokensStart
+
+			var newChunkStartID int64
+			var subtractValue int
+			err := c.db.QueryRow(`
+				SELECT id, context_tokens FROM messages
+				WHERE group_id = ? AND context_tokens < ?
+				ORDER BY id DESC LIMIT 1
+			`, groupID, targetThreshold).Scan(&newChunkStartID, &subtractValue)
+
+			if err != nil && err != sql.ErrNoRows {
+				return nil, err
+			}
+
+			if err == nil {
+				_, err = c.db.Exec(`
+					UPDATE messages SET context_tokens = context_tokens - ?
+					WHERE group_id = ? AND id >= ?
+				`, subtractValue, groupID, newChunkStartID)
+				if err != nil {
+					return nil, err
+				}
+
+				err = c.db.QueryRow(`
+					SELECT tokens, context_tokens FROM messages
+					WHERE group_id = ? ORDER BY id DESC LIMIT 1
+				`, groupID).Scan(&prevTokens, &prevContextTokens)
+				if err != nil {
+					return nil, err
+				}
+				contextTokens = prevContextTokens + prevTokens + tokens
+			}
+		}
+	}
+
+	result, err := c.db.Exec(
+		"INSERT INTO messages (group_id, user_id, role, content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?)",
+		groupID, userID, role, content, tokens, contextTokens,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return &Message{
+		ID:            id,
+		UserID:        userID,
+		GroupID:       &groupID,
+		Role:          role,
+		Content:       content,
+		Tokens:        tokens,
+		ContextTokens: contextTokens,
+		CreatedAt:     time.Now(),
+	}, nil
+}
+
+// GetGroupContextMessages returns messages in the current context window for a group.
+func (c *CoreDB) GetGroupContextMessages(groupID int64) ([]Message, error) {
+	var chunkStartID int64
+	err := c.db.QueryRow(`
+		SELECT id FROM messages
+		WHERE group_id = ? AND context_tokens = 0
+		ORDER BY id DESC LIMIT 1
+	`, groupID).Scan(&chunkStartID)
+
+	if err == sql.ErrNoRows {
+		return []Message{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := c.db.Query(`
+		SELECT id, user_id, group_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE group_id = ? AND id >= ? AND role IN ('user', 'assistant')
+		ORDER BY id ASC
+	`, groupID, chunkStartID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		var groupIDVal sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.UserID, &groupIDVal, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		if groupIDVal.Valid {
+			m.GroupID = &groupIDVal.Int64
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
 }

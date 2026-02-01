@@ -685,3 +685,219 @@ func TestCoreDB_ListUsers(t *testing.T) {
 		t.Errorf("expected 3 users, got %d", len(users))
 	}
 }
+
+func TestCreateGroup(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUser("owner", "hash")
+
+	group, err := db.CreateGroup("Test Group", user.ID)
+	if err != nil {
+		t.Fatalf("CreateGroup failed: %v", err)
+	}
+
+	if group.ID == 0 {
+		t.Error("expected non-zero group ID")
+	}
+	if group.Name != "Test Group" {
+		t.Errorf("expected name 'Test Group', got %q", group.Name)
+	}
+	if group.OwnerID != user.ID {
+		t.Errorf("expected owner_id %d, got %d", user.ID, group.OwnerID)
+	}
+	if group.DeletedAt != nil {
+		t.Error("expected nil deleted_at for new group")
+	}
+}
+
+func TestAddGroupMember(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	member, _ := db.CreateUser("member", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	err := db.AddGroupMember(group.ID, member.ID)
+	if err != nil {
+		t.Fatalf("AddGroupMember failed: %v", err)
+	}
+
+	// Adding same member again should fail or be idempotent
+	err = db.AddGroupMember(group.ID, member.ID)
+	// SQLite will error on duplicate primary key
+	if err == nil {
+		t.Error("expected error when adding duplicate member")
+	}
+}
+
+func TestRemoveGroupMember(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	member, _ := db.CreateUser("member", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+	db.AddGroupMember(group.ID, member.ID)
+
+	err := db.RemoveGroupMember(group.ID, member.ID)
+	if err != nil {
+		t.Fatalf("RemoveGroupMember failed: %v", err)
+	}
+
+	// Verify member is removed by checking membership
+	isMember, _ := db.IsGroupMember(group.ID, member.ID)
+	if isMember {
+		t.Error("expected member to be removed")
+	}
+}
+
+func TestGetGroupByID(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	created, _ := db.CreateGroup("Test Group", owner.ID)
+
+	group, err := db.GetGroupByID(created.ID)
+	if err != nil {
+		t.Fatalf("GetGroupByID failed: %v", err)
+	}
+	if group.Name != "Test Group" {
+		t.Errorf("expected name 'Test Group', got %q", group.Name)
+	}
+
+	// Test not found
+	_, err = db.GetGroupByID(9999)
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestGetUserGroups(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	member, _ := db.CreateUser("member", "hash")
+
+	group1, _ := db.CreateGroup("Group 1", owner.ID)
+	group2, _ := db.CreateGroup("Group 2", owner.ID)
+	db.AddGroupMember(group1.ID, member.ID)
+	db.AddGroupMember(group2.ID, member.ID)
+
+	groups, err := db.GetUserGroups(member.ID)
+	if err != nil {
+		t.Fatalf("GetUserGroups failed: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Errorf("expected 2 groups, got %d", len(groups))
+	}
+}
+
+func TestSoftDeleteGroup(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	err := db.SoftDeleteGroup(group.ID)
+	if err != nil {
+		t.Fatalf("SoftDeleteGroup failed: %v", err)
+	}
+
+	// Should not be found after soft delete
+	_, err = db.GetGroupByID(group.ID)
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound after soft delete, got %v", err)
+	}
+}
+
+func TestGetGroupMembers(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUserFull("owner", "hash", "Owner", "user")
+	member, _ := db.CreateUserFull("member", "hash", "Member", "user")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+	db.AddGroupMember(group.ID, owner.ID)
+	db.AddGroupMember(group.ID, member.ID)
+
+	members, err := db.GetGroupMembers(group.ID)
+	if err != nil {
+		t.Fatalf("GetGroupMembers failed: %v", err)
+	}
+	if len(members) != 2 {
+		t.Errorf("expected 2 members, got %d", len(members))
+	}
+}
+
+func TestCreateGroupMessage(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	msg, err := db.CreateGroupMessage(group.ID, owner.ID, "user", "Hello group!")
+	if err != nil {
+		t.Fatalf("CreateGroupMessage failed: %v", err)
+	}
+	if msg.GroupID == nil || *msg.GroupID != group.ID {
+		t.Error("expected group_id to be set")
+	}
+	if msg.Content != "Hello group!" {
+		t.Errorf("expected content 'Hello group!', got %q", msg.Content)
+	}
+}
+
+func TestGetGroupRecentMessages(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	db.CreateGroupMessage(group.ID, owner.ID, "user", "Message 1")
+	db.CreateGroupMessage(group.ID, owner.ID, "assistant", "Response 1")
+	db.CreateGroupMessage(group.ID, owner.ID, "user", "Message 2")
+
+	msgs, err := db.GetGroupRecentMessages(group.ID, 10)
+	if err != nil {
+		t.Fatalf("GetGroupRecentMessages failed: %v", err)
+	}
+	if len(msgs) != 3 {
+		t.Errorf("expected 3 messages, got %d", len(msgs))
+	}
+}
+
+func TestGetGroupContextMessages(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	group, _ := db.CreateGroup("Test Group", owner.ID)
+
+	db.CreateGroupMessageWithContext(group.ID, owner.ID, "user", "Hello", 1000, 80000)
+	db.CreateGroupMessageWithContext(group.ID, owner.ID, "assistant", "Hi there", 1000, 80000)
+
+	msgs, err := db.GetGroupContextMessages(group.ID)
+	if err != nil {
+		t.Fatalf("GetGroupContextMessages failed: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Errorf("expected 2 context messages, got %d", len(msgs))
+	}
+}
