@@ -37,7 +37,7 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("HX-Redirect", "/groups/"+strconv.FormatInt(group.ID, 10))
+	w.Header().Set("HX-Location", "/groups/"+strconv.FormatInt(group.ID, 10))
 	w.WriteHeader(http.StatusNoContent)
 }
 

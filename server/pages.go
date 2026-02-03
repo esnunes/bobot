@@ -128,7 +128,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	s.clearSessionCookie(w)
 
-	w.Header().Set("HX-Redirect", "/")
+	w.Header().Set("HX-Location", "/")
 	w.WriteHeader(http.StatusNoContent)
 }
 

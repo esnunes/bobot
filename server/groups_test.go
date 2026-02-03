@@ -50,9 +50,9 @@ func TestCreateGroup(t *testing.T) {
 	}
 
 	// HTMX pattern: redirect to the new group
-	redirect := w.Header().Get("HX-Redirect")
+	redirect := w.Header().Get("HX-Location")
 	if redirect != "/groups/1" {
-		t.Errorf("expected HX-Redirect '/groups/1', got %q", redirect)
+		t.Errorf("expected HX-Location '/groups/1', got %q", redirect)
 	}
 
 	// Verify group was created in DB

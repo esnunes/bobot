@@ -594,9 +594,9 @@ func TestHandleLogout_ClearsCookie(t *testing.T) {
 		t.Errorf("Cookie MaxAge = %d, want -1 (delete)", sessionCookie.MaxAge)
 	}
 
-	// Check HX-Redirect header
-	if rr.Header().Get("HX-Redirect") != "/" {
-		t.Errorf("HX-Redirect = %q, want /", rr.Header().Get("HX-Redirect"))
+	// Check HX-Location header
+	if rr.Header().Get("HX-Location") != "/" {
+		t.Errorf("HX-Location = %q, want /", rr.Header().Get("HX-Location"))
 	}
 }
 
