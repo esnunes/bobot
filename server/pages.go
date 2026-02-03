@@ -108,132 +108,21 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	s.templates["authenticated"].Execute(w, PageData{Title: "Loading"})
 }
 
-func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
-	// GET request - show signup form
-	if r.Method == http.MethodGet {
-		code := r.URL.Query().Get("code")
-		if code == "" {
-			s.templates["signup"].Execute(w, PageData{
-				Title: "Sign Up",
-				Error: "Invite code required",
-			})
-			return
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	// Check for "logout everywhere" parameter
+	if r.URL.Query().Get("all") == "true" {
+		// Try to get user from session cookie
+		if cookie, err := r.Cookie("session"); err == nil {
+			if token, err := s.session.DecryptToken(cookie.Value); err == nil {
+				s.db.CreateSessionRevocation(token.UserID, "logout_all")
+			}
 		}
-
-		// Validate code exists and is valid
-		invite, err := s.db.GetInviteByCode(code)
-		if err != nil || invite.UsedBy != nil || invite.Revoked {
-			s.templates["signup"].Execute(w, PageData{
-				Title: "Sign Up",
-				Error: "Invalid or expired invite",
-			})
-			return
-		}
-
-		s.templates["signup"].Execute(w, PageData{
-			Title: "Sign Up",
-			Code:  code,
-		})
-		return
 	}
 
-	// POST request - handle signup
-	if err := r.ParseForm(); err != nil {
-		s.templates["signup"].Execute(w, PageData{Title: "Sign Up", Error: "Invalid request"})
-		return
-	}
+	s.clearSessionCookie(w)
 
-	code := r.FormValue("code")
-	username := r.FormValue("username")
-	displayName := r.FormValue("display_name")
-	password := r.FormValue("password")
-
-	// Validate invite code
-	invite, err := s.db.GetInviteByCode(code)
-	if err != nil || invite.UsedBy != nil || invite.Revoked {
-		s.templates["signup"].Execute(w, PageData{
-			Title: "Sign Up",
-			Error: "Invalid or expired invite",
-			Code:  code,
-		})
-		return
-	}
-
-	// Validate username
-	if err := validateUsername(username); err != nil {
-		s.templates["signup"].Execute(w, PageData{
-			Title: "Sign Up",
-			Error: err.Error(),
-			Code:  code,
-		})
-		return
-	}
-
-	// Validate display name
-	if err := validateDisplayName(displayName); err != nil {
-		s.templates["signup"].Execute(w, PageData{
-			Title: "Sign Up",
-			Error: err.Error(),
-			Code:  code,
-		})
-		return
-	}
-
-	// Validate password
-	if err := validatePassword(password); err != nil {
-		s.templates["signup"].Execute(w, PageData{
-			Title: "Sign Up",
-			Error: err.Error(),
-			Code:  code,
-		})
-		return
-	}
-
-	// Hash password
-	passwordHash, err := auth.HashPassword(password)
-	if err != nil {
-		s.templates["signup"].Execute(w, PageData{
-			Title: "Sign Up",
-			Error: "Internal error",
-			Code:  code,
-		})
-		return
-	}
-
-	// Create user
-	user, err := s.db.CreateUserFull(username, passwordHash, displayName, "user")
-	if err != nil {
-		s.templates["signup"].Execute(w, PageData{
-			Title: "Sign Up",
-			Error: "Username already taken",
-			Code:  code,
-		})
-		return
-	}
-
-	// Mark invite as used
-	if err := s.db.UseInvite(code, user.ID); err != nil {
-		s.templates["signup"].Execute(w, PageData{
-			Title: "Sign Up",
-			Error: "Internal error",
-			Code:  code,
-		})
-		return
-	}
-
-	// Create session token
-	token, err := s.session.CreateToken(user.ID, user.Role)
-	if err != nil {
-		s.templates["signup"].Execute(w, PageData{
-			Title: "Sign Up",
-			Error: "Internal error",
-			Code:  code,
-		})
-		return
-	}
-
-	s.setSessionCookie(w, token)
-	s.templates["authenticated"].Execute(w, PageData{Title: "Loading"})
+	w.Header().Set("HX-Redirect", "/")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {

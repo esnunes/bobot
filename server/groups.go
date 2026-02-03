@@ -42,16 +42,8 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isHTMXRequest(r) {
-		w.Header().Set("HX-Redirect", "/groups/"+strconv.FormatInt(group.ID, 10))
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":       group.ID,
-		"name":     group.Name,
-		"owner_id": group.OwnerID,
-	})
+	w.Header().Set("HX-Redirect", "/groups/"+strconv.FormatInt(group.ID, 10))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleListGroups(w http.ResponseWriter, r *http.Request) {
