@@ -156,6 +156,11 @@ window.ChatClient ||= class ChatClient {
                 this.loadMoreHistory();
             }
         });
+
+        // Logout cleanup - clear chat-specific localStorage
+        document.addEventListener('bobot:logout', () => {
+            localStorage.removeItem('lastMessageTimestamp');
+        });
     }
 
     cleanup() {

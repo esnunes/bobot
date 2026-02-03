@@ -44,14 +44,23 @@ func TestCreateGroup(t *testing.T) {
 
 	s.handleCreateGroup(w, req)
 
-	if w.Code != http.StatusCreated {
-		t.Errorf("expected status 201, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected status 204, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &resp)
-	if resp["name"] != "My Group" {
-		t.Errorf("expected name 'My Group', got %v", resp["name"])
+	// HTMX pattern: redirect to the new group
+	redirect := w.Header().Get("HX-Redirect")
+	if redirect != "/groups/1" {
+		t.Errorf("expected HX-Redirect '/groups/1', got %q", redirect)
+	}
+
+	// Verify group was created in DB
+	group, err := coreDB.GetGroupByID(1)
+	if err != nil {
+		t.Fatalf("expected group to be created: %v", err)
+	}
+	if group.Name != "My Group" {
+		t.Errorf("expected group name 'My Group', got %q", group.Name)
 	}
 }
 

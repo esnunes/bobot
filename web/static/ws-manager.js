@@ -100,11 +100,8 @@
         connect();
     };
 
-    // Centralized logout cleanup - works on any page with logout button
-    document.addEventListener('htmx:beforeRequest', function(event) {
-        if (event.target.id === 'logout-btn') {
-            container.close();
-            localStorage.removeItem('lastMessageTimestamp');
-        }
+    // Close WebSocket on logout
+    document.addEventListener('bobot:logout', function() {
+        container.close();
     });
 })();
