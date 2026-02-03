@@ -11,11 +11,18 @@ import (
 	"github.com/esnunes/bobot/web"
 )
 
+type GroupView struct {
+	ID          int64
+	Name        string
+	MemberCount int
+}
+
 type PageData struct {
 	Title   string
 	Error   string
 	Code    string
 	GroupID int64
+	Groups  []GroupView
 }
 
 func (s *Server) loadTemplates() error {
@@ -130,7 +137,25 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGroupsPage(w http.ResponseWriter, r *http.Request) {
-	s.templates["groups"].Execute(w, PageData{Title: "Groups"})
+	userData := auth.UserDataFromContext(r.Context())
+
+	groups, err := s.db.GetUserGroups(userData.UserID)
+	if err != nil {
+		http.Error(w, "failed to load groups", http.StatusInternalServerError)
+		return
+	}
+
+	groupViews := make([]GroupView, 0, len(groups))
+	for _, g := range groups {
+		members, _ := s.db.GetGroupMembers(g.ID)
+		groupViews = append(groupViews, GroupView{
+			ID:          g.ID,
+			Name:        g.Name,
+			MemberCount: len(members),
+		})
+	}
+
+	s.templates["groups"].Execute(w, PageData{Title: "Groups", Groups: groupViews})
 }
 
 func (s *Server) handleGroupChatPage(w http.ResponseWriter, r *http.Request) {

@@ -82,7 +82,7 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /signup", s.handleSignupPage)
 	s.router.HandleFunc("POST /signup", s.handleSignupPage)
 	s.router.HandleFunc("GET /chat", s.handleChatPage)
-	s.router.HandleFunc("GET /groups", s.handleGroupsPage)
+	s.router.HandleFunc("GET /groups", s.sessionMiddleware(s.handleGroupsPage))
 	s.router.HandleFunc("GET /groups/{id}", s.handleGroupChatPage)
 
 	// Static files

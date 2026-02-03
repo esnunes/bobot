@@ -6,16 +6,25 @@
         <button id="create-group-btn" class="create-btn">+</button>
     </header>
 
-    <main class="groups-list" id="groups-list">
-        <div class="loading">Loading groups...</div>
+    <main class="groups-list">
+        {{if .Groups}}
+            {{range .Groups}}
+            <a href="/groups/{{.ID}}" class="group-item">
+                <span class="group-name">{{.Name}}</span>
+                <span class="group-members">{{.MemberCount}} member{{if ne .MemberCount 1}}s{{end}}</span>
+            </a>
+            {{end}}
+        {{else}}
+            <div class="empty">No groups yet. Create one!</div>
+        {{end}}
     </main>
 </div>
 
 <div id="create-group-modal" class="modal hidden">
     <div class="modal-content">
         <h2>Create Group</h2>
-        <form id="create-group-form" hx-post="/api/groups" hx-ext="json-enc">
-            <input type="text" id="group-name" name="name" placeholder="Group name" required maxlength="100">
+        <form hx-post="/api/groups">
+            <input type="text" name="name" placeholder="Group name" required maxlength="100" autofocus>
             <div class="modal-actions">
                 <button type="button" id="cancel-create">Cancel</button>
                 <button type="submit">Create</button>
@@ -25,79 +34,26 @@
 </div>
 
 <script>
-window.GroupsPage = class GroupsPage {
-    constructor() {
-        this.listEl = document.getElementById('groups-list');
-        this.modal = document.getElementById('create-group-modal');
-        this.init();
-    }
-
-    async init() {
-        await this.loadGroups();
-        this.setupEventListeners();
-    }
-
-    async loadGroups() {
-        try {
-            const resp = await fetch('/api/groups', { credentials: 'include' });
-
-            if (!resp.ok) {
-                if (resp.status === 401) {
-                    window.location.href = '/';
-                    return;
-                }
-                throw new Error('Failed to load groups');
-            }
-
-            const groups = await resp.json();
-            this.renderGroups(groups);
-        } catch (err) {
-            console.error('Failed to load groups:', err);
-            this.listEl.innerHTML = '<div class="error">Failed to load groups</div>';
-        }
-    }
-
-    renderGroups(groups) {
-        if (!groups || groups.length === 0) {
-            this.listEl.innerHTML = '<div class="empty">No groups yet. Create one!</div>';
-            return;
-        }
-
-        this.listEl.innerHTML = groups.map(g => `
-            <a href="/groups/${g.id}" class="group-item">
-                <span class="group-name">${this.escapeHtml(g.name)}</span>
-                <span class="group-members">${g.member_count} member${g.member_count !== 1 ? 's' : ''}</span>
-            </a>
-        `).join('');
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    setupEventListeners() {
-        document.getElementById('create-group-btn').addEventListener('click', () => {
-            this.modal.classList.remove('hidden');
-            document.getElementById('group-name').focus();
-        });
-
-        document.getElementById('cancel-create').addEventListener('click', () => {
-            this.modal.classList.add('hidden');
-        });
-
-        this.modal.addEventListener('click', (e) => {
-            if (e.target === this.modal) {
-                this.modal.classList.add('hidden');
-            }
-        });
-    }
-};
-
 (function() {
-    // Initialize immediately
-    new GroupsPage();
+    const modal = document.getElementById('create-group-modal');
+    const nameInput = modal.querySelector('input[name="name"]');
+
+    document.getElementById('create-group-btn').addEventListener('click', () => {
+        modal.classList.remove('hidden');
+        nameInput.focus();
+    });
+
+    document.getElementById('cancel-create').addEventListener('click', () => {
+        modal.classList.add('hidden');
+        nameInput.value = '';
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            nameInput.value = '';
+        }
+    });
 })();
 </script>
 {{end}}

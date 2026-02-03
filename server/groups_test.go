@@ -37,9 +37,9 @@ func TestCreateGroup(t *testing.T) {
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
 
-	body := `{"name": "My Group"}`
-	req := httptest.NewRequest("POST", "/api/groups", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "name=My+Group"
+	req := httptest.NewRequest("POST", "/api/groups", bytes.NewBufferString(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
 	w := httptest.NewRecorder()
 

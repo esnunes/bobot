@@ -11,26 +11,21 @@ import (
 	"github.com/esnunes/bobot/auth"
 )
 
-type createGroupRequest struct {
-	Name string `json:"name"`
-}
-
 func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 
-	var req createGroupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	req.Name = strings.TrimSpace(req.Name)
-	if req.Name == "" || len(req.Name) > 100 {
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" || len(name) > 100 {
 		http.Error(w, "name required (max 100 chars)", http.StatusBadRequest)
 		return
 	}
 
-	group, err := s.db.CreateGroup(req.Name, userData.UserID)
+	group, err := s.db.CreateGroup(name, userData.UserID)
 	if err != nil {
 		http.Error(w, "failed to create group", http.StatusInternalServerError)
 		return
