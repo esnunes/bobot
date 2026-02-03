@@ -27,26 +27,22 @@ if (typeof GroupChatClient === 'undefined') {
         }
 
         async init() {
-            const token = localStorage.getItem('access_token');
-            if (!token) {
-                htmx.ajax('GET', '/', {target: 'body', swap: 'innerHTML'}).then(() => {
-                    history.pushState({}, '', '/');
-                });
-                return;
-            }
-
-            await this.loadGroupInfo(token);
-            await this.loadRecentMessages(token);
+            await this.loadGroupInfo();
+            await this.loadRecentMessages();
             this.setupEventListeners();
         }
 
-        async loadGroupInfo(token) {
+        async loadGroupInfo() {
             try {
                 const resp = await fetch(`/api/groups/${this.groupId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    credentials: 'include'
                 });
 
                 if (!resp.ok) {
+                    if (resp.status === 401) {
+                        window.location.href = '/';
+                        return;
+                    }
                     if (resp.status === 403 || resp.status === 404) {
                         htmx.ajax('GET', '/groups', {target: 'body', swap: 'innerHTML'}).then(() => {
                             history.pushState({}, '', '/groups');
@@ -59,8 +55,7 @@ if (typeof GroupChatClient === 'undefined') {
                 const group = await resp.json();
                 document.getElementById('group-name').textContent = group.name;
 
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                this.currentUserId = payload.user_id;
+                this.currentUserId = group.current_user_id;
 
                 if (group.owner_id === this.currentUserId) {
                     this.deleteBtn.classList.remove('hidden');
@@ -77,10 +72,10 @@ if (typeof GroupChatClient === 'undefined') {
             }
         }
 
-        async loadRecentMessages(token) {
+        async loadRecentMessages() {
             try {
                 const resp = await fetch(`/api/groups/${this.groupId}/messages/recent?limit=50`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    credentials: 'include'
                 });
 
                 if (!resp.ok) throw new Error('Failed to load messages');
@@ -205,12 +200,11 @@ if (typeof GroupChatClient === 'undefined') {
             if (this.isLoadingHistory || !this.hasMoreHistory || !this.oldestMessageId) return;
 
             this.isLoadingHistory = true;
-            const token = localStorage.getItem('access_token');
 
             try {
                 const resp = await fetch(
                     `/api/groups/${this.groupId}/messages/history?before=${this.oldestMessageId}&limit=50`,
-                    { headers: { 'Authorization': `Bearer ${token}` } }
+                    { credentials: 'include' }
                 );
 
                 if (!resp.ok) throw new Error('Failed to load history');
@@ -263,11 +257,10 @@ if (typeof GroupChatClient === 'undefined') {
         async leaveGroup() {
             if (!confirm('Are you sure you want to leave this group?')) return;
 
-            const token = localStorage.getItem('access_token');
             try {
                 const resp = await fetch(`/api/groups/${this.groupId}/members/${this.currentUserId}`, {
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    credentials: 'include'
                 });
 
                 if (!resp.ok) throw new Error('Failed to leave group');
@@ -284,11 +277,10 @@ if (typeof GroupChatClient === 'undefined') {
         async deleteGroup() {
             if (!confirm('Are you sure you want to delete this group? This cannot be undone.')) return;
 
-            const token = localStorage.getItem('access_token');
             try {
                 const resp = await fetch(`/api/groups/${this.groupId}`, {
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    credentials: 'include'
                 });
 
                 if (!resp.ok) throw new Error('Failed to delete group');

@@ -24,28 +24,20 @@ if (typeof ChatClient === 'undefined') {
         }
 
         async init() {
-            const token = localStorage.getItem('access_token');
-            if (!token) {
-                htmx.ajax('GET', '/', {target: 'body', swap: 'innerHTML'}).then(() => {
-                    history.pushState({}, '', '/');
-                });
-                return;
-            }
-
-            await this.loadRecentMessages(token);
-            await this.syncMessages(token);
+            await this.loadRecentMessages();
+            await this.syncMessages();
             this.setupEventListeners();
         }
 
-        async loadRecentMessages(token) {
+        async loadRecentMessages() {
             try {
                 const resp = await fetch('/api/messages/recent?limit=50', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    credentials: 'include'
                 });
 
                 if (!resp.ok) {
                     if (resp.status === 401) {
-                        document.dispatchEvent(new CustomEvent('bobot:auth-expired'));
+                        window.location.href = '/';
                         return;
                     }
                     throw new Error('Failed to load messages');
@@ -69,11 +61,10 @@ if (typeof ChatClient === 'undefined') {
             }
 
             this.isLoadingHistory = true;
-            const token = localStorage.getItem('access_token');
 
             try {
                 const resp = await fetch(`/api/messages/history?before=${this.oldestMessageId}&limit=50`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    credentials: 'include'
                 });
 
                 if (!resp.ok) throw new Error('Failed to load history');
@@ -97,13 +88,13 @@ if (typeof ChatClient === 'undefined') {
             }
         }
 
-        async syncMessages(token) {
+        async syncMessages() {
             const lastSeen = localStorage.getItem('lastMessageTimestamp');
             if (!lastSeen) return;
 
             try {
                 const resp = await fetch(`/api/messages/sync?since=${encodeURIComponent(lastSeen)}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    credentials: 'include'
                 });
 
                 if (!resp.ok) return;
@@ -236,33 +227,20 @@ if (typeof ChatClient === 'undefined') {
         }
 
         async logout() {
-            const refreshToken = localStorage.getItem('refresh_token');
-
-            // Close WebSocket before logout
             this.wsContainer.close();
 
-            if (refreshToken) {
-                try {
-                    await fetch('/api/logout', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'HX-Request': 'true'
-                        },
-                        body: JSON.stringify({ refresh_token: refreshToken })
-                    });
-                } catch (err) {
-                    console.error('Logout error:', err);
-                }
+            try {
+                await fetch('/api/logout', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'HX-Request': 'true' }
+                });
+            } catch (err) {
+                console.error('Logout error:', err);
             }
 
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
             localStorage.removeItem('lastMessageTimestamp');
-
-            htmx.ajax('GET', '/', {target: 'body', swap: 'innerHTML'}).then(() => {
-                history.pushState({}, '', '/');
-            });
+            window.location.href = '/';
         }
     };
 }
