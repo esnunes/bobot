@@ -21,7 +21,7 @@ func NewCoreDBAdapter(coreDB *db.CoreDB) *CoreDBAdapter {
 
 // GetContextMessages returns context messages for a user.
 func (a *CoreDBAdapter) GetContextMessages(userID int64) ([]assistant.ContextMessage, error) {
-	messages, err := a.db.GetContextMessages(userID)
+	messages, err := a.db.GetPrivateChatContextMessages(userID)
 	if err != nil {
 		return nil, err
 	}

@@ -22,7 +22,7 @@ func (s *Server) handleRecentMessages(w http.ResponseWriter, r *http.Request) {
 		limit = s.cfg.History.DefaultLimit
 	}
 
-	messages, err := s.db.GetRecentMessages(userData.UserID, limit)
+	messages, err := s.db.GetPrivateChatRecentMessages(userData.UserID, limit)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -50,7 +50,7 @@ func (s *Server) handleMessageHistory(w http.ResponseWriter, r *http.Request) {
 		limit = s.cfg.History.DefaultLimit
 	}
 
-	messages, err := s.db.GetMessagesBefore(userData.UserID, beforeID, limit)
+	messages, err := s.db.GetPrivateChatMessagesBefore(userData.UserID, beforeID, limit)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -85,7 +85,7 @@ func (s *Server) handleMessageSync(w http.ResponseWriter, r *http.Request) {
 		since = minTime
 	}
 
-	messages, err := s.db.GetMessagesSince(userData.UserID, since)
+	messages, err := s.db.GetPrivateChatMessagesSince(userData.UserID, since)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

@@ -272,7 +272,7 @@ func (s *Server) handleGroupRecentMessages(w http.ResponseWriter, r *http.Reques
 			"CreatedAt": m.CreatedAt,
 		}
 		if m.Role == "user" {
-			if user, err := s.db.GetUserByID(m.UserID); err == nil {
+			if user, err := s.db.GetUserByID(m.SenderID); err == nil {
 				item["UserID"] = user.ID
 				item["DisplayName"] = user.DisplayName
 			}
@@ -322,7 +322,7 @@ func (s *Server) handleGroupMessageHistory(w http.ResponseWriter, r *http.Reques
 			"CreatedAt": m.CreatedAt,
 		}
 		if m.Role == "user" {
-			if user, err := s.db.GetUserByID(m.UserID); err == nil {
+			if user, err := s.db.GetUserByID(m.SenderID); err == nil {
 				item["UserID"] = user.ID
 				item["DisplayName"] = user.DisplayName
 			}
@@ -371,7 +371,7 @@ func (s *Server) handleGroupMessageSync(w http.ResponseWriter, r *http.Request) 
 			"CreatedAt": m.CreatedAt,
 		}
 		if m.Role == "user" {
-			if user, err := s.db.GetUserByID(m.UserID); err == nil {
+			if user, err := s.db.GetUserByID(m.SenderID); err == nil {
 				item["UserID"] = user.ID
 				item["DisplayName"] = user.DisplayName
 			}

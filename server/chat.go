@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/esnunes/bobot/auth"
+	"github.com/esnunes/bobot/db"
 )
 
 var upgrader = websocket.Upgrader{
@@ -84,8 +85,9 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, content string) {
 	// Check for slash commands
 	if response, handled := s.handleSlashCommand(ctx, content); handled {
-		s.db.CreateMessageWithContextThreshold(
-			userID, "command", content,
+		// User sends command: sender=user, receiver=bobot
+		s.db.CreatePrivateMessageWithContextThreshold(
+			userID, db.BobotUserID, "command", content,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
@@ -95,8 +97,9 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 		})
 		s.connections.Broadcast(userID, userMsgJSON)
 
-		s.db.CreateMessageWithContextThreshold(
-			userID, "system", response,
+		// System response: sender=bobot, receiver=user
+		s.db.CreatePrivateMessageWithContextThreshold(
+			db.BobotUserID, userID, "system", response,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
@@ -108,9 +111,9 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 		return
 	}
 
-	// Save user message with context tracking
-	s.db.CreateMessageWithContextThreshold(
-		userID, "user", content,
+	// Save user message: sender=user, receiver=bobot
+	s.db.CreatePrivateMessageWithContextThreshold(
+		userID, db.BobotUserID, "user", content,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
 
@@ -128,9 +131,9 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 		response = "Sorry, I encountered an error. Please try again."
 	}
 
-	// Save assistant message
-	s.db.CreateMessageWithContextThreshold(
-		userID, "assistant", response,
+	// Save assistant message: sender=bobot, receiver=user
+	s.db.CreatePrivateMessageWithContextThreshold(
+		db.BobotUserID, userID, "assistant", response,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
 
@@ -229,7 +232,7 @@ func (s *Server) handleGroupAssistantResponse(ctx context.Context, groupID int64
 	var conversation []string
 	for _, m := range messages {
 		if m.Role == "user" {
-			user, _ := s.db.GetUserByID(m.UserID)
+			user, _ := s.db.GetUserByID(m.SenderID)
 			name := "User"
 			if user != nil && user.DisplayName != "" {
 				name = user.DisplayName
@@ -247,9 +250,9 @@ func (s *Server) handleGroupAssistantResponse(ctx context.Context, groupID int64
 		response = "Sorry, I encountered an error. Please try again."
 	}
 
-	// Save assistant message using system user
+	// Save assistant message using bobot user ID
 	_, err = s.db.CreateGroupMessageWithContext(
-		groupID, s.systemUserID, "assistant", response,
+		groupID, db.BobotUserID, "assistant", response,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
 	if err != nil {
