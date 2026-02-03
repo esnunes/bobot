@@ -116,8 +116,8 @@ func (t *UserTool) block(adminID int64, username string) (string, error) {
 		return "", err
 	}
 
-	// Delete all refresh tokens for blocked user
-	if err := t.db.DeleteUserRefreshTokens(user.ID); err != nil {
+	// Revoke all sessions for blocked user
+	if err := t.db.CreateSessionRevocation(user.ID, "user_blocked"); err != nil {
 		return "", err
 	}
 
