@@ -102,8 +102,23 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement session-based logout in Task 8
-	http.Error(w, "not implemented", http.StatusNotImplemented)
+	// Check for "logout everywhere" parameter
+	if r.URL.Query().Get("all") == "true" {
+		// Try to get user from session cookie
+		if cookie, err := r.Cookie("session"); err == nil {
+			if token, err := s.session.DecryptToken(cookie.Value); err == nil {
+				s.db.CreateSessionRevocation(token.UserID, "logout_all")
+			}
+		}
+	}
+
+	s.clearSessionCookie(w)
+
+	if isHTMXRequest(r) {
+		w.Header().Set("HX-Redirect", "/")
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {

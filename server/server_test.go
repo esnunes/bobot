@@ -216,30 +216,9 @@ func TestServer_Refresh_ExpiredToken(t *testing.T) {
 	}
 }
 
-func TestServer_Logout(t *testing.T) {
-	srv := setupTestServer(t)
-
-	hash, _ := auth.HashPassword("testpass")
-	user, _ := srv.db.CreateUser("testuser", hash)
-	srv.db.CreateRefreshToken(user.ID, "logout-token", time.Now().Add(24*time.Hour))
-
-	body := `{"refresh_token":"logout-token"}`
-	req := httptest.NewRequest("POST", "/api/logout", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	srv.router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d", w.Code)
-	}
-
-	// Token should be deleted
-	_, err := srv.db.GetRefreshToken("logout-token")
-	if err != db.ErrNotFound {
-		t.Error("expected token to be deleted")
-	}
-}
+// TestServer_Logout was removed - JWT refresh token deletion is obsolete
+// See TestHandleLogout_ClearsCookie and TestHandleLogout_WithAllParam_CreatesRevocation
+// for session-based logout tests
 
 func TestMessageEndpointsRequireAuth(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -633,5 +612,58 @@ func TestHandleSignup_SetsSessionCookie(t *testing.T) {
 
 	if sessionCookie == nil {
 		t.Error("Expected session cookie to be set")
+	}
+}
+
+func TestHandleLogout_ClearsCookie(t *testing.T) {
+	s := setupTestServer(t)
+
+	req := httptest.NewRequest("POST", "/api/logout", nil)
+	rr := httptest.NewRecorder()
+
+	s.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Status = %d, want 200", rr.Code)
+	}
+
+	cookies := rr.Result().Cookies()
+	var sessionCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "session" {
+			sessionCookie = c
+			break
+		}
+	}
+
+	if sessionCookie == nil {
+		t.Error("Expected session cookie in response")
+	} else if sessionCookie.MaxAge != -1 {
+		t.Errorf("Cookie MaxAge = %d, want -1 (delete)", sessionCookie.MaxAge)
+	}
+}
+
+func TestHandleLogout_WithAllParam_CreatesRevocation(t *testing.T) {
+	s := setupTestServer(t)
+
+	// Create user and session
+	hash, _ := auth.HashPassword("password123")
+	user, _ := s.db.CreateUserFull("testuser", hash, "Test", "user")
+	token, _ := s.session.CreateToken(user.ID, "user")
+
+	req := httptest.NewRequest("POST", "/api/logout?all=true", nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: token})
+	rr := httptest.NewRecorder()
+
+	s.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Status = %d, want 200", rr.Code)
+	}
+
+	// Verify revocation was created
+	hasRevocation, _ := s.db.HasSessionRevocation(user.ID, time.Now().Add(-1*time.Hour))
+	if !hasRevocation {
+		t.Error("Expected revocation to be created")
 	}
 }
