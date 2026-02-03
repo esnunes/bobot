@@ -10,15 +10,6 @@
 </div>
 <script>
 (function() {
-    // Check if already logged in - redirect via HTMX content swap
-    const existingToken = localStorage.getItem('access_token');
-    if (existingToken) {
-        htmx.ajax('GET', '/chat', {target: 'body', swap: 'innerHTML'}).then(() => {
-            history.pushState({}, '', '/chat');
-        });
-        return;
-    }
-
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
@@ -31,6 +22,7 @@
                     'Content-Type': 'application/json',
                     'HX-Request': 'true'
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     username: form.username.value,
                     password: form.password.value
@@ -41,14 +33,7 @@
                 throw new Error(resp.status === 401 ? 'Invalid credentials' : 'Login failed');
             }
 
-            const data = await resp.json();
-            localStorage.setItem('access_token', data.access_token);
-            localStorage.setItem('refresh_token', data.refresh_token);
-
-            // Trigger WebSocket connection
-            document.dispatchEvent(new CustomEvent('bobot:token-updated'));
-
-            // Navigate via HTMX content swap
+            // Navigate via HTMX content swap (session cookie is set by server)
             htmx.ajax('GET', '/chat', {target: 'body', swap: 'innerHTML'}).then(() => {
                 history.pushState({}, '', '/chat');
             });
