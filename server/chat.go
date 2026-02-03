@@ -11,8 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	// TODO: This import will be used again when WebSocket auth is implemented in Task 9
-	// "github.com/esnunes/bobot/auth"
+	"github.com/esnunes/bobot/auth"
 )
 
 var upgrader = websocket.Upgrader{
@@ -27,8 +26,59 @@ type chatMessage struct {
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement session-based WebSocket auth in Task 9
-	http.Error(w, "not implemented", http.StatusUnauthorized)
+	// Get session from cookie
+	cookie, err := r.Cookie("session")
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := s.session.DecryptToken(cookie.Value)
+	if err != nil {
+		http.Error(w, "invalid session", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if past absolute deadline
+	if s.session.IsPastDeadline(token) {
+		http.Error(w, "session expired", http.StatusUnauthorized)
+		return
+	}
+
+	// Upgrade to WebSocket
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("websocket upgrade error: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	// Register connection for multi-device support
+	s.connections.Add(token.UserID, conn)
+	defer s.connections.Remove(token.UserID, conn)
+
+	// Create context with user data
+	ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
+		UserID: token.UserID,
+		Role:   token.Role,
+	})
+
+	// Handle messages
+	for {
+		var msg chatMessage
+		if err := conn.ReadJSON(&msg); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("websocket error: %v", err)
+			}
+			break
+		}
+
+		if msg.GroupID != nil {
+			s.handleGroupChatMessage(ctx, token.UserID, *msg.GroupID, msg.Content)
+		} else {
+			s.handlePrivateChatMessage(ctx, token.UserID, msg.Content)
+		}
+	}
 }
 
 func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, content string) {
