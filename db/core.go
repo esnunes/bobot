@@ -214,6 +214,28 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Create session_revocations table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS session_revocations (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			revoked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			reason TEXT,
+			FOREIGN KEY (user_id) REFERENCES users(id)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_revocations_user_revoked
+		ON session_revocations(user_id, revoked_at)
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1171,4 +1193,32 @@ func (c *CoreDB) GetGroupContextMessages(groupID int64) ([]Message, error) {
 		messages = append(messages, m)
 	}
 	return messages, rows.Err()
+}
+
+func (c *CoreDB) CreateSessionRevocation(userID int64, reason string) error {
+	_, err := c.db.Exec(
+		"INSERT INTO session_revocations (user_id, reason) VALUES (?, ?)",
+		userID, reason,
+	)
+	return err
+}
+
+func (c *CoreDB) HasSessionRevocation(userID int64, tokenIssuedAt time.Time) (bool, error) {
+	var count int
+	err := c.db.QueryRow(
+		"SELECT COUNT(*) FROM session_revocations WHERE user_id = ? AND revoked_at > ?",
+		userID, tokenIssuedAt.UTC(),
+	).Scan(&count)
+	return count > 0, err
+}
+
+func (c *CoreDB) DeleteOldSessionRevocations(olderThan time.Time) (int64, error) {
+	result, err := c.db.Exec(
+		"DELETE FROM session_revocations WHERE revoked_at < ?",
+		olderThan.UTC(),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
