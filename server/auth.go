@@ -2,10 +2,14 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/esnunes/bobot/auth"
+	"github.com/esnunes/bobot/db"
 )
 
 type loginRequest struct {
@@ -51,8 +55,45 @@ func validateDisplayName(name string) error {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement session-based login in Task 6
-	http.Error(w, "not implemented", http.StatusNotImplemented)
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	user, err := s.db.GetUserByUsername(req.Username)
+	if err == db.ErrNotFound {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if !auth.CheckPassword(req.Password, user.PasswordHash) {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	if user.Blocked {
+		http.Error(w, "account blocked", http.StatusForbidden)
+		return
+	}
+
+	token, err := s.session.CreateToken(user.ID, user.Role)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	s.setSessionCookie(w, token)
+
+	if isHTMXRequest(r) {
+		w.Header().Set("HX-Redirect", "/chat")
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {

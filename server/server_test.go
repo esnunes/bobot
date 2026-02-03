@@ -50,7 +50,7 @@ func TestServer_Login_Success(t *testing.T) {
 
 	// Create user
 	hash, _ := auth.HashPassword("testpass")
-	srv.db.CreateUser("testuser", hash)
+	srv.db.CreateUserFull("testuser", hash, "Test User", "user")
 
 	body := `{"username":"testuser","password":"testpass"}`
 	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
@@ -66,11 +66,58 @@ func TestServer_Login_Success(t *testing.T) {
 	var resp map[string]string
 	json.NewDecoder(w.Body).Decode(&resp)
 
-	if resp["access_token"] == "" {
-		t.Error("expected access_token in response")
+	if resp["status"] != "ok" {
+		t.Errorf("expected status 'ok', got %s", resp["status"])
 	}
-	if resp["refresh_token"] == "" {
-		t.Error("expected refresh_token in response")
+
+	// Check for session cookie
+	cookies := w.Result().Cookies()
+	var sessionCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "session" {
+			sessionCookie = c
+			break
+		}
+	}
+
+	if sessionCookie == nil {
+		t.Error("expected session cookie to be set")
+	}
+}
+
+func TestHandleLogin_SetsSessionCookie(t *testing.T) {
+	s := setupTestServer(t)
+
+	// Create a user
+	hash, _ := auth.HashPassword("password123")
+	s.db.CreateUserFull("testuser", hash, "Test", "user")
+
+	body := `{"username":"testuser","password":"password123"}`
+	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	s.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Status = %d, want 200", rr.Code)
+	}
+
+	// Check for session cookie
+	cookies := rr.Result().Cookies()
+	var sessionCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "session" {
+			sessionCookie = c
+			break
+		}
+	}
+
+	if sessionCookie == nil {
+		t.Error("Expected session cookie to be set")
+	}
+	if !sessionCookie.HttpOnly {
+		t.Error("Session cookie should be HttpOnly")
 	}
 }
 
@@ -78,7 +125,7 @@ func TestServer_Login_InvalidCredentials(t *testing.T) {
 	srv := setupTestServer(t)
 
 	hash, _ := auth.HashPassword("testpass")
-	srv.db.CreateUser("testuser", hash)
+	srv.db.CreateUserFull("testuser", hash, "Test User", "user")
 
 	body := `{"username":"testuser","password":"wrongpass"}`
 	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
