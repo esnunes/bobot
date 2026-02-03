@@ -57,7 +57,7 @@ func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.E
 func (s *Server) routes() {
 	// API routes
 	s.router.HandleFunc("GET /health", s.handleHealth)
-	s.router.HandleFunc("POST /api/logout", s.handleLogout)
+	s.router.HandleFunc("POST /logout", s.handleLogout)
 	s.router.HandleFunc("GET /ws/chat", s.handleChat)
 
 	// Message routes (require auth)

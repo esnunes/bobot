@@ -570,7 +570,7 @@ func TestHandleSignup_SetsSessionCookie(t *testing.T) {
 func TestHandleLogout_ClearsCookie(t *testing.T) {
 	s := setupTestServer(t)
 
-	req := httptest.NewRequest("POST", "/api/logout", nil)
+	req := httptest.NewRequest("POST", "/logout", nil)
 	rr := httptest.NewRecorder()
 
 	s.router.ServeHTTP(rr, req)
@@ -603,7 +603,7 @@ func TestHandleLogout_WithAllParam_CreatesRevocation(t *testing.T) {
 	user, _ := s.db.CreateUserFull("testuser", hash, "Test", "user")
 	token, _ := s.session.CreateToken(user.ID, "user")
 
-	req := httptest.NewRequest("POST", "/api/logout?all=true", nil)
+	req := httptest.NewRequest("POST", "/logout?all=true", nil)
 	req.AddCookie(&http.Cookie{Name: "session", Value: token})
 	rr := httptest.NewRecorder()
 
