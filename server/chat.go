@@ -11,7 +11,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/esnunes/bobot/auth"
+	// TODO: This import will be used again when WebSocket auth is implemented in Task 9
+	// "github.com/esnunes/bobot/auth"
 )
 
 var upgrader = websocket.Upgrader{
@@ -26,56 +27,8 @@ type chatMessage struct {
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
-	// Get token from query param
-	token := r.URL.Query().Get("token")
-	if token == "" {
-		http.Error(w, "missing token", http.StatusUnauthorized)
-		return
-	}
-
-	// Validate token
-	claims, err := s.jwt.ValidateAccessToken(token)
-	if err != nil {
-		http.Error(w, "invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	// Upgrade to WebSocket
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("websocket upgrade error: %v", err)
-		return
-	}
-	defer conn.Close()
-
-	// Register connection for multi-device support
-	s.connections.Add(claims.UserID, conn)
-	defer s.connections.Remove(claims.UserID, conn)
-
-	// Create context with user data
-	ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
-		UserID: claims.UserID,
-		Role:   claims.Role,
-	})
-
-	// Handle messages
-	for {
-		var msg chatMessage
-		if err := conn.ReadJSON(&msg); err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("websocket error: %v", err)
-			}
-			break
-		}
-
-		if msg.GroupID != nil {
-			// Handle group message
-			s.handleGroupChatMessage(ctx, claims.UserID, *msg.GroupID, msg.Content)
-		} else {
-			// Handle 1:1 message (existing logic)
-			s.handlePrivateChatMessage(ctx, claims.UserID, msg.Content)
-		}
-	}
+	// TODO: Implement session-based WebSocket auth in Task 9
+	http.Error(w, "not implemented", http.StatusUnauthorized)
 }
 
 func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, content string) {

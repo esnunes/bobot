@@ -35,21 +35,22 @@ func (m *mockContextProvider) GetContextMessages(userID int64) ([]assistant.Cont
 func setupChatTestServer(t *testing.T) (*Server, string) {
 	tmpDir := t.TempDir()
 	coreDB, _ := db.NewCoreDB(tmpDir + "/core.db")
-	jwtSvc := auth.NewJWTService("test-secret-32-chars-minimum!!")
 
 	cfg := &config.Config{
-		Server: config.ServerConfig{Host: "localhost", Port: 8080},
+		Server:  config.ServerConfig{Host: "localhost", Port: 8080},
+		JWT:     config.JWTConfig{Secret: "test-secret-32-chars-minimum!!"},
+		Session: config.SessionConfig{},
 	}
 
 	registry := tools.NewRegistry()
 	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{})
 
-	srv := NewWithAssistant(cfg, coreDB, jwtSvc, engine, registry)
+	srv := NewWithAssistant(cfg, coreDB, engine, registry)
 
-	// Create test user and get token
+	// Create test user and get session token
 	hash, _ := auth.HashPassword("testpass")
 	user, _ := coreDB.CreateUser("testuser", hash)
-	token, _ := jwtSvc.GenerateAccessToken(user.ID)
+	token, _ := srv.session.CreateToken(user.ID, "user")
 
 	return srv, token
 }
@@ -121,10 +122,11 @@ func TestChatWebSocket_SendMessage(t *testing.T) {
 func TestChatWebSocket_SlashCommand(t *testing.T) {
 	tmpDir := t.TempDir()
 	coreDB, _ := db.NewCoreDB(tmpDir + "/core.db")
-	jwtSvc := auth.NewJWTService("test-secret-32-chars-minimum!!")
 
 	cfg := &config.Config{
 		Server:  config.ServerConfig{Host: "localhost", Port: 8080},
+		JWT:     config.JWTConfig{Secret: "test-secret-32-chars-minimum!!"},
+		Session: config.SessionConfig{},
 		BaseURL: "http://localhost:8080",
 	}
 
@@ -132,12 +134,12 @@ func TestChatWebSocket_SlashCommand(t *testing.T) {
 	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
 	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{})
 
-	srv := NewWithAssistant(cfg, coreDB, jwtSvc, engine, registry)
+	srv := NewWithAssistant(cfg, coreDB, engine, registry)
 
 	// Create admin user and get token with role
 	hash, _ := auth.HashPassword("testpass")
 	adminUser, _ := coreDB.CreateUserFull("admin", hash, "Admin", "admin")
-	token, _ := jwtSvc.GenerateAccessTokenWithRole(adminUser.ID, "admin")
+	token, _ := srv.session.CreateToken(adminUser.ID, "admin")
 
 	server := httptest.NewServer(srv)
 	defer server.Close()

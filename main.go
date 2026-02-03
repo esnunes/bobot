@@ -57,8 +57,8 @@ func main() {
 		}
 	}
 
-	// Initialize JWT service
-	jwtSvc := auth.NewJWTService(cfg.JWT.Secret)
+	// TODO: Remove JWT service in Task 12
+	// jwtSvc := auth.NewJWTService(cfg.JWT.Secret)
 
 	// Initialize tool registry
 	registry := tools.NewRegistry()
@@ -81,7 +81,7 @@ func main() {
 	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter)
 
 	// Initialize HTTP server
-	srv := server.NewWithAssistant(cfg, coreDB, jwtSvc, engine, registry)
+	srv := server.NewWithAssistant(cfg, coreDB, engine, registry)
 
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

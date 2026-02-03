@@ -18,13 +18,14 @@ import (
 func setupTestServer(t *testing.T) *Server {
 	tmpDir := t.TempDir()
 	coreDB, _ := db.NewCoreDB(tmpDir + "/core.db")
-	jwtSvc := auth.NewJWTService("test-secret-32-chars-minimum!!")
 
 	cfg := &config.Config{
-		Server: config.ServerConfig{Host: "localhost", Port: 8080},
+		Server:  config.ServerConfig{Host: "localhost", Port: 8080},
+		JWT:     config.JWTConfig{Secret: "test-secret-32-chars-minimum!!"},
+		Session: config.SessionConfig{},
 	}
 
-	return New(cfg, coreDB, jwtSvc)
+	return New(cfg, coreDB)
 }
 
 func TestServer_HealthCheck(t *testing.T) {
@@ -194,7 +195,8 @@ func TestMessageEndpointsRequireAuth(t *testing.T) {
 	defer coreDB.Close()
 
 	cfg := &config.Config{
-		JWT: config.JWTConfig{Secret: "testsecret"},
+		JWT:     config.JWTConfig{Secret: "testsecret"},
+		Session: config.SessionConfig{},
 		History: config.HistoryConfig{
 			DefaultLimit: 50,
 			MaxLimit:     100,
@@ -203,8 +205,7 @@ func TestMessageEndpointsRequireAuth(t *testing.T) {
 			MaxLookback: 24 * time.Hour,
 		},
 	}
-	jwt := auth.NewJWTService(cfg.JWT.Secret)
-	srv := New(cfg, coreDB, jwt)
+	srv := New(cfg, coreDB)
 
 	endpoints := []string{
 		"/api/messages/recent",

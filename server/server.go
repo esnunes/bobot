@@ -18,7 +18,7 @@ import (
 type Server struct {
 	cfg         *config.Config
 	db          *db.CoreDB
-	jwt         *auth.JWTService
+	session     *auth.SessionService
 	engine      *assistant.Engine
 	registry    *tools.Registry
 	connections *ConnectionRegistry
@@ -26,15 +26,22 @@ type Server struct {
 	templates   map[string]*template.Template
 }
 
-func New(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTService) *Server {
-	return NewWithAssistant(cfg, coreDB, jwt, nil, nil)
+func New(cfg *config.Config, coreDB *db.CoreDB) *Server {
+	return NewWithAssistant(cfg, coreDB, nil, nil)
 }
 
-func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, jwt *auth.JWTService, engine *assistant.Engine, registry *tools.Registry) *Server {
+func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.Engine, registry *tools.Registry) *Server {
+	session := auth.NewSessionService(
+		cfg.JWT.Secret,
+		cfg.Session.Duration,
+		cfg.Session.MaxAge,
+		cfg.Session.RefreshThreshold,
+	)
+
 	s := &Server{
 		cfg:         cfg,
 		db:          coreDB,
-		jwt:         jwt,
+		session:     session,
 		engine:      engine,
 		registry:    registry,
 		connections: NewConnectionRegistry(),
@@ -98,25 +105,8 @@ func (s *Server) routes() {
 
 func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get token from Authorization header
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" || len(authHeader) < 8 || authHeader[:7] != "Bearer " {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		token := authHeader[7:]
-		claims, err := s.jwt.ValidateAccessToken(token)
-		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
-			UserID: claims.UserID,
-			Role:   claims.Role,
-		})
-		next(w, r.WithContext(ctx))
+		// TODO: Replace with sessionMiddleware in Task 5
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	}
 }
 

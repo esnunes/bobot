@@ -20,19 +20,19 @@ func TestHandleRecentMessages(t *testing.T) {
 	defer coreDB.Close()
 
 	cfg := &config.Config{
-		JWT: config.JWTConfig{Secret: "testsecret"},
+		JWT:     config.JWTConfig{Secret: "testsecret"},
+		Session: config.SessionConfig{},
 		History: config.HistoryConfig{
 			DefaultLimit: 50,
 			MaxLimit:     100,
 		},
 	}
-	jwt := auth.NewJWTService(cfg.JWT.Secret)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
 	coreDB.CreateMessage(user.ID, "user", "Hello")
 	coreDB.CreateMessage(user.ID, "assistant", "Hi there")
 
-	srv := New(cfg, coreDB, jwt)
+	srv := New(cfg, coreDB)
 
 	// Create request with auth context
 	req := httptest.NewRequest("GET", "/api/messages/recent?limit=10", nil)
@@ -59,13 +59,13 @@ func TestHandleMessageHistory(t *testing.T) {
 	defer coreDB.Close()
 
 	cfg := &config.Config{
-		JWT: config.JWTConfig{Secret: "testsecret"},
+		JWT:     config.JWTConfig{Secret: "testsecret"},
+		Session: config.SessionConfig{},
 		History: config.HistoryConfig{
 			DefaultLimit: 50,
 			MaxLimit:     100,
 		},
 	}
-	jwt := auth.NewJWTService(cfg.JWT.Secret)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
 
@@ -74,7 +74,7 @@ func TestHandleMessageHistory(t *testing.T) {
 		coreDB.CreateMessage(user.ID, "user", "msg")
 	}
 
-	srv := New(cfg, coreDB, jwt)
+	srv := New(cfg, coreDB)
 
 	req := httptest.NewRequest("GET", "/api/messages/history?before=5&limit=2", nil)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
@@ -93,12 +93,12 @@ func TestHandleMessageSync(t *testing.T) {
 	defer coreDB.Close()
 
 	cfg := &config.Config{
-		JWT: config.JWTConfig{Secret: "testsecret"},
+		JWT:     config.JWTConfig{Secret: "testsecret"},
+		Session: config.SessionConfig{},
 		Sync: config.SyncConfig{
 			MaxLookback: 24 * time.Hour,
 		},
 	}
-	jwt := auth.NewJWTService(cfg.JWT.Secret)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
 
@@ -108,7 +108,7 @@ func TestHandleMessageSync(t *testing.T) {
 	// Create a message after the "since" time
 	coreDB.CreateMessage(user.ID, "assistant", "new message")
 
-	srv := New(cfg, coreDB, jwt)
+	srv := New(cfg, coreDB)
 
 	req := httptest.NewRequest("GET", "/api/messages/sync?since="+since, nil)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
