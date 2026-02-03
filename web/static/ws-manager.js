@@ -3,9 +3,6 @@
     const container = document.getElementById('ws-connection');
     if (!container) return;
 
-    // Only connect if explicitly enabled (authenticated pages)
-    if (container.dataset.connect !== 'true') return;
-
     if (container.dataset.initialized === 'true') return;
     container.dataset.initialized = 'true';
 
@@ -75,6 +72,13 @@
         setTimeout(connect, delay);
     }
 
+    container.connect = function() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            return;
+        }
+        connect();
+    };
+
     container.send = function(message) {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(message));
@@ -95,7 +99,4 @@
         reconnectAttempts = 0;
         connect();
     };
-
-    // Initialize connection
-    connect();
 })();

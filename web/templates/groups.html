@@ -35,27 +35,19 @@ if (typeof GroupsPage === 'undefined') {
         }
 
         async init() {
-            const token = localStorage.getItem('access_token');
-            if (!token) {
-                htmx.ajax('GET', '/', {target: 'body', swap: 'innerHTML'}).then(() => {
-                    history.pushState({}, '', '/');
-                });
-                return;
-            }
-
-            await this.loadGroups(token);
+            await this.loadGroups();
             this.setupEventListeners();
         }
 
-        async loadGroups(token) {
+        async loadGroups() {
             try {
                 const resp = await fetch('/api/groups', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    credentials: 'include'
                 });
 
                 if (!resp.ok) {
                     if (resp.status === 401) {
-                        document.dispatchEvent(new CustomEvent('bobot:auth-expired'));
+                        window.location.href = '/';
                         return;
                     }
                     throw new Error('Failed to load groups');
@@ -114,19 +106,23 @@ if (typeof GroupsPage === 'undefined') {
             const name = document.getElementById('group-name').value.trim();
             if (!name) return;
 
-            const token = localStorage.getItem('access_token');
             try {
                 const resp = await fetch('/api/groups', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                        'HX-Request': 'true'
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ name })
                 });
 
-                if (!resp.ok) throw new Error('Failed to create group');
+                if (!resp.ok) {
+                    if (resp.status === 401) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    throw new Error('Failed to create group');
+                }
 
                 const group = await resp.json();
 
