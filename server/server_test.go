@@ -3,6 +3,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -596,5 +597,41 @@ func TestSessionMiddleware_RoleInContext(t *testing.T) {
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Status = %d, want 200", rr.Code)
+	}
+}
+
+func TestHandleSignup_SetsSessionCookie(t *testing.T) {
+	s := setupTestServer(t)
+
+	// Create an admin to create invite
+	hash, _ := auth.HashPassword("password123")
+	admin, _ := s.db.CreateUserFull("admin", hash, "Admin", "admin")
+
+	// Create invite
+	invite, _ := s.db.CreateInvite(admin.ID, "test-invite-code")
+
+	body := fmt.Sprintf(`{"code":"%s","username":"newuser","display_name":"New User","password":"password123"}`, invite.Code)
+	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	s.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Status = %d, want 200, body: %s", rr.Code, rr.Body.String())
+	}
+
+	// Check for session cookie
+	cookies := rr.Result().Cookies()
+	var sessionCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "session" {
+			sessionCookie = c
+			break
+		}
+	}
+
+	if sessionCookie == nil {
+		t.Error("Expected session cookie to be set")
 	}
 }
