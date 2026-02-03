@@ -89,13 +89,13 @@
 
     container.close = function() {
         if (ws) {
-            ws.close(1001);
+            ws.close(1000);
             ws = null;
         }
     };
 
     container.reconnect = function() {
-        if (ws) ws.close();
+        if (ws) ws.close(1000);
         reconnectAttempts = 0;
         connect();
     };
