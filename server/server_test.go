@@ -575,8 +575,8 @@ func TestHandleLogout_ClearsCookie(t *testing.T) {
 
 	s.router.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Status = %d, want 200", rr.Code)
+	if rr.Code != http.StatusNoContent {
+		t.Errorf("Status = %d, want 204", rr.Code)
 	}
 
 	cookies := rr.Result().Cookies()
@@ -592,6 +592,11 @@ func TestHandleLogout_ClearsCookie(t *testing.T) {
 		t.Error("Expected session cookie in response")
 	} else if sessionCookie.MaxAge != -1 {
 		t.Errorf("Cookie MaxAge = %d, want -1 (delete)", sessionCookie.MaxAge)
+	}
+
+	// Check HX-Redirect header
+	if rr.Header().Get("HX-Redirect") != "/" {
+		t.Errorf("HX-Redirect = %q, want /", rr.Header().Get("HX-Redirect"))
 	}
 }
 
@@ -609,8 +614,8 @@ func TestHandleLogout_WithAllParam_CreatesRevocation(t *testing.T) {
 
 	s.router.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Status = %d, want 200", rr.Code)
+	if rr.Code != http.StatusNoContent {
+		t.Errorf("Status = %d, want 204", rr.Code)
 	}
 
 	// Verify revocation was created

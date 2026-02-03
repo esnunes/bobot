@@ -2,7 +2,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -52,10 +51,6 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	s.clearSessionCookie(w)
 
-	if isHTMXRequest(r) {
-		w.Header().Set("HX-Redirect", "/")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	w.Header().Set("HX-Redirect", "/")
+	w.WriteHeader(http.StatusNoContent)
 }
