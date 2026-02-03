@@ -16,14 +16,15 @@ import (
 )
 
 type Server struct {
-	cfg         *config.Config
-	db          *db.CoreDB
-	session     *auth.SessionService
-	engine      *assistant.Engine
-	registry    *tools.Registry
-	connections *ConnectionRegistry
-	router      *http.ServeMux
-	templates   map[string]*template.Template
+	cfg          *config.Config
+	db           *db.CoreDB
+	session      *auth.SessionService
+	engine       *assistant.Engine
+	registry     *tools.Registry
+	connections  *ConnectionRegistry
+	router       *http.ServeMux
+	templates    map[string]*template.Template
+	systemUserID int64
 }
 
 func New(cfg *config.Config, coreDB *db.CoreDB) *Server {
@@ -38,15 +39,26 @@ func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.E
 		cfg.Session.RefreshThreshold,
 	)
 
+	// Get or create system user for assistant messages in groups
+	systemUser, err := coreDB.GetOrCreateSystemUser()
+	var systemUserID int64
+	if err != nil {
+		// Log but don't fail - group assistant messages will fail gracefully
+		systemUserID = 0
+	} else {
+		systemUserID = systemUser.ID
+	}
+
 	s := &Server{
-		cfg:         cfg,
-		db:          coreDB,
-		session:     session,
-		engine:      engine,
-		registry:    registry,
-		connections: NewConnectionRegistry(),
-		router:      http.NewServeMux(),
-		templates:   make(map[string]*template.Template),
+		cfg:          cfg,
+		db:           coreDB,
+		session:      session,
+		engine:       engine,
+		registry:     registry,
+		connections:  NewConnectionRegistry(),
+		router:       http.NewServeMux(),
+		templates:    make(map[string]*template.Template),
+		systemUserID: systemUserID,
 	}
 
 	s.loadTemplates()

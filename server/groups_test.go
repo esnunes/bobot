@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/esnunes/bobot/auth"
@@ -203,9 +204,12 @@ func TestRemoveGroupMember(t *testing.T) {
 	coreDB.AddGroupMember(group.ID, owner.ID)
 	coreDB.AddGroupMember(group.ID, member.ID)
 
-	req := httptest.NewRequest("DELETE", "/api/groups/1/members/2", nil)
-	req.SetPathValue("id", "1")
-	req.SetPathValue("userId", "2")
+	groupIDStr := strconv.FormatInt(group.ID, 10)
+	memberIDStr := strconv.FormatInt(member.ID, 10)
+
+	req := httptest.NewRequest("DELETE", "/api/groups/"+groupIDStr+"/members/"+memberIDStr, nil)
+	req.SetPathValue("id", groupIDStr)
+	req.SetPathValue("userId", memberIDStr)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: owner.ID}))
 	w := httptest.NewRecorder()
 
@@ -227,10 +231,13 @@ func TestLeaveGroup(t *testing.T) {
 	coreDB.AddGroupMember(group.ID, owner.ID)
 	coreDB.AddGroupMember(group.ID, member.ID)
 
+	groupIDStr := strconv.FormatInt(group.ID, 10)
+	memberIDStr := strconv.FormatInt(member.ID, 10)
+
 	// Member removes self
-	req := httptest.NewRequest("DELETE", "/api/groups/1/members/2", nil)
-	req.SetPathValue("id", "1")
-	req.SetPathValue("userId", "2")
+	req := httptest.NewRequest("DELETE", "/api/groups/"+groupIDStr+"/members/"+memberIDStr, nil)
+	req.SetPathValue("id", groupIDStr)
+	req.SetPathValue("userId", memberIDStr)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: member.ID}))
 	w := httptest.NewRecorder()
 
@@ -250,9 +257,12 @@ func TestOwnerCannotLeave(t *testing.T) {
 	group, _ := coreDB.CreateGroup("Test Group", owner.ID)
 	coreDB.AddGroupMember(group.ID, owner.ID)
 
-	req := httptest.NewRequest("DELETE", "/api/groups/1/members/1", nil)
-	req.SetPathValue("id", "1")
-	req.SetPathValue("userId", "1")
+	groupIDStr := strconv.FormatInt(group.ID, 10)
+	ownerIDStr := strconv.FormatInt(owner.ID, 10)
+
+	req := httptest.NewRequest("DELETE", "/api/groups/"+groupIDStr+"/members/"+ownerIDStr, nil)
+	req.SetPathValue("id", groupIDStr)
+	req.SetPathValue("userId", ownerIDStr)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: owner.ID}))
 	w := httptest.NewRecorder()
 

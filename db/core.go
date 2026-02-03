@@ -295,6 +295,23 @@ func (c *CoreDB) CreateUserFull(username, passwordHash, displayName, role string
 	}, nil
 }
 
+// GetOrCreateSystemUser returns the system user (used for assistant messages in groups).
+// Creates the user if it doesn't exist.
+func (c *CoreDB) GetOrCreateSystemUser() (*User, error) {
+	const systemUsername = "_system"
+
+	user, err := c.GetUserByUsername(systemUsername)
+	if err == nil {
+		return user, nil
+	}
+	if err != ErrNotFound {
+		return nil, err
+	}
+
+	// Create system user with a random password hash (can't login)
+	return c.CreateUserFull(systemUsername, "!", "Assistant", "system")
+}
+
 func (c *CoreDB) GetUserByUsername(username string) (*User, error) {
 	var user User
 	var blocked int

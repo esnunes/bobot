@@ -247,11 +247,14 @@ func (s *Server) handleGroupAssistantResponse(ctx context.Context, groupID int64
 		response = "Sorry, I encountered an error. Please try again."
 	}
 
-	// Save assistant message (userID 0 for assistant)
-	s.db.CreateGroupMessageWithContext(
-		groupID, 0, "assistant", response,
+	// Save assistant message using system user
+	_, err = s.db.CreateGroupMessageWithContext(
+		groupID, s.systemUserID, "assistant", response,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
+	if err != nil {
+		log.Printf("failed to save assistant message: %v", err)
+	}
 
 	// Broadcast to group
 	assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
