@@ -57,9 +57,6 @@ func main() {
 		}
 	}
 
-	// TODO: Remove JWT service in Task 12
-	// jwtSvc := auth.NewJWTService(cfg.JWT.Secret)
-
 	// Initialize tool registry
 	registry := tools.NewRegistry()
 	registry.Register(task.NewTaskTool(taskDB))
