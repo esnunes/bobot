@@ -99,3 +99,32 @@ func TestLoad_ContextConfig_Defaults(t *testing.T) {
 		t.Errorf("expected MaxLookback 24h, got %v", cfg.Sync.MaxLookback)
 	}
 }
+
+func TestSessionConfigDefaults(t *testing.T) {
+	// Set required env vars
+	os.Setenv("BOBOT_LLM_BASE_URL", "http://test")
+	os.Setenv("BOBOT_LLM_API_KEY", "test-key")
+	os.Setenv("BOBOT_LLM_MODEL", "test-model")
+	os.Setenv("BOBOT_JWT_SECRET", "test-secret-key")
+	defer func() {
+		os.Unsetenv("BOBOT_LLM_BASE_URL")
+		os.Unsetenv("BOBOT_LLM_API_KEY")
+		os.Unsetenv("BOBOT_LLM_MODEL")
+		os.Unsetenv("BOBOT_JWT_SECRET")
+	}()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if cfg.Session.Duration != 30*time.Minute {
+		t.Errorf("Session.Duration = %v, want 30m", cfg.Session.Duration)
+	}
+	if cfg.Session.MaxAge != 7*24*time.Hour {
+		t.Errorf("Session.MaxAge = %v, want 168h", cfg.Session.MaxAge)
+	}
+	if cfg.Session.RefreshThreshold != 5*time.Minute {
+		t.Errorf("Session.RefreshThreshold = %v, want 5m", cfg.Session.RefreshThreshold)
+	}
+}
