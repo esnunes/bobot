@@ -155,67 +155,6 @@ func TestServer_Login_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestServer_Refresh_Success(t *testing.T) {
-	srv := setupTestServer(t)
-
-	// Create user and token
-	hash, _ := auth.HashPassword("testpass")
-	user, _ := srv.db.CreateUser("testuser", hash)
-	srv.db.CreateRefreshToken(user.ID, "valid-refresh-token", time.Now().Add(24*time.Hour))
-
-	body := `{"refresh_token":"valid-refresh-token"}`
-	req := httptest.NewRequest("POST", "/api/refresh", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	srv.router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d", w.Code)
-	}
-
-	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
-
-	if resp["access_token"] == "" {
-		t.Error("expected new access_token")
-	}
-}
-
-func TestServer_Refresh_InvalidToken(t *testing.T) {
-	srv := setupTestServer(t)
-
-	body := `{"refresh_token":"invalid-token"}`
-	req := httptest.NewRequest("POST", "/api/refresh", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	srv.router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("expected status 401, got %d", w.Code)
-	}
-}
-
-func TestServer_Refresh_ExpiredToken(t *testing.T) {
-	srv := setupTestServer(t)
-
-	hash, _ := auth.HashPassword("testpass")
-	user, _ := srv.db.CreateUser("testuser", hash)
-	srv.db.CreateRefreshToken(user.ID, "expired-token", time.Now().Add(-1*time.Hour))
-
-	body := `{"refresh_token":"expired-token"}`
-	req := httptest.NewRequest("POST", "/api/refresh", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	srv.router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("expected status 401, got %d", w.Code)
-	}
-}
-
 // TestServer_Logout was removed - JWT refresh token deletion is obsolete
 // See TestHandleLogout_ClearsCookie and TestHandleLogout_WithAllParam_CreatesRevocation
 // for session-based logout tests
@@ -266,32 +205,6 @@ func TestLogin_BlockedUser(t *testing.T) {
 	// Try to login
 	body := `{"username":"blocked","password":"password"}`
 	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-
-	srv.ServeHTTP(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Errorf("expected 403, got %d", w.Code)
-	}
-}
-
-func TestRefresh_BlockedUser(t *testing.T) {
-	srv := setupTestServer(t)
-
-	// Create user and get tokens
-	hash, _ := auth.HashPassword("password")
-	user, _ := srv.db.CreateUserFull("toblock", hash, "To Block", "user")
-
-	// Create refresh token
-	srv.db.CreateRefreshToken(user.ID, "block-test-token", time.Now().Add(24*time.Hour))
-
-	// Block the user
-	srv.db.BlockUser(user.ID)
-
-	// Try to refresh
-	body := `{"refresh_token":"block-test-token"}`
-	req := httptest.NewRequest("POST", "/api/refresh", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 

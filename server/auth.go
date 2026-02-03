@@ -96,11 +96,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
-	// TODO: Remove this endpoint in Task 10 - session tokens are auto-refreshed via cookies
-	http.Error(w, "not implemented", http.StatusNotImplemented)
-}
-
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	// Check for "logout everywhere" parameter
 	if r.URL.Query().Get("all") == "true" {
