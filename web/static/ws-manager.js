@@ -29,12 +29,17 @@
         };
 
         ws.onclose = (event) => {
-            console.log('WebSocket disconnected');
+            console.log('WebSocket disconnected, code:', event.code);
             dispatchStatus('disconnected');
 
-            // Check if it was an auth error (server sends 401)
+            // Auth error - redirect to login
             if (event.code === 1008 || event.code === 4001) {
                 window.location.href = '/';
+                return;
+            }
+
+            // Normal closure - intentional, don't reconnect
+            if (event.code === 1000) {
                 return;
             }
 
