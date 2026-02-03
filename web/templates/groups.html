@@ -14,7 +14,7 @@
 <div id="create-group-modal" class="modal hidden">
     <div class="modal-content">
         <h2>Create Group</h2>
-        <form id="create-group-form">
+        <form id="create-group-form" hx-post="/api/groups" hx-ext="json-enc">
             <input type="text" id="group-name" name="name" placeholder="Group name" required maxlength="100">
             <div class="modal-actions">
                 <button type="button" id="cancel-create">Cancel</button>
@@ -80,6 +80,7 @@ window.GroupsPage = class GroupsPage {
     setupEventListeners() {
         document.getElementById('create-group-btn').addEventListener('click', () => {
             this.modal.classList.remove('hidden');
+            document.getElementById('group-name').focus();
         });
 
         document.getElementById('cancel-create').addEventListener('click', () => {
@@ -91,43 +92,6 @@ window.GroupsPage = class GroupsPage {
                 this.modal.classList.add('hidden');
             }
         });
-
-        document.getElementById('create-group-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await this.createGroup();
-        });
-    }
-
-    async createGroup() {
-        const name = document.getElementById('group-name').value.trim();
-        if (!name) return;
-
-        try {
-            const resp = await fetch('/api/groups', {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ name })
-            });
-
-            if (!resp.ok) {
-                if (resp.status === 401) {
-                    window.location.href = '/';
-                    return;
-                }
-                throw new Error('Failed to create group');
-            }
-
-            const group = await resp.json();
-
-            // Navigate via HTMX content swap
-            htmx.ajax('GET', `/groups/${group.id}`, {target: 'body', swap: 'innerHTML'});
-        } catch (err) {
-            console.error('Failed to create group:', err);
-            alert('Failed to create group');
-        }
     }
 };
 
