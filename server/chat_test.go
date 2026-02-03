@@ -35,21 +35,26 @@ func (m *mockContextProvider) GetContextMessages(userID int64) ([]assistant.Cont
 func setupChatTestServer(t *testing.T) (*Server, string) {
 	tmpDir := t.TempDir()
 	coreDB, _ := db.NewCoreDB(tmpDir + "/core.db")
-	jwtSvc := auth.NewJWTService("test-secret-32-chars-minimum!!")
 
 	cfg := &config.Config{
 		Server: config.ServerConfig{Host: "localhost", Port: 8080},
+		JWT:    config.JWTConfig{Secret: "test-secret-32-chars-minimum!!"},
+		Session: config.SessionConfig{
+			Duration:         30 * time.Minute,
+			MaxAge:           7 * 24 * time.Hour,
+			RefreshThreshold: 5 * time.Minute,
+		},
 	}
 
 	registry := tools.NewRegistry()
 	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{})
 
-	srv := NewWithAssistant(cfg, coreDB, jwtSvc, engine, registry)
+	srv := NewWithAssistant(cfg, coreDB, engine, registry)
 
-	// Create test user and get token
+	// Create test user and get session token
 	hash, _ := auth.HashPassword("testpass")
 	user, _ := coreDB.CreateUser("testuser", hash)
-	token, _ := jwtSvc.GenerateAccessToken(user.ID)
+	token, _ := srv.session.CreateToken(user.ID, "user")
 
 	return srv, token
 }
@@ -60,10 +65,12 @@ func TestChatWebSocket_Connect(t *testing.T) {
 	server := httptest.NewServer(srv)
 	defer server.Close()
 
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/chat?token=" + token
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/chat"
+	header := http.Header{}
+	header.Add("Cookie", "session="+token)
 
 	dialer := websocket.Dialer{}
-	conn, resp, err := dialer.Dial(wsURL, nil)
+	conn, resp, err := dialer.Dial(wsURL, header)
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}
@@ -80,10 +87,12 @@ func TestChatWebSocket_SendMessage(t *testing.T) {
 	server := httptest.NewServer(srv)
 	defer server.Close()
 
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/chat?token=" + token
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/chat"
+	header := http.Header{}
+	header.Add("Cookie", "session="+token)
 
 	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, header)
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}
@@ -121,10 +130,15 @@ func TestChatWebSocket_SendMessage(t *testing.T) {
 func TestChatWebSocket_SlashCommand(t *testing.T) {
 	tmpDir := t.TempDir()
 	coreDB, _ := db.NewCoreDB(tmpDir + "/core.db")
-	jwtSvc := auth.NewJWTService("test-secret-32-chars-minimum!!")
 
 	cfg := &config.Config{
-		Server:  config.ServerConfig{Host: "localhost", Port: 8080},
+		Server: config.ServerConfig{Host: "localhost", Port: 8080},
+		JWT:    config.JWTConfig{Secret: "test-secret-32-chars-minimum!!"},
+		Session: config.SessionConfig{
+			Duration:         30 * time.Minute,
+			MaxAge:           7 * 24 * time.Hour,
+			RefreshThreshold: 5 * time.Minute,
+		},
 		BaseURL: "http://localhost:8080",
 	}
 
@@ -132,20 +146,22 @@ func TestChatWebSocket_SlashCommand(t *testing.T) {
 	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
 	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{})
 
-	srv := NewWithAssistant(cfg, coreDB, jwtSvc, engine, registry)
+	srv := NewWithAssistant(cfg, coreDB, engine, registry)
 
 	// Create admin user and get token with role
 	hash, _ := auth.HashPassword("testpass")
 	adminUser, _ := coreDB.CreateUserFull("admin", hash, "Admin", "admin")
-	token, _ := jwtSvc.GenerateAccessTokenWithRole(adminUser.ID, "admin")
+	token, _ := srv.session.CreateToken(adminUser.ID, "admin")
 
 	server := httptest.NewServer(srv)
 	defer server.Close()
 
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/chat?token=" + token
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/chat"
+	header := http.Header{}
+	header.Add("Cookie", "session="+token)
 
 	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, header)
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}
@@ -200,4 +216,27 @@ func TestGroupMessage(t *testing.T) {
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+func TestWebSocket_SessionCookieAuth(t *testing.T) {
+	srv, token := setupChatTestServer(t)
+
+	// Create test server
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	// Connect with session cookie
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws/chat"
+	header := http.Header{}
+	header.Add("Cookie", "session="+token)
+
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, header)
+	if err != nil {
+		t.Fatalf("Dial error: %v", err)
+	}
+	defer conn.Close()
+
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Errorf("Status = %d, want 101", resp.StatusCode)
+	}
 }

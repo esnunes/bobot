@@ -12,6 +12,16 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+func setupTestDB(t *testing.T) *CoreDB {
+	t.Helper()
+	tmpDir := t.TempDir()
+	db, err := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	if err != nil {
+		t.Fatalf("failed to create test db: %v", err)
+	}
+	return db
+}
+
 func TestNewCoreDB_CreatesSchema(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "core.db")
@@ -151,70 +161,6 @@ func TestCoreDB_UserNotFound(t *testing.T) {
 	_, err := db.GetUserByUsername("nonexistent")
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound, got %v", err)
-	}
-}
-
-func TestCoreDB_RefreshTokens(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("tokenuser", "hash")
-
-	// Create token
-	token, err := db.CreateRefreshToken(user.ID, "token123", time.Now().Add(24*time.Hour))
-	if err != nil {
-		t.Fatalf("failed to create token: %v", err)
-	}
-	if token.Token != "token123" {
-		t.Errorf("expected token token123, got %s", token.Token)
-	}
-
-	// Get token
-	found, err := db.GetRefreshToken("token123")
-	if err != nil {
-		t.Fatalf("failed to get token: %v", err)
-	}
-	if found.UserID != user.ID {
-		t.Errorf("expected user_id %d, got %d", user.ID, found.UserID)
-	}
-
-	// Delete token
-	err = db.DeleteRefreshToken("token123")
-	if err != nil {
-		t.Fatalf("failed to delete token: %v", err)
-	}
-
-	_, err = db.GetRefreshToken("token123")
-	if err != ErrNotFound {
-		t.Error("expected token to be deleted")
-	}
-}
-
-func TestCoreDB_DeleteExpiredTokens(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("expireuser", "hash")
-
-	// Create expired token
-	db.CreateRefreshToken(user.ID, "expired", time.Now().Add(-1*time.Hour))
-	// Create valid token
-	db.CreateRefreshToken(user.ID, "valid", time.Now().Add(1*time.Hour))
-
-	deleted, err := db.DeleteExpiredRefreshTokens()
-	if err != nil {
-		t.Fatalf("failed to delete expired: %v", err)
-	}
-	if deleted != 1 {
-		t.Errorf("expected 1 deleted, got %d", deleted)
-	}
-
-	// Valid token should still exist
-	_, err = db.GetRefreshToken("valid")
-	if err != nil {
-		t.Error("valid token should still exist")
 	}
 }
 
@@ -899,5 +845,76 @@ func TestGetGroupContextMessages(t *testing.T) {
 	}
 	if len(msgs) != 2 {
 		t.Errorf("expected 2 context messages, got %d", len(msgs))
+	}
+}
+
+func TestSessionRevocations(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Create a user first
+	user, err := db.CreateUserFull("testuser", "hash", "Test User", "user")
+	if err != nil {
+		t.Fatalf("CreateUserFull() error: %v", err)
+	}
+
+	// Create a revocation
+	err = db.CreateSessionRevocation(user.ID, "logout_all")
+	if err != nil {
+		t.Fatalf("CreateSessionRevocation() error: %v", err)
+	}
+
+	// Check for revocation after the token was issued (before revocation)
+	tokenIssuedAt := time.Now().Add(-1 * time.Hour)
+	hasRevocation, err := db.HasSessionRevocation(user.ID, tokenIssuedAt)
+	if err != nil {
+		t.Fatalf("HasSessionRevocation() error: %v", err)
+	}
+	if !hasRevocation {
+		t.Error("Expected revocation to be found for token issued before revocation")
+	}
+
+	// Check for revocation before the token was issued (after revocation)
+	tokenIssuedAt = time.Now().Add(1 * time.Hour)
+	hasRevocation, err = db.HasSessionRevocation(user.ID, tokenIssuedAt)
+	if err != nil {
+		t.Fatalf("HasSessionRevocation() error: %v", err)
+	}
+	if hasRevocation {
+		t.Error("Expected no revocation for token issued after revocation")
+	}
+}
+
+func TestDeleteOldSessionRevocations(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, err := db.CreateUserFull("testuser", "hash", "Test User", "user")
+	if err != nil {
+		t.Fatalf("CreateUserFull() error: %v", err)
+	}
+
+	// Create a revocation
+	err = db.CreateSessionRevocation(user.ID, "logout_all")
+	if err != nil {
+		t.Fatalf("CreateSessionRevocation() error: %v", err)
+	}
+
+	// Delete revocations older than 1 hour in the future (should delete the one we just created)
+	deleted, err := db.DeleteOldSessionRevocations(time.Now().Add(1 * time.Hour))
+	if err != nil {
+		t.Fatalf("DeleteOldSessionRevocations() error: %v", err)
+	}
+	if deleted != 1 {
+		t.Errorf("Expected 1 deletion, got %d", deleted)
+	}
+
+	// Verify it's gone
+	hasRevocation, err := db.HasSessionRevocation(user.ID, time.Now().Add(-1*time.Hour))
+	if err != nil {
+		t.Fatalf("HasSessionRevocation() error: %v", err)
+	}
+	if hasRevocation {
+		t.Error("Expected no revocation after deletion")
 	}
 }

@@ -12,6 +12,7 @@ type Config struct {
 	Server   ServerConfig
 	LLM      LLMConfig
 	JWT      JWTConfig
+	Session  SessionConfig
 	Context  ContextConfig
 	History  HistoryConfig
 	Sync     SyncConfig
@@ -50,6 +51,12 @@ type SyncConfig struct {
 	MaxLookback time.Duration
 }
 
+type SessionConfig struct {
+	Duration         time.Duration
+	MaxAge           time.Duration
+	RefreshThreshold time.Duration
+}
+
 func Load() (*Config, error) {
 	cfg := &Config{
 		Server: ServerConfig{
@@ -63,6 +70,11 @@ func Load() (*Config, error) {
 		},
 		JWT: JWTConfig{
 			Secret: os.Getenv("BOBOT_JWT_SECRET"),
+		},
+		Session: SessionConfig{
+			Duration:         getEnvDurationOrDefault("BOBOT_SESSION_DURATION", 30*time.Minute),
+			MaxAge:           getEnvDurationOrDefault("BOBOT_SESSION_MAX_AGE", 7*24*time.Hour),
+			RefreshThreshold: getEnvDurationOrDefault("BOBOT_SESSION_REFRESH_THRESHOLD", 5*time.Minute),
 		},
 		Context: ContextConfig{
 			TokensStart: getEnvIntOrDefault("BOBOT_CONTEXT_TOKENS_START", 30000),

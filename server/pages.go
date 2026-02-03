@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/web"
 )
 
@@ -48,11 +49,63 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["group_chat"] = groupChatTmpl
 
+	authTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/authenticated.html")
+	if err != nil {
+		return err
+	}
+	s.templates["authenticated"] = authTmpl
+
 	return nil
 }
 
 func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
-	s.templates["login"].Execute(w, PageData{Title: "Login"})
+	// Check if already authenticated
+	if cookie, err := r.Cookie("session"); err == nil {
+		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
+			s.templates["authenticated"].Execute(w, PageData{Title: "Loading"})
+			return
+		}
+	}
+
+	// GET request - show login form
+	if r.Method == http.MethodGet {
+		s.templates["login"].Execute(w, PageData{Title: "Login"})
+		return
+	}
+
+	// POST request - handle login
+	if err := r.ParseForm(); err != nil {
+		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Invalid request"})
+		return
+	}
+
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	user, err := s.db.GetUserByUsername(username)
+	if err != nil {
+		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Invalid credentials"})
+		return
+	}
+
+	if !auth.CheckPassword(password, user.PasswordHash) {
+		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Invalid credentials"})
+		return
+	}
+
+	if user.Blocked {
+		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Account blocked"})
+		return
+	}
+
+	token, err := s.session.CreateToken(user.ID, user.Role)
+	if err != nil {
+		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Internal error"})
+		return
+	}
+
+	s.setSessionCookie(w, token)
+	s.templates["authenticated"].Execute(w, PageData{Title: "Loading"})
 }
 
 func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {

@@ -22,10 +22,10 @@ func setupGroupTestServer(t *testing.T) (*Server, *db.CoreDB, func()) {
 	}
 
 	cfg := &config.Config{
-		JWT: config.JWTConfig{Secret: "test-secret-key-32-chars-min!!"},
+		JWT:     config.JWTConfig{Secret: "test-secret-key-32-chars-min!!"},
+		Session: config.SessionConfig{},
 	}
-	jwt := auth.NewJWTService(cfg.JWT.Secret)
-	s := New(cfg, coreDB, jwt)
+	s := New(cfg, coreDB)
 
 	return s, coreDB, func() { coreDB.Close() }
 }

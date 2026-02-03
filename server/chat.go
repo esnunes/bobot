@@ -26,17 +26,22 @@ type chatMessage struct {
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
-	// Get token from query param
-	token := r.URL.Query().Get("token")
-	if token == "" {
-		http.Error(w, "missing token", http.StatusUnauthorized)
+	// Get session from cookie
+	cookie, err := r.Cookie("session")
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Validate token
-	claims, err := s.jwt.ValidateAccessToken(token)
+	token, err := s.session.DecryptToken(cookie.Value)
 	if err != nil {
-		http.Error(w, "invalid token", http.StatusUnauthorized)
+		http.Error(w, "invalid session", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if past absolute deadline
+	if s.session.IsPastDeadline(token) {
+		http.Error(w, "session expired", http.StatusUnauthorized)
 		return
 	}
 
@@ -49,13 +54,13 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	// Register connection for multi-device support
-	s.connections.Add(claims.UserID, conn)
-	defer s.connections.Remove(claims.UserID, conn)
+	s.connections.Add(token.UserID, conn)
+	defer s.connections.Remove(token.UserID, conn)
 
 	// Create context with user data
 	ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
-		UserID: claims.UserID,
-		Role:   claims.Role,
+		UserID: token.UserID,
+		Role:   token.Role,
 	})
 
 	// Handle messages
@@ -69,11 +74,9 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if msg.GroupID != nil {
-			// Handle group message
-			s.handleGroupChatMessage(ctx, claims.UserID, *msg.GroupID, msg.Content)
+			s.handleGroupChatMessage(ctx, token.UserID, *msg.GroupID, msg.Content)
 		} else {
-			// Handle 1:1 message (existing logic)
-			s.handlePrivateChatMessage(ctx, claims.UserID, msg.Content)
+			s.handlePrivateChatMessage(ctx, token.UserID, msg.Content)
 		}
 	}
 }

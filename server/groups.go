@@ -113,10 +113,11 @@ func (s *Server) handleGetGroup(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":       group.ID,
-		"name":     group.Name,
-		"owner_id": group.OwnerID,
-		"members":  memberList,
+		"id":              group.ID,
+		"name":            group.Name,
+		"owner_id":        group.OwnerID,
+		"current_user_id": userData.UserID,
+		"members":         memberList,
 	})
 }
 

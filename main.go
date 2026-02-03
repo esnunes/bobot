@@ -57,9 +57,6 @@ func main() {
 		}
 	}
 
-	// Initialize JWT service
-	jwtSvc := auth.NewJWTService(cfg.JWT.Secret)
-
 	// Initialize tool registry
 	registry := tools.NewRegistry()
 	registry.Register(task.NewTaskTool(taskDB))
@@ -81,7 +78,7 @@ func main() {
 	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter)
 
 	// Initialize HTTP server
-	srv := server.NewWithAssistant(cfg, coreDB, jwtSvc, engine, registry)
+	srv := server.NewWithAssistant(cfg, coreDB, engine, registry)
 
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

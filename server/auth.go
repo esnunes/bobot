@@ -7,25 +7,10 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
 )
-
-type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-type tokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
-
-type refreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
 
 type signupRequest struct {
 	Code        string `json:"code"`
@@ -64,114 +49,18 @@ func validateDisplayName(name string) error {
 	return nil
 }
 
-func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
-	}
-
-	user, err := s.db.GetUserByUsername(req.Username)
-	if err == db.ErrNotFound {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
-		return
-	}
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	if !auth.CheckPassword(req.Password, user.PasswordHash) {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
-		return
-	}
-
-	// Check if user is blocked
-	if user.Blocked {
-		http.Error(w, "account blocked", http.StatusForbidden)
-		return
-	}
-
-	accessToken, err := s.jwt.GenerateAccessTokenWithRole(user.ID, user.Role)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	refreshToken := s.jwt.GenerateRefreshToken()
-	expiresAt := time.Now().Add(s.jwt.RefreshTTL())
-
-	_, err = s.db.CreateRefreshToken(user.ID, refreshToken, expiresAt)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	if isHTMXRequest(r) {
-		w.Header().Set("HX-Redirect", "/chat")
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokenResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	})
-}
-
-func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
-	var req refreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
-	}
-
-	token, err := s.db.GetRefreshToken(req.RefreshToken)
-	if err == db.ErrNotFound {
-		http.Error(w, "invalid token", http.StatusUnauthorized)
-		return
-	}
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	if time.Now().After(token.ExpiresAt) {
-		s.db.DeleteRefreshToken(req.RefreshToken)
-		http.Error(w, "token expired", http.StatusUnauthorized)
-		return
-	}
-
-	// Check if user is blocked
-	user, err := s.db.GetUserByID(token.UserID)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	if user.Blocked {
-		s.db.DeleteRefreshToken(req.RefreshToken)
-		http.Error(w, "account blocked", http.StatusForbidden)
-		return
-	}
-
-	accessToken, err := s.jwt.GenerateAccessTokenWithRole(user.ID, user.Role)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"access_token": accessToken,
-	})
-}
-
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	var req refreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
+	// Check for "logout everywhere" parameter
+	if r.URL.Query().Get("all") == "true" {
+		// Try to get user from session cookie
+		if cookie, err := r.Cookie("session"); err == nil {
+			if token, err := s.session.DecryptToken(cookie.Value); err == nil {
+				s.db.CreateSessionRevocation(token.UserID, "logout_all")
+			}
+		}
 	}
 
-	s.db.DeleteRefreshToken(req.RefreshToken)
+	s.clearSessionCookie(w)
 
 	if isHTMXRequest(r) {
 		w.Header().Set("HX-Redirect", "/")
@@ -202,42 +91,35 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate inputs
-	req.Username = strings.ToLower(req.Username)
+	// Validate username
 	if err := validateUsername(req.Username); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := validatePassword(req.Password); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+
+	// Validate display name
 	if err := validateDisplayName(req.DisplayName); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Check username uniqueness
-	_, err = s.db.GetUserByUsername(req.Username)
-	if err == nil {
-		http.Error(w, "username already taken", http.StatusBadRequest)
+	// Validate password
+	if err := validatePassword(req.Password); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err != db.ErrNotFound {
+
+	// Hash password
+	passwordHash, err := auth.HashPassword(req.Password)
+	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	// Create user
-	hash, err := auth.HashPassword(req.Password)
+	user, err := s.db.CreateUserFull(req.Username, passwordHash, req.DisplayName, "user")
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	user, err := s.db.CreateUserFull(req.Username, hash, req.DisplayName, "user")
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		http.Error(w, "username already taken", http.StatusBadRequest)
 		return
 	}
 
@@ -247,28 +129,19 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate tokens
-	accessToken, err := s.jwt.GenerateAccessTokenWithRole(user.ID, user.Role)
+	// Create session token
+	token, err := s.session.CreateToken(user.ID, user.Role)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	refreshToken := s.jwt.GenerateRefreshToken()
-	expiresAt := time.Now().Add(s.jwt.RefreshTTL())
-
-	_, err = s.db.CreateRefreshToken(user.ID, refreshToken, expiresAt)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	// Set session cookie
+	s.setSessionCookie(w, token)
 
 	if isHTMXRequest(r) {
 		w.Header().Set("HX-Redirect", "/chat")
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tokenResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	})
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
