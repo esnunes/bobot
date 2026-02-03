@@ -150,12 +150,6 @@ window.ChatClient ||= class ChatClient {
             }
         });
 
-        // Logout - cleanup before HTMX request
-        document.getElementById('logout-btn')?.addEventListener('htmx:beforeRequest', () => {
-            this.wsContainer.close();
-            localStorage.removeItem('lastMessageTimestamp');
-        });
-
         // Infinite scroll
         this.messagesEl.addEventListener('scroll', () => {
             if (this.messagesEl.scrollTop < 100) {

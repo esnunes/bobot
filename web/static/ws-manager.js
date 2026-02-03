@@ -89,7 +89,7 @@
 
     container.close = function() {
         if (ws) {
-            ws.close();
+            ws.close(1001);
             ws = null;
         }
     };
@@ -99,4 +99,12 @@
         reconnectAttempts = 0;
         connect();
     };
+
+    // Centralized logout cleanup - works on any page with logout button
+    document.addEventListener('htmx:beforeRequest', function(event) {
+        if (event.target.id === 'logout-btn') {
+            container.close();
+            localStorage.removeItem('lastMessageTimestamp');
+        }
+    });
 })();
