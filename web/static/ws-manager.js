@@ -3,6 +3,9 @@
     const container = document.getElementById('ws-connection');
     if (!container) return;
 
+    // Only connect if explicitly enabled (authenticated pages)
+    if (container.dataset.connect !== 'true') return;
+
     if (container.dataset.initialized === 'true') return;
     container.dataset.initialized = 'true';
 
