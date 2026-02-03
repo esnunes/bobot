@@ -238,9 +238,9 @@ func TestSignup_ValidInvite(t *testing.T) {
 	admin, _ := srv.db.CreateUserFull("admin", "hash", "Admin", "admin")
 	srv.db.CreateInvite(admin.ID, "validcode")
 
-	body := `{"code":"validcode","username":"newuser","display_name":"New User","password":"password123"}`
-	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "code=validcode&username=newuser&display_name=New+User&password=password123"
+	req := httptest.NewRequest("POST", "/signup", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
 	srv.ServeHTTP(w, req)
@@ -271,15 +271,21 @@ func TestSignup_ValidInvite(t *testing.T) {
 func TestSignup_InvalidInvite(t *testing.T) {
 	srv := setupTestServer(t)
 
-	body := `{"code":"invalidcode","username":"newuser","display_name":"New User","password":"password123"}`
-	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "code=invalidcode&username=newuser&display_name=New+User&password=password123"
+	req := httptest.NewRequest("POST", "/signup", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
 	srv.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", w.Code)
+	// Form signup returns 200 with error in template
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "Invalid or expired invite") {
+		t.Errorf("expected error message in response, got %s", body)
 	}
 }
 
@@ -290,15 +296,21 @@ func TestSignup_UsernameValidation(t *testing.T) {
 	srv.db.CreateInvite(admin.ID, "testcode")
 
 	// Too short
-	body := `{"code":"testcode","username":"ab","display_name":"Test","password":"password123"}`
-	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "code=testcode&username=ab&display_name=Test&password=password123"
+	req := httptest.NewRequest("POST", "/signup", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
 	srv.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for short username, got %d", w.Code)
+	// Form signup returns 200 with error in template
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "at least 3 characters") {
+		t.Errorf("expected username error message in response, got %s", body)
 	}
 }
 
@@ -309,15 +321,21 @@ func TestSignup_PasswordValidation(t *testing.T) {
 	srv.db.CreateInvite(admin.ID, "testcode2")
 
 	// Too short
-	body := `{"code":"testcode2","username":"validuser","display_name":"Test","password":"short"}`
-	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "code=testcode2&username=validuser&display_name=Test&password=short"
+	req := httptest.NewRequest("POST", "/signup", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
 	srv.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for short password, got %d", w.Code)
+	// Form signup returns 200 with error in template
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "at least 8 characters") {
+		t.Errorf("expected password error message in response, got %s", body)
 	}
 }
 
@@ -332,15 +350,21 @@ func TestSignup_UsedInvite(t *testing.T) {
 	srv.db.UseInvite("usedcode", user.ID)
 
 	// Try to use it again
-	body := `{"code":"usedcode","username":"seconduser","display_name":"Second","password":"password123"}`
-	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "code=usedcode&username=seconduser&display_name=Second&password=password123"
+	req := httptest.NewRequest("POST", "/signup", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
 	srv.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for used invite, got %d", w.Code)
+	// Form signup returns 200 with error in template
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "Invalid or expired invite") {
+		t.Errorf("expected error message in response, got %s", body)
 	}
 }
 
@@ -357,9 +381,9 @@ func TestSessionMiddleware_ValidToken(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	handler := s.sessionMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := auth.UserIDFromContext(r.Context())
-		if userID != 1 {
-			t.Errorf("UserID = %d, want 1", userID)
+		data := auth.UserDataFromContext(r.Context())
+		if data.UserID != 1 {
+			t.Errorf("UserID = %d, want 1", data.UserID)
 		}
 		w.WriteHeader(http.StatusOK)
 	})
@@ -489,14 +513,13 @@ func TestSessionMiddleware_RoleInContext(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	handler := s.sessionMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := auth.UserIDFromContext(r.Context())
-		role := auth.RoleFromContext(r.Context())
+		data := auth.UserDataFromContext(r.Context())
 
-		if userID != 42 {
-			t.Errorf("UserID = %d, want 42", userID)
+		if data.UserID != 42 {
+			t.Errorf("UserID = %d, want 42", data.UserID)
 		}
-		if role != "admin" {
-			t.Errorf("Role = %s, want admin", role)
+		if data.Role != "admin" {
+			t.Errorf("Role = %s, want admin", data.Role)
 		}
 		w.WriteHeader(http.StatusOK)
 	})
@@ -518,9 +541,9 @@ func TestHandleSignup_SetsSessionCookie(t *testing.T) {
 	// Create invite
 	invite, _ := s.db.CreateInvite(admin.ID, "test-invite-code")
 
-	body := fmt.Sprintf(`{"code":"%s","username":"newuser","display_name":"New User","password":"password123"}`, invite.Code)
-	req := httptest.NewRequest("POST", "/api/signup", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := fmt.Sprintf("code=%s&username=newuser&display_name=New+User&password=password123", invite.Code)
+	req := httptest.NewRequest("POST", "/signup", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
 	s.router.ServeHTTP(rr, req)

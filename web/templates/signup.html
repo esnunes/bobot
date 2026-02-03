@@ -3,59 +3,35 @@
     <h1>bobot</h1>
     {{if .Error}}
     <p class="error">{{.Error}}</p>
-    {{else}}
-    <form id="signup-form" class="login-form">
+    {{if .Code}}
+    <form id="signup-form" hx-post="/signup" hx-target="body" class="login-form">
         <input type="hidden" name="code" value="{{.Code}}">
-        <input type="text" name="username" placeholder="Username" required autofocus
+        <input type="text" name="username" placeholder="Username" autocapitalize="none" required autofocus
                pattern="[a-zA-Z0-9_]+" minlength="3" title="Letters, numbers, and underscores only">
         <input type="text" name="display_name" placeholder="Display Name" required>
         <input type="password" name="password" placeholder="Password" required minlength="8">
         <input type="password" name="confirm_password" placeholder="Confirm Password" required>
         <button type="submit">Sign Up</button>
-        <p id="error-message" class="error hidden"></p>
+    </form>
+    {{end}}
+    {{else}}
+    <form id="signup-form" hx-post="/signup" hx-target="body" class="login-form">
+        <input type="hidden" name="code" value="{{.Code}}">
+        <input type="text" name="username" placeholder="Username" autocapitalize="none" required autofocus
+               pattern="[a-zA-Z0-9_]+" minlength="3" title="Letters, numbers, and underscores only">
+        <input type="text" name="display_name" placeholder="Display Name" required>
+        <input type="password" name="password" placeholder="Password" required minlength="8">
+        <input type="password" name="confirm_password" placeholder="Confirm Password" required>
+        <button type="submit">Sign Up</button>
     </form>
     {{end}}
 </div>
 <script>
-document.getElementById('signup-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
+document.getElementById('signup-form')?.addEventListener('htmx:confirm', function(e) {
     const form = e.target;
-    const errorEl = document.getElementById('error-message');
-
     if (form.password.value !== form.confirm_password.value) {
-        errorEl.textContent = 'Passwords do not match';
-        errorEl.classList.remove('hidden');
-        return;
-    }
-
-    try {
-        const resp = await fetch('/api/signup', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'HX-Request': 'true'
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-                code: form.code.value,
-                username: form.username.value,
-                display_name: form.display_name.value,
-                password: form.password.value
-            })
-        });
-
-        if (!resp.ok) {
-            const text = await resp.text();
-            throw new Error(text || 'Signup failed');
-        }
-
-        // Navigate via HTMX content swap (session cookie is set by server)
-        htmx.ajax('GET', '/chat', {target: 'body', swap: 'innerHTML'}).then(() => {
-            history.pushState({}, '', '/chat');
-        });
-    } catch (err) {
-        errorEl.textContent = err.message;
-        errorEl.classList.remove('hidden');
+        e.preventDefault();
+        alert('Passwords do not match');
     }
 });
 </script>

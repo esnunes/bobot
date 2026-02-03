@@ -57,7 +57,6 @@ func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.E
 func (s *Server) routes() {
 	// API routes
 	s.router.HandleFunc("GET /health", s.handleHealth)
-	s.router.HandleFunc("POST /api/signup", s.handleSignup)
 	s.router.HandleFunc("POST /api/logout", s.handleLogout)
 	s.router.HandleFunc("GET /ws/chat", s.handleChat)
 
@@ -81,6 +80,7 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /{$}", s.handleLoginPage)
 	s.router.HandleFunc("POST /{$}", s.handleLoginPage)
 	s.router.HandleFunc("GET /signup", s.handleSignupPage)
+	s.router.HandleFunc("POST /signup", s.handleSignupPage)
 	s.router.HandleFunc("GET /chat", s.handleChatPage)
 	s.router.HandleFunc("GET /groups", s.handleGroupsPage)
 	s.router.HandleFunc("GET /groups/{id}", s.handleGroupChatPage)
