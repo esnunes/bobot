@@ -11,7 +11,6 @@ window.ChatClient ||= class ChatClient {
         this.input = document.getElementById('message-input');
         this.menuBtn = document.getElementById('menu-btn');
         this.menuOverlay = document.getElementById('menu-overlay');
-        this.logoutBtn = document.getElementById('logout-btn');
         this.isLoadingHistory = false;
         this.oldestMessageId = null;
         this.hasMoreHistory = true;
@@ -151,9 +150,10 @@ window.ChatClient ||= class ChatClient {
             }
         });
 
-        // Logout
-        this.logoutBtn.addEventListener('click', () => {
-            this.logout();
+        // Logout - cleanup before HTMX request
+        document.getElementById('logout-btn')?.addEventListener('htmx:beforeRequest', () => {
+            this.wsContainer.close();
+            localStorage.removeItem('lastMessageTimestamp');
         });
 
         // Infinite scroll
@@ -223,23 +223,6 @@ window.ChatClient ||= class ChatClient {
 
     scrollToBottom() {
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
-    }
-
-    async logout() {
-        this.wsContainer.close();
-
-        try {
-            await fetch('/api/logout', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'HX-Request': 'true' }
-            });
-        } catch (err) {
-            console.error('Logout error:', err);
-        }
-
-        localStorage.removeItem('lastMessageTimestamp');
-        window.location.href = '/';
     }
 };
 

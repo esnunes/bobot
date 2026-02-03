@@ -53,7 +53,8 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	s.clearSessionCookie(w)
 
 	if isHTMXRequest(r) {
-		w.Header().Set("HX-Redirect", "/")
+		s.templates["login"].Execute(w, PageData{Title: "Login"})
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})

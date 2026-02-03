@@ -1,7 +1,6 @@
 {{define "content"}}
 <div class="login-container">
     <h1>bobot</h1>
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
     {{if .Code}}
     <form id="signup-form" hx-post="/signup" hx-target="body" class="login-form">
         <input type="hidden" name="code" value="{{.Code}}">
@@ -13,6 +12,7 @@
         <button type="submit">Sign Up</button>
     </form>
     {{end}}
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
 </div>
 <script>
 document.getElementById('signup-form')?.addEventListener('htmx:confirm', function(e) {
