@@ -272,32 +272,3 @@ func TestOwnerCannotLeave(t *testing.T) {
 		t.Errorf("expected status 403, got %d", w.Code)
 	}
 }
-
-func TestGetGroupMessages(t *testing.T) {
-	s, coreDB, cleanup := setupGroupTestServer(t)
-	defer cleanup()
-
-	user, _ := coreDB.CreateUser("testuser", "hash")
-
-	group, _ := coreDB.CreateGroup("Test Group", user.ID)
-	coreDB.AddGroupMember(group.ID, user.ID)
-	coreDB.CreateGroupMessage(group.ID, user.ID, "user", "Hello")
-	coreDB.CreateGroupMessage(group.ID, user.ID, "assistant", "Hi there")
-
-	req := httptest.NewRequest("GET", "/api/groups/1/messages/recent?limit=50", nil)
-	req.SetPathValue("id", "1")
-	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
-	w := httptest.NewRecorder()
-
-	s.handleGroupRecentMessages(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	var messages []map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &messages)
-	if len(messages) != 2 {
-		t.Errorf("expected 2 messages, got %d", len(messages))
-	}
-}

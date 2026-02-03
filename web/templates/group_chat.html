@@ -1,12 +1,20 @@
 {{define "content"}}
-<div class="chat-container" data-page="group-chat" data-group-id="{{.GroupID}}">
+<div class="chat-container" data-page="group-chat" data-group-id="{{.GroupID}}" data-owner-id="{{.OwnerID}}" data-current-user-id="{{.CurrentUserID}}">
     <header class="chat-header">
         <a href="/groups" class="back-link">&larr;</a>
-        <h1 id="group-name">Loading...</h1>
+        <h1 id="group-name">{{.GroupName}}</h1>
         <button id="menu-btn" class="menu-btn">&#9776;</button>
     </header>
 
     <main class="chat-messages" id="messages">
+        {{range .Messages}}
+        <div class="message {{.Role}}" data-message-id="{{.ID}}">
+            {{if eq .Role "user"}}
+            <div class="message-sender">{{.DisplayName}}</div>
+            {{end}}
+            <div class="message-content">{{.Content}}</div>
+        </div>
+        {{end}}
     </main>
 
     <footer class="chat-input">
@@ -19,10 +27,18 @@
 
 <div id="menu-overlay" class="menu-overlay hidden">
     <div class="menu">
-        <div id="members-list" class="members-list"></div>
+        <div id="members-list" class="members-list">
+            <strong>Members:</strong>
+            {{range .Members}}
+            <div class="member">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}</div>
+            {{end}}
+        </div>
         <hr>
+        {{if eq .OwnerID .CurrentUserID}}
+        <button id="delete-btn" class="danger-btn">Delete Group</button>
+        {{else}}
         <button id="leave-btn" class="danger-btn">Leave Group</button>
-        <button id="delete-btn" class="danger-btn hidden">Delete Group</button>
+        {{end}}
     </div>
 </div>
 

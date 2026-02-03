@@ -22,34 +22,20 @@ window.ChatClient ||= class ChatClient {
 
     async init() {
         this.wsContainer.connect();
-        await this.loadRecentMessages();
+        this.initFromDOM();
         await this.syncMessages();
         this.setupEventListeners();
+        this.scrollToBottom();
     }
 
-    async loadRecentMessages() {
-        try {
-            const resp = await fetch('/api/messages/recent?limit=50', {
-                credentials: 'include'
-            });
-
-            if (!resp.ok) {
-                if (resp.status === 401) {
-                    window.location.href = '/';
-                    return;
-                }
-                throw new Error('Failed to load messages');
+    initFromDOM() {
+        const messageEls = this.messagesEl.querySelectorAll('[data-message-id]');
+        if (messageEls.length > 0) {
+            this.oldestMessageId = parseInt(messageEls[0].dataset.messageId, 10);
+            const lastMessage = messageEls[messageEls.length - 1];
+            if (lastMessage.dataset.createdAt) {
+                this.updateLastSeenTimestamp(lastMessage.dataset.createdAt);
             }
-
-            const messages = await resp.json();
-            if (messages && messages.length > 0) {
-                messages.forEach(msg => this.addMessage(msg.Content, msg.Role, msg.ID, false));
-                this.oldestMessageId = messages[0].ID;
-                this.updateLastSeenTimestamp(messages[messages.length - 1].CreatedAt);
-            }
-            this.scrollToBottom();
-        } catch (err) {
-            console.error('Failed to load messages:', err);
         }
     }
 

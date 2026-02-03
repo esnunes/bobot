@@ -9,6 +9,9 @@
     </header>
 
     <main class="chat-messages" id="messages">
+        {{range .Messages}}
+        <div class="message {{.Role}}" data-message-id="{{.ID}}" data-created-at="{{.CreatedAt}}">{{.Content}}</div>
+        {{end}}
     </main>
 
     <footer class="chat-input">

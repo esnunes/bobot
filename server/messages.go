@@ -10,28 +10,6 @@ import (
 	"github.com/esnunes/bobot/auth"
 )
 
-func (s *Server) handleRecentMessages(w http.ResponseWriter, r *http.Request) {
-	userData := auth.UserDataFromContext(r.Context())
-	if userData.UserID == 0 {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit <= 0 || limit > s.cfg.History.MaxLimit {
-		limit = s.cfg.History.DefaultLimit
-	}
-
-	messages, err := s.db.GetPrivateChatRecentMessages(userData.UserID, limit)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(messages)
-}
-
 func (s *Server) handleMessageHistory(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 	if userData.UserID == 0 {

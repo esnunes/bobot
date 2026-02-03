@@ -188,7 +188,6 @@ func TestMessageEndpointsRequireAuth(t *testing.T) {
 	srv := New(cfg, coreDB)
 
 	endpoints := []string{
-		"/api/messages/recent",
 		"/api/messages/history?before=1",
 		"/api/messages/sync?since=2020-01-01T00:00:00Z",
 	}

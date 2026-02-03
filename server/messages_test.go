@@ -14,45 +14,6 @@ import (
 	"github.com/esnunes/bobot/db"
 )
 
-func TestHandleRecentMessages(t *testing.T) {
-	tmpDir := t.TempDir()
-	coreDB, _ := db.NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer coreDB.Close()
-
-	cfg := &config.Config{
-		JWT:     config.JWTConfig{Secret: "testsecret"},
-		Session: config.SessionConfig{},
-		History: config.HistoryConfig{
-			DefaultLimit: 50,
-			MaxLimit:     100,
-		},
-	}
-
-	user, _ := coreDB.CreateUser("testuser", "hash")
-	coreDB.CreateMessage(user.ID, db.BobotUserID, "user", "Hello")
-	coreDB.CreateMessage(db.BobotUserID, user.ID, "assistant", "Hi there")
-
-	srv := New(cfg, coreDB)
-
-	// Create request with auth context
-	req := httptest.NewRequest("GET", "/api/messages/recent?limit=10", nil)
-	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
-	rec := httptest.NewRecorder()
-
-	srv.handleRecentMessages(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", rec.Code)
-	}
-
-	var messages []db.Message
-	json.NewDecoder(rec.Body).Decode(&messages)
-
-	if len(messages) != 2 {
-		t.Errorf("expected 2 messages, got %d", len(messages))
-	}
-}
-
 func TestHandleMessageHistory(t *testing.T) {
 	tmpDir := t.TempDir()
 	coreDB, _ := db.NewCoreDB(filepath.Join(tmpDir, "core.db"))

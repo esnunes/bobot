@@ -17,12 +17,32 @@ type GroupView struct {
 	MemberCount int
 }
 
+type MessageView struct {
+	ID          int64
+	Role        string
+	Content     string
+	CreatedAt   string
+	UserID      int64
+	DisplayName string
+}
+
+type MemberView struct {
+	UserID      int64
+	Username    string
+	DisplayName string
+}
+
 type PageData struct {
-	Title   string
-	Error   string
-	Code    string
-	GroupID int64
-	Groups  []GroupView
+	Title         string
+	Error         string
+	Code          string
+	GroupID       int64
+	Groups        []GroupView
+	Messages      []MessageView
+	Members       []MemberView
+	GroupName     string
+	OwnerID       int64
+	CurrentUserID int64
 }
 
 func (s *Server) loadTemplates() error {
@@ -133,7 +153,24 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
-	s.templates["chat"].Execute(w, PageData{Title: "Chat"})
+	userData := auth.UserDataFromContext(r.Context())
+
+	dbMessages, _ := s.db.GetPrivateChatRecentMessages(userData.UserID, 50)
+
+	messages := make([]MessageView, 0, len(dbMessages))
+	for _, m := range dbMessages {
+		messages = append(messages, MessageView{
+			ID:        m.ID,
+			Role:      m.Role,
+			Content:   m.Content,
+			CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	s.templates["chat"].Execute(w, PageData{
+		Title:    "Chat",
+		Messages: messages,
+	})
 }
 
 func (s *Server) handleGroupsPage(w http.ResponseWriter, r *http.Request) {
@@ -159,6 +196,8 @@ func (s *Server) handleGroupsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGroupChatPage(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 3 {
 		http.Error(w, "invalid path", http.StatusBadRequest)
@@ -170,8 +209,54 @@ func (s *Server) handleGroupChatPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check membership
+	isMember, err := s.db.IsGroupMember(groupID, userData.UserID)
+	if err != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	group, err := s.db.GetGroupByID(groupID)
+	if err != nil {
+		http.Error(w, "group not found", http.StatusNotFound)
+		return
+	}
+
+	dbMembers, _ := s.db.GetGroupMembers(groupID)
+	members := make([]MemberView, 0, len(dbMembers))
+	for _, m := range dbMembers {
+		members = append(members, MemberView{
+			UserID:      m.UserID,
+			Username:    m.Username,
+			DisplayName: m.DisplayName,
+		})
+	}
+
+	dbMessages, _ := s.db.GetGroupRecentMessages(groupID, 50)
+	messages := make([]MessageView, 0, len(dbMessages))
+	for _, m := range dbMessages {
+		mv := MessageView{
+			ID:        m.ID,
+			Role:      m.Role,
+			Content:   m.Content,
+			CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		if m.Role == "user" {
+			if user, err := s.db.GetUserByID(m.SenderID); err == nil {
+				mv.UserID = user.ID
+				mv.DisplayName = user.DisplayName
+			}
+		}
+		messages = append(messages, mv)
+	}
+
 	s.templates["group_chat"].Execute(w, PageData{
-		Title:   "Group Chat",
-		GroupID: groupID,
+		Title:         "Group Chat",
+		GroupID:       groupID,
+		GroupName:     group.Name,
+		OwnerID:       group.OwnerID,
+		CurrentUserID: userData.UserID,
+		Members:       members,
+		Messages:      messages,
 	})
 }

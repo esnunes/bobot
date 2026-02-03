@@ -12,8 +12,8 @@ window.GroupChatClient = class GroupChatClient {
         this.input = document.getElementById('message-input');
         this.menuBtn = document.getElementById('menu-btn');
         this.menuOverlay = document.getElementById('menu-overlay');
-        this.leaveBtn = document.getElementById('leave-btn');
-        this.deleteBtn = document.getElementById('delete-btn');
+        this.leaveBtn = document.getElementById('leave-btn');  // May be null if owner
+        this.deleteBtn = document.getElementById('delete-btn');  // May be null if not owner
         this.isLoadingHistory = false;
         this.oldestMessageId = null;
         this.hasMoreHistory = true;
@@ -24,69 +24,20 @@ window.GroupChatClient = class GroupChatClient {
         this.init();
     }
 
-    async init() {
+    init() {
         this.wsContainer.connect();
-        await this.loadGroupInfo();
-        await this.loadRecentMessages();
+        this.initFromDOM();
         this.setupEventListeners();
+        this.scrollToBottom();
     }
 
-    async loadGroupInfo() {
-        try {
-            const resp = await fetch(`/api/groups/${this.groupId}`, {
-                credentials: 'include'
-            });
+    initFromDOM() {
+        const container = document.querySelector('[data-page="group-chat"]');
+        this.currentUserId = parseInt(container.dataset.currentUserId, 10);
 
-            if (!resp.ok) {
-                if (resp.status === 401) {
-                    window.location.href = '/';
-                    return;
-                }
-                if (resp.status === 403 || resp.status === 404) {
-                    htmx.ajax('GET', '/groups', {target: 'body', swap: 'innerHTML'}).then(() => {
-                        history.pushState({}, '', '/groups');
-                    });
-                    return;
-                }
-                throw new Error('Failed to load group');
-            }
-
-            const group = await resp.json();
-            document.getElementById('group-name').textContent = group.name;
-
-            this.currentUserId = group.current_user_id;
-
-            if (group.owner_id === this.currentUserId) {
-                this.deleteBtn.classList.remove('hidden');
-                this.leaveBtn.classList.add('hidden');
-            }
-
-            const membersList = document.getElementById('members-list');
-            membersList.innerHTML = '<strong>Members:</strong>' + group.members.map(m =>
-                `<div class="member">${this.escapeHtml(m.display_name || m.username)}</div>`
-            ).join('');
-
-        } catch (err) {
-            console.error('Failed to load group:', err);
-        }
-    }
-
-    async loadRecentMessages() {
-        try {
-            const resp = await fetch(`/api/groups/${this.groupId}/messages/recent?limit=50`, {
-                credentials: 'include'
-            });
-
-            if (!resp.ok) throw new Error('Failed to load messages');
-
-            const messages = await resp.json();
-            if (messages && messages.length > 0) {
-                messages.forEach(msg => this.addMessage(msg, false));
-                this.oldestMessageId = messages[0].ID;
-            }
-            this.scrollToBottom();
-        } catch (err) {
-            console.error('Failed to load messages:', err);
+        const messageEls = this.messagesEl.querySelectorAll('[data-message-id]');
+        if (messageEls.length > 0) {
+            this.oldestMessageId = parseInt(messageEls[0].dataset.messageId, 10);
         }
     }
 
@@ -118,8 +69,12 @@ window.GroupChatClient = class GroupChatClient {
             }
         });
 
-        this.leaveBtn.addEventListener('click', () => this.leaveGroup());
-        this.deleteBtn.addEventListener('click', () => this.deleteGroup());
+        if (this.leaveBtn) {
+            this.leaveBtn.addEventListener('click', () => this.leaveGroup());
+        }
+        if (this.deleteBtn) {
+            this.deleteBtn.addEventListener('click', () => this.deleteGroup());
+        }
 
         this.messagesEl.addEventListener('scroll', () => {
             if (this.messagesEl.scrollTop < 100) {
@@ -287,12 +242,6 @@ window.GroupChatClient = class GroupChatClient {
             console.error('Failed to delete group:', err);
             alert('Failed to delete group');
         }
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 };
 

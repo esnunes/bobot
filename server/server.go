@@ -60,7 +60,6 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /ws/chat", s.handleChat)
 
 	// Message routes (require auth)
-	s.router.HandleFunc("GET /api/messages/recent", s.sessionMiddleware(s.handleRecentMessages))
 	s.router.HandleFunc("GET /api/messages/history", s.sessionMiddleware(s.handleMessageHistory))
 	s.router.HandleFunc("GET /api/messages/sync", s.sessionMiddleware(s.handleMessageSync))
 
@@ -71,7 +70,6 @@ func (s *Server) routes() {
 	s.router.HandleFunc("DELETE /api/groups/{id}", s.sessionMiddleware(s.handleDeleteGroup))
 	s.router.HandleFunc("POST /api/groups/{id}/members", s.sessionMiddleware(s.handleAddGroupMember))
 	s.router.HandleFunc("DELETE /api/groups/{id}/members/{userId}", s.sessionMiddleware(s.handleRemoveGroupMember))
-	s.router.HandleFunc("GET /api/groups/{id}/messages/recent", s.sessionMiddleware(s.handleGroupRecentMessages))
 	s.router.HandleFunc("GET /api/groups/{id}/messages/history", s.sessionMiddleware(s.handleGroupMessageHistory))
 	s.router.HandleFunc("GET /api/groups/{id}/messages/sync", s.sessionMiddleware(s.handleGroupMessageSync))
 
@@ -81,9 +79,9 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /logout", s.handleLogout)
 	s.router.HandleFunc("GET /signup", s.handleSignupPage)
 	s.router.HandleFunc("POST /signup", s.handleSignupPage)
-	s.router.HandleFunc("GET /chat", s.handleChatPage)
+	s.router.HandleFunc("GET /chat", s.sessionMiddleware(s.handleChatPage))
 	s.router.HandleFunc("GET /groups", s.sessionMiddleware(s.handleGroupsPage))
-	s.router.HandleFunc("GET /groups/{id}", s.handleGroupChatPage)
+	s.router.HandleFunc("GET /groups/{id}", s.sessionMiddleware(s.handleGroupChatPage))
 
 	// Static files
 	staticFS, _ := fs.Sub(web.FS, "static")
