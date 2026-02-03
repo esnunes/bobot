@@ -1,0 +1,9 @@
+{{define "content"}}
+<div class="authenticated-container"
+     hx-get="/chat"
+     hx-trigger="load"
+     hx-target="body">
+    <h1>bobot</h1>
+    <div class="loading-spinner"></div>
+</div>
+{{end}}

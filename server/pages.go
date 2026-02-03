@@ -49,6 +49,12 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["group_chat"] = groupChatTmpl
 
+	authTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/authenticated.html")
+	if err != nil {
+		return err
+	}
+	s.templates["authenticated"] = authTmpl
+
 	return nil
 }
 
@@ -56,7 +62,7 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	// Check if already authenticated
 	if cookie, err := r.Cookie("session"); err == nil {
 		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
-			http.Redirect(w, r, "/chat", http.StatusSeeOther)
+			s.templates["authenticated"].Execute(w, PageData{Title: "Loading"})
 			return
 		}
 	}
@@ -99,7 +105,7 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.setSessionCookie(w, token)
-	http.Redirect(w, r, "/chat", http.StatusSeeOther)
+	s.templates["authenticated"].Execute(w, PageData{Title: "Loading"})
 }
 
 func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
