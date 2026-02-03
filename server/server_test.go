@@ -2,7 +2,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -53,9 +52,9 @@ func TestServer_Login_Success(t *testing.T) {
 	hash, _ := auth.HashPassword("testpass")
 	srv.db.CreateUserFull("testuser", hash, "Test User", "user")
 
-	body := `{"username":"testuser","password":"testpass"}`
-	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "username=testuser&password=testpass"
+	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
 	srv.router.ServeHTTP(w, req)
@@ -64,11 +63,10 @@ func TestServer_Login_Success(t *testing.T) {
 		t.Errorf("expected status 200, got %d", w.Code)
 	}
 
-	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
-
-	if resp["status"] != "ok" {
-		t.Errorf("expected status 'ok', got %s", resp["status"])
+	// Check that authenticated template is rendered
+	body := w.Body.String()
+	if !strings.Contains(body, "authenticated-container") {
+		t.Errorf("expected authenticated template, got %s", body)
 	}
 
 	// Check for session cookie
@@ -93,9 +91,9 @@ func TestHandleLogin_SetsSessionCookie(t *testing.T) {
 	hash, _ := auth.HashPassword("password123")
 	s.db.CreateUserFull("testuser", hash, "Test", "user")
 
-	body := `{"username":"testuser","password":"password123"}`
-	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "username=testuser&password=password123"
+	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
 	s.router.ServeHTTP(rr, req)
@@ -128,30 +126,42 @@ func TestServer_Login_InvalidCredentials(t *testing.T) {
 	hash, _ := auth.HashPassword("testpass")
 	srv.db.CreateUserFull("testuser", hash, "Test User", "user")
 
-	body := `{"username":"testuser","password":"wrongpass"}`
-	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "username=testuser&password=wrongpass"
+	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
 	srv.router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("expected status 401, got %d", w.Code)
+	// Form login returns 200 with error in template
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "Invalid credentials") {
+		t.Errorf("expected error message in response, got %s", body)
 	}
 }
 
 func TestServer_Login_UserNotFound(t *testing.T) {
 	srv := setupTestServer(t)
 
-	body := `{"username":"nouser","password":"pass"}`
-	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "username=nouser&password=pass"
+	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
 	srv.router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("expected status 401, got %d", w.Code)
+	// Form login returns 200 with error in template
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "Invalid credentials") {
+		t.Errorf("expected error message in response, got %s", body)
 	}
 }
 
@@ -203,15 +213,21 @@ func TestLogin_BlockedUser(t *testing.T) {
 	srv.db.BlockUser(user.ID)
 
 	// Try to login
-	body := `{"username":"blocked","password":"password"}`
-	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	form := "username=blocked&password=password"
+	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
 	srv.ServeHTTP(w, req)
 
-	if w.Code != http.StatusForbidden {
-		t.Errorf("expected 403, got %d", w.Code)
+	// Form login returns 200 with error in template
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "Account blocked") {
+		t.Errorf("expected blocked message in response, got %s", body)
 	}
 }
 

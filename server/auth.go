@@ -12,11 +12,6 @@ import (
 	"github.com/esnunes/bobot/db"
 )
 
-type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
 type signupRequest struct {
 	Code        string `json:"code"`
 	Username    string `json:"username"`
@@ -52,48 +47,6 @@ func validateDisplayName(name string) error {
 		return fmt.Errorf("display name is required")
 	}
 	return nil
-}
-
-func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
-	}
-
-	user, err := s.db.GetUserByUsername(req.Username)
-	if err == db.ErrNotFound {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
-		return
-	}
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	if !auth.CheckPassword(req.Password, user.PasswordHash) {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
-		return
-	}
-
-	if user.Blocked {
-		http.Error(w, "account blocked", http.StatusForbidden)
-		return
-	}
-
-	token, err := s.session.CreateToken(user.ID, user.Role)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	s.setSessionCookie(w, token)
-
-	if isHTMXRequest(r) {
-		w.Header().Set("HX-Redirect", "/chat")
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
