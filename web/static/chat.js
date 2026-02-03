@@ -120,7 +120,6 @@ window.ChatClient ||= class ChatClient {
     setupEventListeners() {
         // WebSocket message events - bind to instance for cleanup
         this.handleChatMessage = (event) => {
-            alert('chat message');
             const data = event.detail;
             if (data.role === 'assistant' || data.role === 'system') {
                 this.removeTypingIndicator();

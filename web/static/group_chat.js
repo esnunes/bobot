@@ -103,7 +103,7 @@ window.GroupChatClient = class GroupChatClient {
         };
         document.addEventListener('bobot:group-message', this.handleGroupMessage);
 
-        this.form.addEventListener('submit', (e) => {
+        this.form.addEventListener('htmx:confirm', (e) => {
             e.preventDefault();
             this.sendMessage();
         });
@@ -264,9 +264,7 @@ window.GroupChatClient = class GroupChatClient {
 
             if (!resp.ok) throw new Error('Failed to leave group');
 
-            htmx.ajax('GET', '/groups', {target: 'body', swap: 'innerHTML'}).then(() => {
-                history.pushState({}, '', '/groups');
-            });
+            htmx.ajax('GET', '/groups', {target: 'body', swap: 'innerHTML'});
         } catch (err) {
             console.error('Failed to leave group:', err);
             alert('Failed to leave group');
@@ -284,9 +282,7 @@ window.GroupChatClient = class GroupChatClient {
 
             if (!resp.ok) throw new Error('Failed to delete group');
 
-            htmx.ajax('GET', '/groups', {target: 'body', swap: 'innerHTML'}).then(() => {
-                history.pushState({}, '', '/groups');
-            });
+            htmx.ajax('GET', '/groups', {target: 'body', swap: 'innerHTML'});
         } catch (err) {
             console.error('Failed to delete group:', err);
             alert('Failed to delete group');
