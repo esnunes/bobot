@@ -94,12 +94,6 @@
         }
     };
 
-    container.reconnect = function() {
-        if (ws) ws.close(1000);
-        reconnectAttempts = 0;
-        connect();
-    };
-
     // Close WebSocket on logout
     document.addEventListener('bobot:logout', function() {
         container.close();
