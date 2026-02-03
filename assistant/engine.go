@@ -41,19 +41,18 @@ func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill, 
 // Chat processes a user message and returns the assistant's response.
 // The context must contain the user ID (set by auth middleware).
 func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
-	// Get role from context for tool filtering
-	role := auth.RoleFromContext(ctx)
+	// Get user data from context
+	userData := auth.UserDataFromContext(ctx)
 
 	// Build system prompt with role-filtered tools
-	llmTools := e.registry.ToLLMToolsForRole(role)
+	llmTools := e.registry.ToLLMToolsForRole(userData.Role)
 	systemPrompt := BuildSystemPrompt(e.skills, llmTools)
 
 	// Build messages with context
 	var messages []llm.Message
 
 	// Get context messages
-	userID := auth.UserIDFromContext(ctx)
-	contextMsgs, err := e.contextProvider.GetContextMessages(userID)
+	contextMsgs, err := e.contextProvider.GetContextMessages(userData.UserID)
 	if err == nil {
 		for _, cm := range contextMsgs {
 			messages = append(messages, llm.Message{
@@ -71,7 +70,7 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 
 	// Loop for tool use
 	maxIterations := 10
-	for i := 0; i < maxIterations; i++ {
+	for range maxIterations {
 		resp, err := e.provider.Chat(ctx, &llm.ChatRequest{
 			SystemPrompt: systemPrompt,
 			Messages:     messages,
@@ -87,9 +86,9 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 		}
 
 		// Build assistant message with tool use
-		toolUseContent := make([]map[string]interface{}, 0)
+		toolUseContent := make([]map[string]any, 0)
 		for _, tc := range resp.ToolCalls {
-			toolUseContent = append(toolUseContent, map[string]interface{}{
+			toolUseContent = append(toolUseContent, map[string]any{
 				"type":  "tool_use",
 				"id":    tc.ID,
 				"name":  tc.Name,
@@ -102,13 +101,13 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 		})
 
 		// Execute tools and add results
-		toolResults := make([]map[string]interface{}, 0)
+		toolResults := make([]map[string]any, 0)
 		for _, tc := range resp.ToolCalls {
 			result, err := e.registry.Execute(ctx, tc.Name, tc.Input)
 			if err != nil {
 				result = fmt.Sprintf("Error: %v", err)
 			}
-			toolResults = append(toolResults, map[string]interface{}{
+			toolResults = append(toolResults, map[string]any{
 				"type":        "tool_result",
 				"tool_use_id": tc.ID,
 				"content":     result,

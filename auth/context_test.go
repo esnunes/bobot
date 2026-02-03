@@ -12,11 +12,12 @@ func TestContextWithUserData(t *testing.T) {
 		Role:   "admin",
 	})
 
-	if UserIDFromContext(ctx) != 123 {
+	data := UserDataFromContext(ctx)
+	if data.UserID != 123 {
 		t.Error("expected user_id 123")
 	}
-	if RoleFromContext(ctx) != "admin" {
-		t.Errorf("expected role 'admin', got %s", RoleFromContext(ctx))
+	if data.Role != "admin" {
+		t.Errorf("expected role 'admin', got %s", data.Role)
 	}
 }
 
@@ -38,13 +39,6 @@ func TestUserDataFromContext(t *testing.T) {
 
 func TestEmptyContext(t *testing.T) {
 	ctx := context.Background()
-
-	if UserIDFromContext(ctx) != 0 {
-		t.Error("expected user_id 0 from empty context")
-	}
-	if RoleFromContext(ctx) != "" {
-		t.Error("expected empty role from empty context")
-	}
 
 	data := UserDataFromContext(ctx)
 	if data.UserID != 0 || data.Role != "" {

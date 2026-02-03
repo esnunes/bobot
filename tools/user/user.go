@@ -28,20 +28,20 @@ func (t *UserTool) Description() string {
 	return "Manage users: invite new users, block/unblock users, list users and invites"
 }
 
-func (t *UserTool) Schema() interface{} {
-	return map[string]interface{}{
+func (t *UserTool) Schema() any {
+	return map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"command": map[string]interface{}{
+		"properties": map[string]any{
+			"command": map[string]any{
 				"type":        "string",
 				"enum":        []string{"invite", "block", "unblock", "list", "invites", "revoke"},
 				"description": "The operation to perform",
 			},
-			"username": map[string]interface{}{
+			"username": map[string]any{
 				"type":        "string",
 				"description": "Username for block/unblock commands",
 			},
-			"code": map[string]interface{}{
+			"code": map[string]any{
 				"type":        "string",
 				"description": "Invite code for revoke command",
 			},
@@ -54,23 +54,22 @@ func (t *UserTool) AdminOnly() bool {
 	return true
 }
 
-func (t *UserTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
+func (t *UserTool) Execute(ctx context.Context, input map[string]any) (string, error) {
+	userData := auth.UserDataFromContext(ctx)
 	// Check admin role
-	role := auth.RoleFromContext(ctx)
-	if role != "admin" {
+	if userData.Role != "admin" {
 		return "", fmt.Errorf("this command requires admin privileges")
 	}
 
-	userID := auth.UserIDFromContext(ctx)
 	command, _ := input["command"].(string)
 	username, _ := input["username"].(string)
 	code, _ := input["code"].(string)
 
 	switch command {
 	case "invite":
-		return t.invite(userID)
+		return t.invite(userData.UserID)
 	case "block":
-		return t.block(userID, username)
+		return t.block(userData.UserID, username)
 	case "unblock":
 		return t.unblock(username)
 	case "list":

@@ -21,15 +21,3 @@ func UserDataFromContext(ctx context.Context) UserData {
 	data, _ := ctx.Value(userDataKey{}).(UserData)
 	return data
 }
-
-// UserIDFromContext extracts the user ID from the context.
-// Returns 0 if no user data is present.
-func UserIDFromContext(ctx context.Context) int64 {
-	return UserDataFromContext(ctx).UserID
-}
-
-// RoleFromContext extracts the role from the context.
-// Returns empty string if no user data is present.
-func RoleFromContext(ctx context.Context) string {
-	return UserDataFromContext(ctx).Role
-}

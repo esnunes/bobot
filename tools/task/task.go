@@ -25,24 +25,24 @@ func (t *TaskTool) Description() string {
 	return "Manage tasks within projects"
 }
 
-func (t *TaskTool) Schema() interface{} {
-	return map[string]interface{}{
+func (t *TaskTool) Schema() any {
+	return map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"command": map[string]interface{}{
+		"properties": map[string]any{
+			"command": map[string]any{
 				"type":        "string",
 				"enum":        []string{"create", "list", "update", "delete"},
 				"description": "The operation to perform",
 			},
-			"project": map[string]interface{}{
+			"project": map[string]any{
 				"type":        "string",
 				"description": "Project name (e.g., 'groceries')",
 			},
-			"title": map[string]interface{}{
+			"title": map[string]any{
 				"type":        "string",
 				"description": "Task title",
 			},
-			"status": map[string]interface{}{
+			"status": map[string]any{
 				"type":        "string",
 				"enum":        []string{"pending", "done"},
 				"description": "Task status",
@@ -56,9 +56,9 @@ func (t *TaskTool) AdminOnly() bool {
 	return false
 }
 
-func (t *TaskTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	userID := auth.UserIDFromContext(ctx)
-	if userID == 0 {
+func (t *TaskTool) Execute(ctx context.Context, input map[string]any) (string, error) {
+	userData := auth.UserDataFromContext(ctx)
+	if userData.UserID == 0 {
 		return "", fmt.Errorf("user_id not found in context")
 	}
 
@@ -67,7 +67,7 @@ func (t *TaskTool) Execute(ctx context.Context, input map[string]interface{}) (s
 	title, _ := input["title"].(string)
 	status, _ := input["status"].(string)
 
-	project, err := t.db.GetOrCreateProject(userID, projectName)
+	project, err := t.db.GetOrCreateProject(userData.UserID, projectName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get/create project: %w", err)
 	}
