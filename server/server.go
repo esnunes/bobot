@@ -79,7 +79,8 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /api/groups/{id}/messages/sync", s.sessionMiddleware(s.handleGroupMessageSync))
 
 	// Page routes
-	s.router.HandleFunc("GET /", s.handleLoginPage)
+	s.router.HandleFunc("GET /{$}", s.handleLoginPage)
+	s.router.HandleFunc("POST /{$}", s.handleLoginPage)
 	s.router.HandleFunc("GET /signup", s.handleSignupPage)
 	s.router.HandleFunc("GET /chat", s.handleChatPage)
 	s.router.HandleFunc("GET /groups", s.handleGroupsPage)
