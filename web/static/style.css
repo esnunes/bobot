@@ -306,6 +306,7 @@ body {
   font-family: var(--fonts-body);
   font-size: var(--font-sizes-2);
   padding: var(--space-1) 0;
+  margin: 0 var(--space-1);
   color: var(--colors-text);
   line-height: var(--line-heights-normal);
 }
