@@ -180,10 +180,12 @@ body {
 }
 
 .menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--colors-accent);
-  font-size: var(--font-sizes-4);
   cursor: pointer;
   padding: var(--space-1);
   transition: opacity var(--transitions-fast);
