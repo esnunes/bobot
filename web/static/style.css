@@ -290,6 +290,7 @@ body {
 .chat-input form {
   display: flex;
   align-items: center;
+  gap: var(--space-1);
   background: transparent;
   border: var(--borders-medium);
   border-radius: var(--radii-pill);
@@ -298,12 +299,13 @@ body {
 
 .chat-input input {
   flex: 1;
+  min-width: 0;
   border: none;
   outline: none;
   background: transparent;
   font-family: var(--fonts-body);
   font-size: var(--font-sizes-2);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) 0;
   color: var(--colors-text);
   line-height: var(--line-heights-normal);
 }
@@ -312,15 +314,14 @@ body {
   color: var(--colors-text-secondary);
 }
 
-.chat-input button {
-  width: var(--sizes-button-height);
-  height: var(--sizes-button-height);
+.input-action {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
   background: none;
   border: none;
-  color: var(--colors-border);
-  font-size: var(--font-sizes-3);
+  color: var(--colors-border-strong);
   cursor: pointer;
-  padding: var(--space-1);
   border-radius: var(--radii-pill);
   transition: color var(--transitions-fast);
   display: flex;
@@ -328,15 +329,8 @@ body {
   justify-content: center;
 }
 
-.chat-input button:hover,
-.chat-input button.active {
+.input-action:hover {
   color: var(--colors-accent);
-}
-
-.input-action {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
 }
 
 /* ============================================
