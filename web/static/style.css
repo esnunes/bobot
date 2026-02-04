@@ -333,6 +333,12 @@ body {
   color: var(--colors-accent);
 }
 
+.input-action {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+}
+
 /* ============================================
    MENU OVERLAY
    ============================================ */

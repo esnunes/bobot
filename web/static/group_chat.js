@@ -14,6 +14,7 @@ window.GroupChatClient = class GroupChatClient {
         this.menuOverlay = document.getElementById('menu-overlay');
         this.leaveBtn = document.getElementById('leave-btn');  // May be null if owner
         this.deleteBtn = document.getElementById('delete-btn');  // May be null if not owner
+        this.mentionBotBtn = document.getElementById('mention-bot-btn');
         this.isLoadingHistory = false;
         this.oldestMessageId = null;
         this.hasMoreHistory = true;
@@ -76,6 +77,10 @@ window.GroupChatClient = class GroupChatClient {
             this.deleteBtn.addEventListener('click', () => this.deleteGroup());
         }
 
+        if (this.mentionBotBtn) {
+            this.mentionBotBtn.addEventListener('click', () => this.mentionBot());
+        }
+
         this.messagesEl.addEventListener('scroll', () => {
             if (this.messagesEl.scrollTop < 100) {
                 this.loadMoreHistory();
@@ -90,13 +95,29 @@ window.GroupChatClient = class GroupChatClient {
         }
     }
 
+    mentionBot() {
+        const currentValue = this.input.value;
+        const mention = '@bobot ';
+
+        // Add mention at cursor position or append if no selection
+        if (this.input.selectionStart !== undefined) {
+            const start = this.input.selectionStart;
+            this.input.value = currentValue.slice(0, start) + mention + currentValue.slice(start);
+            this.input.selectionStart = this.input.selectionEnd = start + mention.length;
+        } else {
+            this.input.value = currentValue + mention;
+        }
+
+        this.input.focus();
+    }
+
     sendMessage() {
         const content = this.input.value.trim();
         if (!content) return;
 
         if (this.wsContainer.send({ content: content, group_id: this.groupId })) {
             this.input.value = '';
-            if (content.toLowerCase().includes('@assistant')) {
+            if (content.toLowerCase().includes('@bobot')) {
                 this.showTypingIndicator();
             }
         }
