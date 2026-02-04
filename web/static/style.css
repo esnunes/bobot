@@ -154,10 +154,11 @@ body {
 }
 
 .nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--colors-accent);
   text-decoration: none;
-  font-size: var(--font-sizes-1);
-  font-weight: var(--font-weights-medium);
   padding: var(--space-1);
   transition: opacity var(--transitions-fast);
 }
