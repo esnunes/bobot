@@ -286,11 +286,10 @@ body {
 .chat-input form {
   display: flex;
   align-items: center;
-  background: var(--colors-surface);
-  border: var(--borders-thin);
+  background: transparent;
+  border: var(--borders-medium);
   border-radius: var(--radii-pill);
   padding: var(--space-1);
-  box-shadow: var(--shadows-low);
 }
 
 .chat-input input {
