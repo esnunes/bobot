@@ -321,8 +321,8 @@ body {
 
 .input-action {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: var(--sizes-input-action);
+  height: var(--sizes-input-action);
   background: none;
   border: none;
   color: var(--colors-border-strong);
