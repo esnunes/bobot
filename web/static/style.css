@@ -222,7 +222,8 @@ body {
 }
 
 .message.assistant,
-.message.system {
+.message.system,
+.message.command {
   align-self: flex-start;
   align-items: flex-start;
 }
