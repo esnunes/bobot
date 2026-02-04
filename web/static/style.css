@@ -1,25 +1,26 @@
+/* ============================================
+   RESET & BASE
+   ============================================ */
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-:root {
-    --primary-color: #007AFF;
-    --bg-color: #f5f5f5;
-    --chat-bg: #ffffff;
-    --user-msg-bg: #007AFF;
-    --user-msg-color: #ffffff;
-    --assistant-msg-bg: #e9e9eb;
-    --assistant-msg-color: #000000;
-    --border-color: #e0e0e0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: var(--bg-color);
-    height: 100dvh;
-    overflow: hidden;
+  font-family: var(--fonts-body);
+  font-size: var(--font-sizes-2);
+  line-height: var(--line-heights-normal);
+  color: var(--colors-text);
+  background-color: var(--colors-background);
+  height: 100dvh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.hidden {
+  display: none !important;
 }
 
 /* Login Page */
@@ -72,10 +73,6 @@ body {
     color: #ff3b30;
     text-align: center;
     font-size: 14px;
-}
-
-.hidden {
-    display: none !important;
 }
 
 /* Chat Page */
