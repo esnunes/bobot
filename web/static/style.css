@@ -75,7 +75,7 @@ body {
 .login-form button {
   height: var(--sizes-button-height);
   background-color: var(--colors-accent);
-  color: var(--colors-surface);
+  color: var(--colors-background); /* Text on accent: Base */
   border: none;
   border-radius: var(--radii-pill);
   font-family: var(--fonts-body);
@@ -245,7 +245,6 @@ body {
 
 .message.user .message-bubble {
   background: var(--colors-accent-light);
-  border: var(--borders-accent);
 }
 
 /* Legacy message styling (for messages without bubble wrapper) */
@@ -260,7 +259,6 @@ body {
 
 .message.user:not(:has(.message-bubble)) {
   background: var(--colors-accent-light);
-  border: var(--borders-accent);
 }
 
 .message-sender {
@@ -501,7 +499,7 @@ body {
   font-size: var(--font-sizes-4);
   padding: var(--space-1) var(--space-2);
   background: var(--colors-accent);
-  color: var(--colors-surface);
+  color: var(--colors-background); /* Text on accent: Base */
   border: none;
   border-radius: var(--radii-pill);
   cursor: pointer;
@@ -612,7 +610,7 @@ body {
 
 .modal-actions button[type="submit"] {
   background: var(--colors-accent);
-  color: var(--colors-surface);
+  color: var(--colors-background); /* Text on accent: Base */
   border: none;
 }
 
@@ -638,7 +636,7 @@ body {
 
 .danger-btn {
   background-color: var(--colors-danger);
-  color: var(--colors-surface);
+  color: var(--colors-background); /* Text on danger: Base */
 }
 
 .danger-btn:hover {

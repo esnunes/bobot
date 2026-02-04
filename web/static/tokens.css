@@ -1,21 +1,22 @@
 :root {
   /* ============================================
-     COLORS - Palette "Soft Stone"
+     COLORS - Catppuccin Latte
+     https://github.com/catppuccin/catppuccin
      ============================================ */
-  --colors-background: #F4F3F2;
-  --colors-surface: #FFFFFF;
-  --colors-text: #1A1A1A;
-  --colors-text-secondary: #6B6B6B;
-  --colors-accent: #4A7C6F;
-  --colors-accent-hover: #3d6b5f;
-  --colors-accent-light: #E8F0EE;
-  --colors-border: #E5E4E1;
-  --colors-border-strong: #C5C4C1;
-  --colors-border-accent: #4A7C6F;
-  --colors-error: #D64545;
-  --colors-danger: #D64545;
-  --colors-danger-hover: #B83B3B;
-  --colors-overlay: rgba(0, 0, 0, 0.3);
+  --colors-background: #eff1f5;       /* Base */
+  --colors-surface: #e6e9ef;          /* Mantle */
+  --colors-text: #4c4f69;             /* Text */
+  --colors-text-secondary: #6c6f85;   /* Subtext0 */
+  --colors-accent: #1e66f5;           /* Blue */
+  --colors-accent-hover: #7287fd;     /* Lavender */
+  --colors-accent-light: #dce1fb;     /* Light Lavender tint */
+  --colors-border: #ccd0da;           /* Surface0 */
+  --colors-border-strong: #acb0be;    /* Surface2 */
+  --colors-border-accent: #7287fd;    /* Lavender */
+  --colors-error: #d20f39;            /* Red */
+  --colors-danger: #d20f39;           /* Red */
+  --colors-danger-hover: #e64553;     /* Maroon */
+  --colors-overlay: rgba(220, 224, 232, 0.7); /* Crust with opacity */
 
   /* ============================================
      TYPOGRAPHY
