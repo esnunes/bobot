@@ -148,7 +148,7 @@ func (e *Engine) ChatWithContext(ctx context.Context, conversation []string) (st
 	// Add system prompt for group context
 	systemPrompt := `You are a helpful AI assistant participating in a group chat.
 Messages are formatted as [Name]: message content.
-Only respond when specifically addressed with @assistant.
+Only respond when specifically addressed with @bobot.
 Keep responses concise and relevant to the conversation.`
 
 	resp, err := e.provider.Chat(ctx, &llm.ChatRequest{

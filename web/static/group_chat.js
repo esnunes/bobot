@@ -51,8 +51,8 @@ window.GroupChatClient = class GroupChatClient {
                     this.removeTypingIndicator();
                 }
                 this.addMessage(data, true);
-                // Show typing indicator after user message with @assistant is displayed
-                if (data.role === 'user' && data.content && data.content.toLowerCase().includes('@assistant')) {
+                // Show typing indicator after user message with @bobot is displayed
+                if (data.role === 'user' && data.content && data.content.toLowerCase().includes('@bobot')) {
                     this.showTypingIndicator();
                 }
             }
@@ -101,7 +101,7 @@ window.GroupChatClient = class GroupChatClient {
 
     mentionBot() {
         const currentValue = this.input.value;
-        const mention = '@assistant ';
+        const mention = '@bobot ';
 
         // Add mention at cursor position or append if no selection
         if (this.input.selectionStart !== undefined) {

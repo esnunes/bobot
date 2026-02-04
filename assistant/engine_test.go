@@ -158,7 +158,7 @@ func TestEngine_ChatWithConversation(t *testing.T) {
 	engine := NewEngine(mockProv, registry, nil, mockCtxProvider)
 
 	conversation := []string{
-		"[Alice]: Hello @assistant",
+		"[Alice]: Hello @bobot",
 		"[Bob]: Yes, please help us",
 	}
 
