@@ -2,7 +2,7 @@
   /* ============================================
      COLORS - Palette "Soft Stone"
      ============================================ */
-  --colors-background: #F7F6F3;
+  --colors-background: #F4F3F2;
   --colors-surface: #FFFFFF;
   --colors-text: #1A1A1A;
   --colors-text-secondary: #6B6B6B;
@@ -70,7 +70,7 @@
   --sizes-icon: 24px;
   --sizes-menu-width: 240px;
   --sizes-modal-min-width: 280px;
-  --sizes-max-message-width: 80%;
+  --sizes-max-message-width: 100%;
 
   /* ============================================
      BORDER RADII
