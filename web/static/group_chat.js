@@ -97,7 +97,7 @@ window.GroupChatClient = class GroupChatClient {
 
     mentionBot() {
         const currentValue = this.input.value;
-        const mention = '@bobot ';
+        const mention = '@assistant ';
 
         // Add mention at cursor position or append if no selection
         if (this.input.selectionStart !== undefined) {
@@ -117,7 +117,7 @@ window.GroupChatClient = class GroupChatClient {
 
         if (this.wsContainer.send({ content: content, group_id: this.groupId })) {
             this.input.value = '';
-            if (content.toLowerCase().includes('@bobot')) {
+            if (content.toLowerCase().includes('@assistant')) {
                 this.showTypingIndicator();
             }
         }
