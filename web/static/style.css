@@ -159,7 +159,7 @@ body {
   justify-content: center;
   color: var(--colors-accent);
   text-decoration: none;
-  padding: var(--space-1);
+  padding: var(--space-1) 0;
   transition: opacity var(--transitions-fast);
 }
 
@@ -168,9 +168,11 @@ body {
 }
 
 .back-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--colors-accent);
   text-decoration: none;
-  font-size: var(--font-sizes-3);
   padding: var(--space-1);
   transition: opacity var(--transitions-fast);
 }
