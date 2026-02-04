@@ -51,6 +51,10 @@ window.GroupChatClient = class GroupChatClient {
                     this.removeTypingIndicator();
                 }
                 this.addMessage(data, true);
+                // Show typing indicator after user message with @assistant is displayed
+                if (data.role === 'user' && data.content && data.content.toLowerCase().includes('@assistant')) {
+                    this.showTypingIndicator();
+                }
             }
         };
         document.addEventListener('bobot:group-message', this.handleGroupMessage);
@@ -117,9 +121,6 @@ window.GroupChatClient = class GroupChatClient {
 
         if (this.wsContainer.send({ content: content, group_id: this.groupId })) {
             this.input.value = '';
-            if (content.toLowerCase().includes('@assistant')) {
-                this.showTypingIndicator();
-            }
         }
     }
 
