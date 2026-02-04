@@ -1,9 +1,9 @@
 {{define "content"}}
 <div class="groups-container" data-page="groups">
     <header class="groups-header">
-        <a href="/chat" class="back-link">&larr; Chat</a>
+        <a href="/chat" class="back-link" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
         <h1>Groups</h1>
-        <button id="create-group-btn" class="create-btn">+</button>
+        <button id="menu-btn" class="menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     </header>
 
     <main class="groups-list">
@@ -14,10 +14,15 @@
                 <span class="group-members">{{.MemberCount}} member{{if ne .MemberCount 1}}s{{end}}</span>
             </a>
             {{end}}
-        {{else}}
-            <div class="empty">No groups yet. Create one!</div>
         {{end}}
+        <button id="create-group-btn" class="card-action">+ Create new group</button>
     </main>
+</div>
+
+<div id="menu-overlay" class="menu-overlay hidden">
+    <div class="menu">
+        <button id="logout-btn" hx-post="/logout" hx-on::before-request="htmx.trigger(document.body, 'bobot:logout')">Logout</button>
+    </div>
 </div>
 
 <div id="create-group-modal" class="modal hidden">
@@ -35,6 +40,21 @@
 
 <script>
 (function() {
+    // Menu overlay
+    const menuOverlay = document.getElementById('menu-overlay');
+    const menuBtn = document.getElementById('menu-btn');
+
+    menuBtn.addEventListener('click', () => {
+        menuOverlay.classList.remove('hidden');
+    });
+
+    menuOverlay.addEventListener('click', (e) => {
+        if (e.target === menuOverlay) {
+            menuOverlay.classList.add('hidden');
+        }
+    });
+
+    // Create group modal
     const modal = document.getElementById('create-group-modal');
     const nameInput = modal.querySelector('input[name="name"]');
 

@@ -217,7 +217,7 @@ func (s *Server) handleGroupChatMessage(ctx context.Context, userID, groupID int
 }
 
 func shouldTriggerAssistant(content string) bool {
-	return strings.Contains(strings.ToLower(content), "@assistant")
+	return strings.Contains(strings.ToLower(content), "@bobot")
 }
 
 func (s *Server) handleGroupAssistantResponse(ctx context.Context, groupID int64) {
