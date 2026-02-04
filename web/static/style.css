@@ -285,7 +285,7 @@ body {
 
 .chat-input form {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   background: var(--colors-surface);
   border: var(--borders-thin);
   border-radius: var(--radii-pill);
