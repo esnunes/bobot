@@ -95,41 +95,98 @@ body {
   font-size: var(--font-sizes-1);
 }
 
-/* Chat Page */
+/* ============================================
+   CHAT CONTAINER
+   ============================================ */
 .chat-container {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    background-color: var(--chat-bg);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: var(--colors-background);
 
-    &:has(input:focus) {
-        height: 100dvh;
-    }
+  &:has(input:focus) {
+    height: 100dvh;
+  }
 }
 
+/* ============================================
+   HEADER
+   ============================================ */
 .chat-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: calc(15px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 15px calc(20px + env(safe-area-inset-left));
-    background-color: var(--primary-color);
-    color: white;
-    position: sticky;
-    top: 0;
-    z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: calc(var(--space-2) + env(safe-area-inset-top)) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-2) calc(var(--space-3) + env(safe-area-inset-left));
+  background-color: var(--colors-background);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-indices-header);
 }
 
 .chat-header h1 {
-    font-size: 1.2rem;
-    font-weight: 600;
+  font-size: var(--font-sizes-3);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-text);
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.header-btn {
+  background: none;
+  border: none;
+  color: var(--colors-accent);
+  font-size: var(--font-sizes-1);
+  font-weight: var(--font-weights-medium);
+  padding: var(--space-1);
+  cursor: pointer;
+  transition: opacity var(--transitions-fast);
+}
+
+.header-btn:hover {
+  opacity: var(--opacities-muted);
+}
+
+.nav-link {
+  color: var(--colors-accent);
+  text-decoration: none;
+  font-size: var(--font-sizes-1);
+  font-weight: var(--font-weights-medium);
+  padding: var(--space-1);
+  transition: opacity var(--transitions-fast);
+}
+
+.nav-link:hover {
+  opacity: var(--opacities-muted);
+}
+
+.back-link {
+  color: var(--colors-accent);
+  text-decoration: none;
+  font-size: var(--font-sizes-3);
+  padding: var(--space-1);
+  transition: opacity var(--transitions-fast);
+}
+
+.back-link:hover {
+  opacity: var(--opacities-muted);
 }
 
 .menu-btn {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 1.5rem;
-    cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--colors-accent);
+  font-size: var(--font-sizes-4);
+  cursor: pointer;
+  padding: var(--space-1);
+  transition: opacity var(--transitions-fast);
+}
+
+.menu-btn:hover {
+  opacity: var(--opacities-muted);
 }
 
 .chat-messages {
@@ -268,30 +325,6 @@ body {
     30% {
         transform: translateY(-4px);
     }
-}
-
-/* Navigation */
-.header-nav {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.nav-link {
-    color: inherit;
-    text-decoration: none;
-    padding: 0.5rem;
-}
-
-.nav-link:hover {
-    text-decoration: underline;
-}
-
-.back-link {
-    color: inherit;
-    text-decoration: none;
-    font-size: 1.5rem;
-    padding: 0.5rem;
 }
 
 /* Groups Page */
