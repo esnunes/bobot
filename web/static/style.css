@@ -503,60 +503,93 @@ body {
   color: var(--colors-accent);
 }
 
-/* Modal */
+/* ============================================
+   MODAL
+   ============================================ */
 .modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
+  position: fixed;
+  inset: 0;
+  background: var(--colors-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-indices-modal);
+  padding: var(--space-3);
 }
 
 .modal-content {
-    background: white;
-    padding: 2rem;
-    border-radius: 8px;
-    min-width: 300px;
-    max-width: 90%;
+  background: var(--colors-surface);
+  padding: var(--space-3);
+  border-radius: var(--radii-xl);
+  box-shadow: var(--shadows-high);
+  min-width: var(--sizes-modal-min-width);
+  max-width: 90%;
 }
 
 .modal-content h2 {
-    margin-bottom: 1rem;
+  font-size: var(--font-sizes-4);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-text);
+  margin-bottom: var(--space-2);
 }
 
 .modal-content input {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    font-size: 16px;
-    margin-bottom: 1rem;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  height: var(--sizes-input-height);
+  border: var(--borders-thin);
+  border-radius: var(--radii-pill);
+  font-family: var(--fonts-body);
+  font-size: var(--font-sizes-2);
+  background: var(--colors-surface);
+  color: var(--colors-text);
+  outline: none;
+  margin-bottom: var(--space-2);
+  transition: border-color var(--transitions-fast);
+}
+
+.modal-content input:focus {
+  border-color: var(--colors-accent);
+}
+
+.modal-content input::placeholder {
+  color: var(--colors-text-secondary);
 }
 
 .modal-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: flex-end;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
 }
 
 .modal-actions button {
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radii-pill);
+  cursor: pointer;
+  font-family: var(--fonts-body);
+  font-size: var(--font-sizes-1);
+  font-weight: var(--font-weights-medium);
+  transition: background-color var(--transitions-fast);
 }
 
 .modal-actions button[type="button"] {
-    background: #e0e0e0;
-    border: none;
+  background: transparent;
+  color: var(--colors-accent);
+  border: none;
+}
+
+.modal-actions button[type="button"]:hover {
+  opacity: var(--opacities-muted);
 }
 
 .modal-actions button[type="submit"] {
-    background: var(--primary-color);
-    color: white;
-    border: none;
+  background: var(--colors-accent);
+  color: var(--colors-surface);
+  border: none;
+}
+
+.modal-actions button[type="submit"]:hover {
+  background-color: var(--colors-accent-hover);
 }
 
 .members-list {
