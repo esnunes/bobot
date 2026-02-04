@@ -173,7 +173,7 @@ body {
   justify-content: center;
   color: var(--colors-accent);
   text-decoration: none;
-  padding: var(--space-1);
+  padding: var(--space-1) var(--space-1) var(--space-1) 0;
   transition: opacity var(--transitions-fast);
 }
 
@@ -189,7 +189,7 @@ body {
   border: none;
   color: var(--colors-accent);
   cursor: pointer;
-  padding: var(--space-1);
+  padding: var(--space-1) 0 var(--space-1) var(--space-1);
   transition: opacity var(--transitions-fast);
 }
 
@@ -202,6 +202,7 @@ body {
    ============================================ */
 .chat-messages {
   flex: 1;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: var(--space-3) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-3) calc(var(--space-3) + env(safe-area-inset-left));
   display: flex;
@@ -239,7 +240,7 @@ body {
   box-shadow: var(--shadows-low);
   background: var(--colors-surface);
   line-height: var(--line-heights-normal);
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .message.user .message-bubble {
@@ -254,7 +255,7 @@ body {
   box-shadow: var(--shadows-low);
   background: var(--colors-surface);
   line-height: var(--line-heights-normal);
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .message.user:not(:has(.message-bubble)) {
