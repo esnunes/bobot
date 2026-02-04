@@ -1,9 +1,9 @@
 {{define "content"}}
 <div class="groups-container" data-page="groups">
     <header class="groups-header">
-        <a href="/chat" class="back-link">&larr; Chat</a>
+        <a href="/chat" class="back-link">&larr;</a>
         <h1>Groups</h1>
-        <button id="create-group-btn" class="create-btn">+</button>
+        <button id="menu-btn" class="menu-btn">&#9776;</button>
     </header>
 
     <main class="groups-list">
@@ -14,10 +14,15 @@
                 <span class="group-members">{{.MemberCount}} member{{if ne .MemberCount 1}}s{{end}}</span>
             </a>
             {{end}}
-        {{else}}
-            <div class="empty">No groups yet. Create one!</div>
         {{end}}
+        <button id="create-group-btn" class="card-action">+ Create new group</button>
     </main>
+</div>
+
+<div id="menu-overlay" class="menu-overlay hidden">
+    <div class="menu">
+        <button id="logout-btn" hx-post="/logout" hx-on::before-request="htmx.trigger(document.body, 'bobot:logout')">Logout</button>
+    </div>
 </div>
 
 <div id="create-group-modal" class="modal hidden">
@@ -35,6 +40,21 @@
 
 <script>
 (function() {
+    // Menu overlay
+    const menuOverlay = document.getElementById('menu-overlay');
+    const menuBtn = document.getElementById('menu-btn');
+
+    menuBtn.addEventListener('click', () => {
+        menuOverlay.classList.remove('hidden');
+    });
+
+    menuOverlay.addEventListener('click', (e) => {
+        if (e.target === menuOverlay) {
+            menuOverlay.classList.add('hidden');
+        }
+    });
+
+    // Create group modal
     const modal = document.getElementById('create-group-modal');
     const nameInput = modal.querySelector('input[name="name"]');
 

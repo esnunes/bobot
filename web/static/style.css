@@ -113,8 +113,8 @@ body {
    HEADER
    ============================================ */
 .chat-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: calc(var(--space-2) + env(safe-area-inset-top)) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-2) calc(var(--space-3) + env(safe-area-inset-left));
   background-color: var(--colors-background);
@@ -123,16 +123,19 @@ body {
   z-index: var(--z-indices-header);
 }
 
+.chat-header > :first-child {
+  justify-self: start;
+}
+
+.chat-header > :last-child {
+  justify-self: end;
+}
+
 .chat-header h1 {
   font-size: var(--font-sizes-3);
   font-weight: var(--font-weights-medium);
   color: var(--colors-text);
-}
-
-.header-nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  text-align: center;
 }
 
 .header-btn {
@@ -430,16 +433,25 @@ body {
 }
 
 .groups-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: var(--space-2) 0;
+}
+
+.groups-header > :first-child {
+  justify-self: start;
+}
+
+.groups-header > :last-child {
+  justify-self: end;
 }
 
 .groups-header h1 {
   font-size: var(--font-sizes-3);
   font-weight: var(--font-weights-medium);
   color: var(--colors-text);
+  text-align: center;
 }
 
 .groups-list {
@@ -492,6 +504,7 @@ body {
 }
 
 .card-action {
+  width: 100%;
   background: transparent;
   border: var(--borders-dashed);
   border-radius: var(--radii-lg);
