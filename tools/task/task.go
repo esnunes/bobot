@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/esnunes/bobot/auth"
+	"github.com/esnunes/bobot/tools"
 )
 
 type TaskTool struct {
@@ -56,16 +57,32 @@ func (t *TaskTool) AdminOnly() bool {
 	return false
 }
 
-func (t *TaskTool) Execute(ctx context.Context, input map[string]any) (string, error) {
+func (t *TaskTool) Execute(ctx context.Context, input tools.ExecuteInput) (string, error) {
 	userData := auth.UserDataFromContext(ctx)
 	if userData.UserID == 0 {
 		return "", fmt.Errorf("user_id not found in context")
 	}
 
-	command, _ := input["command"].(string)
-	projectName, _ := input["project"].(string)
-	title, _ := input["title"].(string)
-	status, _ := input["status"].(string)
+	parts := strings.Fields(input.Args)
+	if len(parts) < 2 {
+		return "", fmt.Errorf("missing arguments. Usage: /task <command> <project> [title] [--status=pending|done]")
+	}
+
+	command := parts[0]
+	projectName := parts[1]
+
+	// Parse optional title and status from remaining parts
+	var title, status string
+	remaining := parts[2:]
+	var titleParts []string
+	for _, p := range remaining {
+		if strings.HasPrefix(p, "--status=") {
+			status = strings.TrimPrefix(p, "--status=")
+		} else {
+			titleParts = append(titleParts, p)
+		}
+	}
+	title = strings.Join(titleParts, " ")
 
 	project, err := t.db.GetOrCreateProject(userData.UserID, projectName)
 	if err != nil {

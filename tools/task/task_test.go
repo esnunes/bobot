@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/esnunes/bobot/auth"
+	"github.com/esnunes/bobot/tools"
 )
 
 func setupTestTool(t *testing.T) *TaskTool {
@@ -27,11 +28,7 @@ func TestTaskTool_Create(t *testing.T) {
 	tool := setupTestTool(t)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command": "create",
-		"project": "groceries",
-		"title":   "milk",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "create groceries milk"})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -45,21 +42,10 @@ func TestTaskTool_List(t *testing.T) {
 	tool := setupTestTool(t)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	tool.Execute(ctx, map[string]interface{}{
-		"command": "create",
-		"project": "groceries",
-		"title":   "milk",
-	})
-	tool.Execute(ctx, map[string]interface{}{
-		"command": "create",
-		"project": "groceries",
-		"title":   "eggs",
-	})
+	tool.Execute(ctx, tools.ExecuteInput{Args: "create groceries milk"})
+	tool.Execute(ctx, tools.ExecuteInput{Args: "create groceries eggs"})
 
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command": "list",
-		"project": "groceries",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "list groceries"})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -73,18 +59,9 @@ func TestTaskTool_Update(t *testing.T) {
 	tool := setupTestTool(t)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	tool.Execute(ctx, map[string]interface{}{
-		"command": "create",
-		"project": "groceries",
-		"title":   "milk",
-	})
+	tool.Execute(ctx, tools.ExecuteInput{Args: "create groceries milk"})
 
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command": "update",
-		"project": "groceries",
-		"title":   "milk",
-		"status":  "done",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "update groceries milk --status=done"})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -98,17 +75,9 @@ func TestTaskTool_Delete(t *testing.T) {
 	tool := setupTestTool(t)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	tool.Execute(ctx, map[string]interface{}{
-		"command": "create",
-		"project": "groceries",
-		"title":   "milk",
-	})
+	tool.Execute(ctx, tools.ExecuteInput{Args: "create groceries milk"})
 
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command": "delete",
-		"project": "groceries",
-		"title":   "milk",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "delete groceries milk"})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
