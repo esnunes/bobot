@@ -8,6 +8,7 @@ import (
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
+	"github.com/esnunes/bobot/tools"
 )
 
 func setupTestDB(t *testing.T) *db.CoreDB {
@@ -31,9 +32,7 @@ func TestUserTool_InviteCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command": "invite",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "invite"})
 	if err != nil {
 		t.Fatalf("failed to execute invite: %v", err)
 	}
@@ -56,10 +55,7 @@ func TestUserTool_BlockCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command":  "block",
-		"username": "victim",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "block victim"})
 	if err != nil {
 		t.Fatalf("failed to execute block: %v", err)
 	}
@@ -87,9 +83,7 @@ func TestUserTool_NonAdminDenied(t *testing.T) {
 		Role:   "user",
 	})
 
-	_, err := tool.Execute(ctx, map[string]interface{}{
-		"command": "list",
-	})
+	_, err := tool.Execute(ctx, tools.ExecuteInput{Args: "list"})
 	if err == nil {
 		t.Error("expected error for non-admin")
 	}
@@ -110,10 +104,7 @@ func TestUserTool_CannotBlockSelf(t *testing.T) {
 		Role:   "admin",
 	})
 
-	_, err := tool.Execute(ctx, map[string]interface{}{
-		"command":  "block",
-		"username": "admin",
-	})
+	_, err := tool.Execute(ctx, tools.ExecuteInput{Args: "block admin"})
 	if err == nil {
 		t.Error("expected error when blocking self")
 	}
@@ -132,9 +123,7 @@ func TestUserTool_ListCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command": "list",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "list"})
 	if err != nil {
 		t.Fatalf("failed to execute list: %v", err)
 	}
@@ -158,10 +147,7 @@ func TestUserTool_UnblockCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command":  "unblock",
-		"username": "blocked",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "unblock blocked"})
 	if err != nil {
 		t.Fatalf("failed to execute unblock: %v", err)
 	}
@@ -191,9 +177,7 @@ func TestUserTool_InvitesCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command": "invites",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "invites"})
 	if err != nil {
 		t.Fatalf("failed to execute invites: %v", err)
 	}
@@ -216,10 +200,7 @@ func TestUserTool_RevokeCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, map[string]interface{}{
-		"command": "revoke",
-		"code":    "torevoke",
-	})
+	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "revoke torevoke"})
 	if err != nil {
 		t.Fatalf("failed to execute revoke: %v", err)
 	}

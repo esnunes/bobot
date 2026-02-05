@@ -9,6 +9,7 @@ import (
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
+	"github.com/esnunes/bobot/tools"
 )
 
 type UserTool struct {
@@ -54,30 +55,37 @@ func (t *UserTool) AdminOnly() bool {
 	return true
 }
 
-func (t *UserTool) Execute(ctx context.Context, input map[string]any) (string, error) {
+func (t *UserTool) Execute(ctx context.Context, input tools.ExecuteInput) (string, error) {
 	userData := auth.UserDataFromContext(ctx)
 	// Check admin role
 	if userData.Role != "admin" {
 		return "", fmt.Errorf("this command requires admin privileges")
 	}
 
-	command, _ := input["command"].(string)
-	username, _ := input["username"].(string)
-	code, _ := input["code"].(string)
+	parts := strings.Fields(input.Args)
+	if len(parts) == 0 {
+		return "", fmt.Errorf("missing command. Usage: /user <command>")
+	}
+
+	command := parts[0]
+	var arg string
+	if len(parts) > 1 {
+		arg = parts[1]
+	}
 
 	switch command {
 	case "invite":
 		return t.invite(userData.UserID)
 	case "block":
-		return t.block(userData.UserID, username)
+		return t.block(userData.UserID, arg)
 	case "unblock":
-		return t.unblock(username)
+		return t.unblock(arg)
 	case "list":
 		return t.list()
 	case "invites":
 		return t.listInvites()
 	case "revoke":
-		return t.revoke(code)
+		return t.revoke(arg)
 	default:
 		return "", fmt.Errorf("unknown command: %s", command)
 	}
