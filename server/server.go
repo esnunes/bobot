@@ -63,15 +63,15 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /api/messages/history", s.sessionMiddleware(s.handleMessageHistory))
 	s.router.HandleFunc("GET /api/messages/sync", s.sessionMiddleware(s.handleMessageSync))
 
-	// Group routes (require auth)
-	s.router.HandleFunc("POST /api/groups", s.sessionMiddleware(s.handleCreateGroup))
-	s.router.HandleFunc("GET /api/groups", s.sessionMiddleware(s.handleListGroups))
-	s.router.HandleFunc("GET /api/groups/{id}", s.sessionMiddleware(s.handleGetGroup))
-	s.router.HandleFunc("DELETE /api/groups/{id}", s.sessionMiddleware(s.handleDeleteGroup))
-	s.router.HandleFunc("POST /api/groups/{id}/members", s.sessionMiddleware(s.handleAddGroupMember))
-	s.router.HandleFunc("DELETE /api/groups/{id}/members/{userId}", s.sessionMiddleware(s.handleRemoveGroupMember))
-	s.router.HandleFunc("GET /api/groups/{id}/messages/history", s.sessionMiddleware(s.handleGroupMessageHistory))
-	s.router.HandleFunc("GET /api/groups/{id}/messages/sync", s.sessionMiddleware(s.handleGroupMessageSync))
+	// Topic routes (require auth)
+	s.router.HandleFunc("POST /api/topics", s.sessionMiddleware(s.handleCreateTopic))
+	s.router.HandleFunc("GET /api/topics", s.sessionMiddleware(s.handleListTopics))
+	s.router.HandleFunc("GET /api/topics/{id}", s.sessionMiddleware(s.handleGetTopic))
+	s.router.HandleFunc("DELETE /api/topics/{id}", s.sessionMiddleware(s.handleDeleteTopic))
+	s.router.HandleFunc("POST /api/topics/{id}/members", s.sessionMiddleware(s.handleAddTopicMember))
+	s.router.HandleFunc("DELETE /api/topics/{id}/members/{userId}", s.sessionMiddleware(s.handleRemoveTopicMember))
+	s.router.HandleFunc("GET /api/topics/{id}/messages/history", s.sessionMiddleware(s.handleTopicMessageHistory))
+	s.router.HandleFunc("GET /api/topics/{id}/messages/sync", s.sessionMiddleware(s.handleTopicMessageSync))
 
 	// Page routes
 	s.router.HandleFunc("GET /{$}", s.handleLoginPage)
@@ -80,8 +80,8 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /signup", s.handleSignupPage)
 	s.router.HandleFunc("POST /signup", s.handleSignupPage)
 	s.router.HandleFunc("GET /chat", s.sessionMiddleware(s.handleChatPage))
-	s.router.HandleFunc("GET /groups", s.sessionMiddleware(s.handleGroupsPage))
-	s.router.HandleFunc("GET /groups/{id}", s.sessionMiddleware(s.handleGroupChatPage))
+	s.router.HandleFunc("GET /topics", s.sessionMiddleware(s.handleTopicsPage))
+	s.router.HandleFunc("GET /topics/{id}", s.sessionMiddleware(s.handleTopicChatPage))
 
 	// Static files
 	staticFS, _ := fs.Sub(web.FS, "static")

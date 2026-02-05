@@ -11,7 +11,7 @@ import (
 	"github.com/esnunes/bobot/web"
 )
 
-type GroupView struct {
+type TopicView struct {
 	ID          int64
 	Name        string
 	MemberCount int
@@ -36,11 +36,11 @@ type PageData struct {
 	Title         string
 	Error         string
 	Code          string
-	GroupID       int64
-	Groups        []GroupView
+	TopicID       int64
+	Topics        []TopicView
 	Messages      []MessageView
 	Members       []MemberView
-	GroupName     string
+	TopicName     string
 	OwnerID       int64
 	CurrentUserID int64
 }
@@ -64,17 +64,17 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["chat"] = chatTmpl
 
-	groupsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/groups.html")
+	topicsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/topics.html")
 	if err != nil {
 		return err
 	}
-	s.templates["groups"] = groupsTmpl
+	s.templates["topics"] = topicsTmpl
 
-	groupChatTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/group_chat.html")
+	topicChatTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/topic_chat.html")
 	if err != nil {
 		return err
 	}
-	s.templates["group_chat"] = groupChatTmpl
+	s.templates["topic_chat"] = topicChatTmpl
 
 	authTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/authenticated.html")
 	if err != nil {
@@ -173,29 +173,29 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleGroupsPage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTopicsPage(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 
-	groups, err := s.db.GetUserGroups(userData.UserID)
+	topics, err := s.db.GetUserTopics(userData.UserID)
 	if err != nil {
-		http.Error(w, "failed to load groups", http.StatusInternalServerError)
+		http.Error(w, "failed to load topics", http.StatusInternalServerError)
 		return
 	}
 
-	groupViews := make([]GroupView, 0, len(groups))
-	for _, g := range groups {
-		members, _ := s.db.GetGroupMembers(g.ID)
-		groupViews = append(groupViews, GroupView{
-			ID:          g.ID,
-			Name:        g.Name,
+	topicViews := make([]TopicView, 0, len(topics))
+	for _, t := range topics {
+		members, _ := s.db.GetTopicMembers(t.ID)
+		topicViews = append(topicViews, TopicView{
+			ID:          t.ID,
+			Name:        t.Name,
 			MemberCount: len(members),
 		})
 	}
 
-	s.templates["groups"].Execute(w, PageData{Title: "Groups", Groups: groupViews})
+	s.templates["topics"].Execute(w, PageData{Title: "Topics", Topics: topicViews})
 }
 
-func (s *Server) handleGroupChatPage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 
 	parts := strings.Split(r.URL.Path, "/")
@@ -203,26 +203,26 @@ func (s *Server) handleGroupChatPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-	groupID, err := strconv.ParseInt(parts[2], 10, 64)
+	topicID, err := strconv.ParseInt(parts[2], 10, 64)
 	if err != nil {
-		http.Error(w, "invalid group id", http.StatusBadRequest)
+		http.Error(w, "invalid topic id", http.StatusBadRequest)
 		return
 	}
 
 	// Check membership
-	isMember, err := s.db.IsGroupMember(groupID, userData.UserID)
+	isMember, err := s.db.IsTopicMember(topicID, userData.UserID)
 	if err != nil || !isMember {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
-	group, err := s.db.GetGroupByID(groupID)
+	topic, err := s.db.GetTopicByID(topicID)
 	if err != nil {
-		http.Error(w, "group not found", http.StatusNotFound)
+		http.Error(w, "topic not found", http.StatusNotFound)
 		return
 	}
 
-	dbMembers, _ := s.db.GetGroupMembers(groupID)
+	dbMembers, _ := s.db.GetTopicMembers(topicID)
 	members := make([]MemberView, 0, len(dbMembers))
 	for _, m := range dbMembers {
 		members = append(members, MemberView{
@@ -232,7 +232,7 @@ func (s *Server) handleGroupChatPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	dbMessages, _ := s.db.GetGroupRecentMessages(groupID, 50)
+	dbMessages, _ := s.db.GetTopicRecentMessages(topicID, 50)
 	messages := make([]MessageView, 0, len(dbMessages))
 	for _, m := range dbMessages {
 		mv := MessageView{
@@ -250,11 +250,11 @@ func (s *Server) handleGroupChatPage(w http.ResponseWriter, r *http.Request) {
 		messages = append(messages, mv)
 	}
 
-	s.templates["group_chat"].Execute(w, PageData{
-		Title:         "Group Chat",
-		GroupID:       groupID,
-		GroupName:     group.Name,
-		OwnerID:       group.OwnerID,
+	s.templates["topic_chat"].Execute(w, PageData{
+		Title:         "Topic Chat",
+		TopicID:       topicID,
+		TopicName:     topic.Name,
+		OwnerID:       topic.OwnerID,
 		CurrentUserID: userData.UserID,
 		Members:       members,
 		Messages:      messages,

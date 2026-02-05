@@ -203,14 +203,14 @@ func TestChatWebSocket_SlashCommand(t *testing.T) {
 	}
 }
 
-func TestGroupMessage(t *testing.T) {
-	// This test verifies the message struct accepts group_id
+func TestTopicMessage(t *testing.T) {
+	// This test verifies the message struct accepts topic_id
 	msg := chatMessage{
 		Content: "Hello",
-		GroupID: ptr(int64(5)),
+		TopicID: ptr(int64(5)),
 	}
-	if msg.GroupID == nil || *msg.GroupID != 5 {
-		t.Error("expected group_id to be 5")
+	if msg.TopicID == nil || *msg.TopicID != 5 {
+		t.Error("expected topic_id to be 5")
 	}
 }
 

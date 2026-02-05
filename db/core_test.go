@@ -316,7 +316,7 @@ func TestCoreDB_ChunkReset(t *testing.T) {
 	// Verify msg4 is now chunk start (ctx=0)
 	// msg4 is the 4th message overall (OFFSET 3 from the start)
 	var msg4Ctx int
-	db.db.QueryRow("SELECT context_tokens FROM messages WHERE group_id IS NULL ORDER BY id ASC LIMIT 1 OFFSET 3").Scan(&msg4Ctx)
+	db.db.QueryRow("SELECT context_tokens FROM messages WHERE topic_id IS NULL ORDER BY id ASC LIMIT 1 OFFSET 3").Scan(&msg4Ctx)
 	if msg4Ctx != 0 {
 		t.Errorf("expected msg4 context_tokens=0 (chunk start), got %d", msg4Ctx)
 	}
@@ -324,7 +324,7 @@ func TestCoreDB_ChunkReset(t *testing.T) {
 	// Verify msg5 was updated (ctx=9)
 	// msg5 is the 5th message overall (OFFSET 4 from the start)
 	var msg5Ctx int
-	db.db.QueryRow("SELECT context_tokens FROM messages WHERE group_id IS NULL ORDER BY id ASC LIMIT 1 OFFSET 4").Scan(&msg5Ctx)
+	db.db.QueryRow("SELECT context_tokens FROM messages WHERE topic_id IS NULL ORDER BY id ASC LIMIT 1 OFFSET 4").Scan(&msg5Ctx)
 	if msg5Ctx != 9 {
 		t.Errorf("expected msg5 context_tokens=9 after reset, got %d", msg5Ctx)
 	}
@@ -636,100 +636,100 @@ func TestCoreDB_ListUsers(t *testing.T) {
 	}
 }
 
-func TestCreateGroup(t *testing.T) {
+func TestCreateTopic(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
 
 	user, _ := db.CreateUser("owner", "hash")
 
-	group, err := db.CreateGroup("Test Group", user.ID)
+	topic, err := db.CreateTopic("Test Topic", user.ID)
 	if err != nil {
-		t.Fatalf("CreateGroup failed: %v", err)
+		t.Fatalf("CreateTopic failed: %v", err)
 	}
 
-	if group.ID == 0 {
-		t.Error("expected non-zero group ID")
+	if topic.ID == 0 {
+		t.Error("expected non-zero topic ID")
 	}
-	if group.Name != "Test Group" {
-		t.Errorf("expected name 'Test Group', got %q", group.Name)
+	if topic.Name != "Test Topic" {
+		t.Errorf("expected name 'Test Topic', got %q", topic.Name)
 	}
-	if group.OwnerID != user.ID {
-		t.Errorf("expected owner_id %d, got %d", user.ID, group.OwnerID)
+	if topic.OwnerID != user.ID {
+		t.Errorf("expected owner_id %d, got %d", user.ID, topic.OwnerID)
 	}
-	if group.DeletedAt != nil {
-		t.Error("expected nil deleted_at for new group")
+	if topic.DeletedAt != nil {
+		t.Error("expected nil deleted_at for new topic")
 	}
 }
 
-func TestAddGroupMember(t *testing.T) {
+func TestAddTopicMember(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
 
 	owner, _ := db.CreateUser("owner", "hash")
 	member, _ := db.CreateUser("member", "hash")
-	group, _ := db.CreateGroup("Test Group", owner.ID)
+	topic, _ := db.CreateTopic("Test Topic", owner.ID)
 
-	err := db.AddGroupMember(group.ID, member.ID)
+	err := db.AddTopicMember(topic.ID, member.ID)
 	if err != nil {
-		t.Fatalf("AddGroupMember failed: %v", err)
+		t.Fatalf("AddTopicMember failed: %v", err)
 	}
 
 	// Adding same member again should fail or be idempotent
-	err = db.AddGroupMember(group.ID, member.ID)
+	err = db.AddTopicMember(topic.ID, member.ID)
 	// SQLite will error on duplicate primary key
 	if err == nil {
 		t.Error("expected error when adding duplicate member")
 	}
 }
 
-func TestRemoveGroupMember(t *testing.T) {
+func TestRemoveTopicMember(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
 
 	owner, _ := db.CreateUser("owner", "hash")
 	member, _ := db.CreateUser("member", "hash")
-	group, _ := db.CreateGroup("Test Group", owner.ID)
-	db.AddGroupMember(group.ID, member.ID)
+	topic, _ := db.CreateTopic("Test Topic", owner.ID)
+	db.AddTopicMember(topic.ID, member.ID)
 
-	err := db.RemoveGroupMember(group.ID, member.ID)
+	err := db.RemoveTopicMember(topic.ID, member.ID)
 	if err != nil {
-		t.Fatalf("RemoveGroupMember failed: %v", err)
+		t.Fatalf("RemoveTopicMember failed: %v", err)
 	}
 
 	// Verify member is removed by checking membership
-	isMember, _ := db.IsGroupMember(group.ID, member.ID)
+	isMember, _ := db.IsTopicMember(topic.ID, member.ID)
 	if isMember {
 		t.Error("expected member to be removed")
 	}
 }
 
-func TestGetGroupByID(t *testing.T) {
+func TestGetTopicByID(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
 
 	owner, _ := db.CreateUser("owner", "hash")
-	created, _ := db.CreateGroup("Test Group", owner.ID)
+	created, _ := db.CreateTopic("Test Topic", owner.ID)
 
-	group, err := db.GetGroupByID(created.ID)
+	topic, err := db.GetTopicByID(created.ID)
 	if err != nil {
-		t.Fatalf("GetGroupByID failed: %v", err)
+		t.Fatalf("GetTopicByID failed: %v", err)
 	}
-	if group.Name != "Test Group" {
-		t.Errorf("expected name 'Test Group', got %q", group.Name)
+	if topic.Name != "Test Topic" {
+		t.Errorf("expected name 'Test Topic', got %q", topic.Name)
 	}
 
 	// Test not found
-	_, err = db.GetGroupByID(9999)
+	_, err = db.GetTopicByID(9999)
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
 
-func TestGetUserGroups(t *testing.T) {
+func TestGetUserTopics(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
@@ -737,115 +737,115 @@ func TestGetUserGroups(t *testing.T) {
 	owner, _ := db.CreateUser("owner", "hash")
 	member, _ := db.CreateUser("member", "hash")
 
-	group1, _ := db.CreateGroup("Group 1", owner.ID)
-	group2, _ := db.CreateGroup("Group 2", owner.ID)
-	db.AddGroupMember(group1.ID, member.ID)
-	db.AddGroupMember(group2.ID, member.ID)
+	topic1, _ := db.CreateTopic("Topic 1", owner.ID)
+	topic2, _ := db.CreateTopic("Topic 2", owner.ID)
+	db.AddTopicMember(topic1.ID, member.ID)
+	db.AddTopicMember(topic2.ID, member.ID)
 
-	groups, err := db.GetUserGroups(member.ID)
+	topics, err := db.GetUserTopics(member.ID)
 	if err != nil {
-		t.Fatalf("GetUserGroups failed: %v", err)
+		t.Fatalf("GetUserTopics failed: %v", err)
 	}
-	if len(groups) != 2 {
-		t.Errorf("expected 2 groups, got %d", len(groups))
+	if len(topics) != 2 {
+		t.Errorf("expected 2 topics, got %d", len(topics))
 	}
 }
 
-func TestSoftDeleteGroup(t *testing.T) {
+func TestSoftDeleteTopic(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
 
 	owner, _ := db.CreateUser("owner", "hash")
-	group, _ := db.CreateGroup("Test Group", owner.ID)
+	topic, _ := db.CreateTopic("Test Topic", owner.ID)
 
-	err := db.SoftDeleteGroup(group.ID)
+	err := db.SoftDeleteTopic(topic.ID)
 	if err != nil {
-		t.Fatalf("SoftDeleteGroup failed: %v", err)
+		t.Fatalf("SoftDeleteTopic failed: %v", err)
 	}
 
 	// Should not be found after soft delete
-	_, err = db.GetGroupByID(group.ID)
+	_, err = db.GetTopicByID(topic.ID)
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound after soft delete, got %v", err)
 	}
 }
 
-func TestGetGroupMembers(t *testing.T) {
+func TestGetTopicMembers(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
 
 	owner, _ := db.CreateUserFull("owner", "hash", "Owner", "user")
 	member, _ := db.CreateUserFull("member", "hash", "Member", "user")
-	group, _ := db.CreateGroup("Test Group", owner.ID)
-	db.AddGroupMember(group.ID, owner.ID)
-	db.AddGroupMember(group.ID, member.ID)
+	topic, _ := db.CreateTopic("Test Topic", owner.ID)
+	db.AddTopicMember(topic.ID, owner.ID)
+	db.AddTopicMember(topic.ID, member.ID)
 
-	members, err := db.GetGroupMembers(group.ID)
+	members, err := db.GetTopicMembers(topic.ID)
 	if err != nil {
-		t.Fatalf("GetGroupMembers failed: %v", err)
+		t.Fatalf("GetTopicMembers failed: %v", err)
 	}
 	if len(members) != 2 {
 		t.Errorf("expected 2 members, got %d", len(members))
 	}
 }
 
-func TestCreateGroupMessage(t *testing.T) {
+func TestCreateTopicMessage(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
 
 	owner, _ := db.CreateUser("owner", "hash")
-	group, _ := db.CreateGroup("Test Group", owner.ID)
+	topic, _ := db.CreateTopic("Test Topic", owner.ID)
 
-	msg, err := db.CreateGroupMessage(group.ID, owner.ID, "user", "Hello group!")
+	msg, err := db.CreateTopicMessage(topic.ID, owner.ID, "user", "Hello topic!")
 	if err != nil {
-		t.Fatalf("CreateGroupMessage failed: %v", err)
+		t.Fatalf("CreateTopicMessage failed: %v", err)
 	}
-	if msg.GroupID == nil || *msg.GroupID != group.ID {
-		t.Error("expected group_id to be set")
+	if msg.TopicID == nil || *msg.TopicID != topic.ID {
+		t.Error("expected topic_id to be set")
 	}
-	if msg.Content != "Hello group!" {
-		t.Errorf("expected content 'Hello group!', got %q", msg.Content)
+	if msg.Content != "Hello topic!" {
+		t.Errorf("expected content 'Hello topic!', got %q", msg.Content)
 	}
 }
 
-func TestGetGroupRecentMessages(t *testing.T) {
+func TestGetTopicRecentMessages(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
 
 	owner, _ := db.CreateUser("owner", "hash")
-	group, _ := db.CreateGroup("Test Group", owner.ID)
+	topic, _ := db.CreateTopic("Test Topic", owner.ID)
 
-	db.CreateGroupMessage(group.ID, owner.ID, "user", "Message 1")
-	db.CreateGroupMessage(group.ID, owner.ID, "assistant", "Response 1")
-	db.CreateGroupMessage(group.ID, owner.ID, "user", "Message 2")
+	db.CreateTopicMessage(topic.ID, owner.ID, "user", "Message 1")
+	db.CreateTopicMessage(topic.ID, owner.ID, "assistant", "Response 1")
+	db.CreateTopicMessage(topic.ID, owner.ID, "user", "Message 2")
 
-	msgs, err := db.GetGroupRecentMessages(group.ID, 10)
+	msgs, err := db.GetTopicRecentMessages(topic.ID, 10)
 	if err != nil {
-		t.Fatalf("GetGroupRecentMessages failed: %v", err)
+		t.Fatalf("GetTopicRecentMessages failed: %v", err)
 	}
 	if len(msgs) != 3 {
 		t.Errorf("expected 3 messages, got %d", len(msgs))
 	}
 }
 
-func TestGetGroupContextMessages(t *testing.T) {
+func TestGetTopicContextMessages(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
 	defer db.Close()
 
 	owner, _ := db.CreateUser("owner", "hash")
-	group, _ := db.CreateGroup("Test Group", owner.ID)
+	topic, _ := db.CreateTopic("Test Topic", owner.ID)
 
-	db.CreateGroupMessageWithContext(group.ID, owner.ID, "user", "Hello", 1000, 80000)
-	db.CreateGroupMessageWithContext(group.ID, owner.ID, "assistant", "Hi there", 1000, 80000)
+	db.CreateTopicMessageWithContext(topic.ID, owner.ID, "user", "Hello", 1000, 80000)
+	db.CreateTopicMessageWithContext(topic.ID, owner.ID, "assistant", "Hi there", 1000, 80000)
 
-	msgs, err := db.GetGroupContextMessages(group.ID)
+	msgs, err := db.GetTopicContextMessages(topic.ID)
 	if err != nil {
-		t.Fatalf("GetGroupContextMessages failed: %v", err)
+		t.Fatalf("GetTopicContextMessages failed: %v", err)
 	}
 	if len(msgs) != 2 {
 		t.Errorf("expected 2 context messages, got %d", len(msgs))

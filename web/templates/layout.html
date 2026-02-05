@@ -17,9 +17,10 @@
     <link rel="stylesheet" href="/static/style.css">
     <link ref="manifest" href="/static/manifest.json">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="/static/bobot.js" defer></script>
     <script src="/static/ws-manager.js" defer></script>
 </head>
-<body hx-boost="true" hx-push-url="false">
+<body hx-push-url="false">
     <div id="ws-connection" hx-preserve="true"></div>
     {{template "content" .}}
 </body>

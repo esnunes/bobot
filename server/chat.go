@@ -23,7 +23,7 @@ var upgrader = websocket.Upgrader{
 
 type chatMessage struct {
 	Content string `json:"content"`
-	GroupID *int64 `json:"group_id"`
+	TopicID *int64 `json:"topic_id"`
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -74,8 +74,8 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		if msg.GroupID != nil {
-			s.handleGroupChatMessage(ctx, token.UserID, *msg.GroupID, msg.Content)
+		if msg.TopicID != nil {
+			s.handleTopicChatMessage(ctx, token.UserID, *msg.TopicID, msg.Content)
 		} else {
 			s.handlePrivateChatMessage(ctx, token.UserID, msg.Content)
 		}
@@ -145,11 +145,11 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 	s.connections.Broadcast(userID, assistantMsgJSON)
 }
 
-func (s *Server) handleGroupChatMessage(ctx context.Context, userID, groupID int64, content string) {
+func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int64, content string) {
 	// Verify membership
-	isMember, err := s.db.IsGroupMember(groupID, userID)
+	isMember, err := s.db.IsTopicMember(topicID, userID)
 	if err != nil || !isMember {
-		log.Printf("user %d not member of group %d", userID, groupID)
+		log.Printf("user %d not member of topic %d", userID, topicID)
 		return
 	}
 
@@ -163,56 +163,56 @@ func (s *Server) handleGroupChatMessage(ctx context.Context, userID, groupID int
 	// Check for slash commands
 	if response, handled := s.handleSlashCommand(ctx, content); handled {
 		// Save command message
-		s.db.CreateGroupMessageWithContext(
-			groupID, userID, "command", content,
+		s.db.CreateTopicMessageWithContext(
+			topicID, userID, "command", content,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
-		// Broadcast command to all group members
+		// Broadcast command to all topic members
 		cmdMsgJSON, _ := json.Marshal(map[string]interface{}{
-			"group_id":     groupID,
+			"topic_id":     topicID,
 			"role":         "command",
 			"content":      content,
 			"user_id":      userID,
 			"display_name": user.DisplayName,
 		})
-		s.broadcastToGroup(groupID, cmdMsgJSON)
+		s.broadcastToTopic(topicID, cmdMsgJSON)
 
 		// Save system response
-		s.db.CreateGroupMessageWithContext(
-			groupID, userID, "system", response,
+		s.db.CreateTopicMessageWithContext(
+			topicID, userID, "system", response,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
-		// Broadcast system response to all group members
+		// Broadcast system response to all topic members
 		respJSON, _ := json.Marshal(map[string]interface{}{
-			"group_id": groupID,
+			"topic_id": topicID,
 			"role":     "system",
 			"content":  response,
 		})
-		s.broadcastToGroup(groupID, respJSON)
+		s.broadcastToTopic(topicID, respJSON)
 		return
 	}
 
 	// Save user message
-	s.db.CreateGroupMessageWithContext(
-		groupID, userID, "user", content,
+	s.db.CreateTopicMessageWithContext(
+		topicID, userID, "user", content,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
 
-	// Broadcast to all group members
+	// Broadcast to all topic members
 	userMsgJSON, _ := json.Marshal(map[string]interface{}{
-		"group_id":     groupID,
+		"topic_id":     topicID,
 		"role":         "user",
 		"content":      content,
 		"user_id":      userID,
 		"display_name": user.DisplayName,
 	})
-	s.broadcastToGroup(groupID, userMsgJSON)
+	s.broadcastToTopic(topicID, userMsgJSON)
 
 	// Check if assistant should respond
 	if shouldTriggerAssistant(content) {
-		s.handleGroupAssistantResponse(ctx, groupID)
+		s.handleTopicAssistantResponse(ctx, topicID)
 	}
 }
 
@@ -220,11 +220,11 @@ func shouldTriggerAssistant(content string) bool {
 	return strings.Contains(strings.ToLower(content), "@bobot")
 }
 
-func (s *Server) handleGroupAssistantResponse(ctx context.Context, groupID int64) {
+func (s *Server) handleTopicAssistantResponse(ctx context.Context, topicID int64) {
 	// Get context messages
-	messages, err := s.db.GetGroupContextMessages(groupID)
+	messages, err := s.db.GetTopicContextMessages(topicID)
 	if err != nil {
-		log.Printf("failed to get group context: %v", err)
+		log.Printf("failed to get topic context: %v", err)
 		return
 	}
 
@@ -251,27 +251,27 @@ func (s *Server) handleGroupAssistantResponse(ctx context.Context, groupID int64
 	}
 
 	// Save assistant message using bobot user ID
-	_, err = s.db.CreateGroupMessageWithContext(
-		groupID, db.BobotUserID, "assistant", response,
+	_, err = s.db.CreateTopicMessageWithContext(
+		topicID, db.BobotUserID, "assistant", response,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
 	if err != nil {
 		log.Printf("failed to save assistant message: %v", err)
 	}
 
-	// Broadcast to group
+	// Broadcast to topic
 	assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
-		"group_id": groupID,
+		"topic_id": topicID,
 		"role":     "assistant",
 		"content":  response,
 	})
-	s.broadcastToGroup(groupID, assistantMsgJSON)
+	s.broadcastToTopic(topicID, assistantMsgJSON)
 }
 
-func (s *Server) broadcastToGroup(groupID int64, data []byte) {
-	members, err := s.db.GetGroupMembers(groupID)
+func (s *Server) broadcastToTopic(topicID int64, data []byte) {
+	members, err := s.db.GetTopicMembers(topicID)
 	if err != nil {
-		log.Printf("failed to get group members: %v", err)
+		log.Printf("failed to get topic members: %v", err)
 		return
 	}
 

@@ -1,12 +1,12 @@
-window.GroupChatClient = class GroupChatClient {
-    constructor(groupId) {
+window.TopicChatClient = class TopicChatClient {
+    constructor(topicId) {
         // Clean up any previous page client
         if (window.currentPageClient && window.currentPageClient.cleanup) {
             window.currentPageClient.cleanup();
         }
         window.currentPageClient = this;
 
-        this.groupId = groupId;
+        this.topicId = topicId;
         this.messagesEl = document.getElementById('messages');
         this.form = document.getElementById('chat-form');
         this.input = document.getElementById('message-input');
@@ -20,7 +20,7 @@ window.GroupChatClient = class GroupChatClient {
         this.hasMoreHistory = true;
         this.currentUserId = null;
         this.wsContainer = document.getElementById('ws-connection');
-        this.handleGroupMessage = null;
+        this.handleTopicMessage = null;
 
         this.init();
     }
@@ -33,7 +33,7 @@ window.GroupChatClient = class GroupChatClient {
     }
 
     initFromDOM() {
-        const container = document.querySelector('[data-page="group-chat"]');
+        const container = document.querySelector('[data-page="topic-chat"]');
         this.currentUserId = parseInt(container.dataset.currentUserId, 10);
 
         const messageEls = this.messagesEl.querySelectorAll('[data-message-id]');
@@ -43,10 +43,10 @@ window.GroupChatClient = class GroupChatClient {
     }
 
     setupEventListeners() {
-        // WebSocket message events - filter by group_id
-        this.handleGroupMessage = (event) => {
+        // WebSocket message events - filter by topic_id
+        this.handleTopicMessage = (event) => {
             const data = event.detail;
-            if (data.group_id === this.groupId) {
+            if (data.topic_id === this.topicId) {
                 if (data.role === 'assistant') {
                     this.removeTypingIndicator();
                 }
@@ -57,11 +57,12 @@ window.GroupChatClient = class GroupChatClient {
                 }
             }
         };
-        document.addEventListener('bobot:group-message', this.handleGroupMessage);
+        document.addEventListener('bobot:topic-message', this.handleTopicMessage);
 
-        this.form.addEventListener('htmx:confirm', (e) => {
+        this.form.addEventListener('submit', (e) => {
             e.preventDefault();
             this.sendMessage();
+            return false;
         });
 
         this.menuBtn.addEventListener('click', () => {
@@ -75,10 +76,10 @@ window.GroupChatClient = class GroupChatClient {
         });
 
         if (this.leaveBtn) {
-            this.leaveBtn.addEventListener('click', () => this.leaveGroup());
+            this.leaveBtn.addEventListener('click', () => this.leaveTopic());
         }
         if (this.deleteBtn) {
-            this.deleteBtn.addEventListener('click', () => this.deleteGroup());
+            this.deleteBtn.addEventListener('click', () => this.deleteTopic());
         }
 
         if (this.mentionBotBtn) {
@@ -93,9 +94,9 @@ window.GroupChatClient = class GroupChatClient {
     }
 
     cleanup() {
-        if (this.handleGroupMessage) {
-            document.removeEventListener('bobot:group-message', this.handleGroupMessage);
-            this.handleGroupMessage = null;
+        if (this.handleTopicMessage) {
+            document.removeEventListener('bobot:topic-message', this.handleTopicMessage);
+            this.handleTopicMessage = null;
         }
     }
 
@@ -119,7 +120,7 @@ window.GroupChatClient = class GroupChatClient {
         const content = this.input.value.trim();
         if (!content) return;
 
-        if (this.wsContainer.send({ content: content, group_id: this.groupId })) {
+        if (this.wsContainer.send({ content: content, topic_id: this.topicId })) {
             this.input.value = '';
         }
     }
@@ -179,7 +180,7 @@ window.GroupChatClient = class GroupChatClient {
 
         try {
             const resp = await fetch(
-                `/api/groups/${this.groupId}/messages/history?before=${this.oldestMessageId}&limit=50`,
+                `/api/topics/${this.topicId}/messages/history?before=${this.oldestMessageId}&limit=50`,
                 { credentials: 'include' }
             );
 
@@ -230,45 +231,45 @@ window.GroupChatClient = class GroupChatClient {
         this.messagesEl.insertBefore(msgEl, this.messagesEl.firstChild);
     }
 
-    async leaveGroup() {
-        if (!confirm('Are you sure you want to leave this group?')) return;
+    async leaveTopic() {
+        if (!confirm('Are you sure you want to leave this topic?')) return;
 
         try {
-            const resp = await fetch(`/api/groups/${this.groupId}/members/${this.currentUserId}`, {
+            const resp = await fetch(`/api/topics/${this.topicId}/members/${this.currentUserId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
 
-            if (!resp.ok) throw new Error('Failed to leave group');
+            if (!resp.ok) throw new Error('Failed to leave topic');
 
-            htmx.ajax('GET', '/groups', {target: 'body', swap: 'innerHTML'});
+            htmx.ajax('GET', '/topics', {target: 'body', swap: 'innerHTML'});
         } catch (err) {
-            console.error('Failed to leave group:', err);
-            alert('Failed to leave group');
+            console.error('Failed to leave topic:', err);
+            alert('Failed to leave topic');
         }
     }
 
-    async deleteGroup() {
-        if (!confirm('Are you sure you want to delete this group? This cannot be undone.')) return;
+    async deleteTopic() {
+        if (!confirm('Are you sure you want to delete this topic? This cannot be undone.')) return;
 
         try {
-            const resp = await fetch(`/api/groups/${this.groupId}`, {
+            const resp = await fetch(`/api/topics/${this.topicId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
 
-            if (!resp.ok) throw new Error('Failed to delete group');
+            if (!resp.ok) throw new Error('Failed to delete topic');
 
-            htmx.ajax('GET', '/groups', {target: 'body', swap: 'innerHTML'});
+            htmx.ajax('GET', '/topics', {target: 'body', swap: 'innerHTML'});
         } catch (err) {
-            console.error('Failed to delete group:', err);
-            alert('Failed to delete group');
+            console.error('Failed to delete topic:', err);
+            alert('Failed to delete topic');
         }
     }
 };
 
-var container = document.querySelector('[data-page="group-chat"]');
+var container = document.querySelector('[data-page="topic-chat"]');
 if (container) {
-    var groupId = parseInt(container.dataset.groupId, 10);
-    window.groupChatClient = new GroupChatClient(groupId);
+    var topicId = parseInt(container.dataset.topicId, 10);
+    window.topicChatClient = new TopicChatClient(topicId);
 }

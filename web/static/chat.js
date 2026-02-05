@@ -120,9 +120,10 @@ window.ChatClient ||= class ChatClient {
         document.addEventListener('bobot:chat-message', this.handleChatMessage);
 
         // Form submission
-        this.form.addEventListener('htmx:confirm', (e) => {
+        this.form.addEventListener('submit', (e) => {
             e.preventDefault();
             this.sendMessage();
+            return false;
         });
 
         // Menu

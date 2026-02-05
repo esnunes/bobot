@@ -1,9 +1,9 @@
 {{define "content"}}
-<div class="chat-container" data-page="group-chat" data-group-id="{{.GroupID}}" data-owner-id="{{.OwnerID}}" data-current-user-id="{{.CurrentUserID}}">
-    <header class="chat-header">
-        <a href="/groups" class="back-link" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
-        <h1 id="group-name">{{.GroupName}}</h1>
-        <button id="menu-btn" class="menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+<div class="chat-container" data-page="topic-chat" data-topic-id="{{.TopicID}}" data-owner-id="{{.OwnerID}}" data-current-user-id="{{.CurrentUserID}}">
+    <header>
+        <button hx-get="/topics" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <h1 id="topic-name">{{.TopicName}}</h1>
+        <button id="menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     </header>
 
     <main class="chat-messages" id="messages">
@@ -36,12 +36,12 @@
         </div>
         <hr>
         {{if eq .OwnerID .CurrentUserID}}
-        <button id="delete-btn" class="danger-btn">Delete Group</button>
+        <button id="delete-btn" class="danger-btn">Delete Topic</button>
         {{else}}
-        <button id="leave-btn" class="danger-btn">Leave Group</button>
+        <button id="leave-btn" class="danger-btn">Leave Topic</button>
         {{end}}
     </div>
 </div>
 
-<script src="/static/group_chat.js"></script>
+<script src="/static/topic_chat.js"></script>
 {{end}}

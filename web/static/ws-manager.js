@@ -59,8 +59,8 @@
     }
 
     function dispatchMessage(data) {
-        if (data.group_id) {
-            document.dispatchEvent(new CustomEvent('bobot:group-message', {
+        if (data.topic_id) {
+            document.dispatchEvent(new CustomEvent('bobot:topic-message', {
                 detail: data
             }));
         } else {

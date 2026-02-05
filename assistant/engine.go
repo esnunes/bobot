@@ -122,7 +122,7 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 	return "", fmt.Errorf("max iterations reached")
 }
 
-// ChatWithContext processes a group conversation and returns the assistant's response.
+// ChatWithContext processes a topic conversation and returns the assistant's response.
 // The conversation is a list of lines formatted as "[Name]: message content" for users
 // or "[assistant]: message content" for assistant messages.
 func (e *Engine) ChatWithContext(ctx context.Context, conversation []string) (string, error) {
@@ -145,8 +145,8 @@ func (e *Engine) ChatWithContext(ctx context.Context, conversation []string) (st
 		}
 	}
 
-	// Add system prompt for group context
-	systemPrompt := `You are a helpful AI assistant participating in a group chat.
+	// Add system prompt for topic context
+	systemPrompt := `You are a helpful AI assistant participating in a topic chat.
 Messages are formatted as [Name]: message content.
 Only respond when specifically addressed with @bobot.
 Keep responses concise and relevant to the conversation.`
