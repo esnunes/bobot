@@ -37,10 +37,14 @@ body {
 }
 
 .login-container h1 {
-  font-size: var(--font-sizes-6);
-  font-weight: var(--font-weights-bold);
+  font-size: var(--font-sizes-4);
+  font-weight: var(--font-weights-medium);
   color: var(--colors-text);
   margin-bottom: var(--space-2);
+}
+
+.login-container img {
+  width: 30dvh;
 }
 
 .login-form {
@@ -684,6 +688,10 @@ body {
   font-size: var(--font-sizes-6);
   font-weight: var(--font-weights-bold);
   color: var(--colors-text);
+}
+
+.authenticated-container img {
+  width: 30dvh;
 }
 
 .loading-spinner {
