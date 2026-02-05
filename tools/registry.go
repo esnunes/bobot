@@ -8,11 +8,18 @@ import (
 	"github.com/esnunes/bobot/llm"
 )
 
+// ExecuteInput contains the input for tool execution.
+type ExecuteInput struct {
+	Args       string // raw string after tool name, e.g. "create hello world"
+	ReceiverID *int64 // set in private chat, nil in topic chat
+	TopicID    *int64 // set in topic chat, nil in private chat
+}
+
 type Tool interface {
 	Name() string
 	Description() string
 	Schema() interface{}
-	Execute(ctx context.Context, input map[string]interface{}) (string, error)
+	Execute(ctx context.Context, input ExecuteInput) (string, error)
 	AdminOnly() bool
 }
 
@@ -43,7 +50,7 @@ func (r *Registry) List() []Tool {
 	return result
 }
 
-func (r *Registry) Execute(ctx context.Context, name string, input map[string]interface{}) (string, error) {
+func (r *Registry) Execute(ctx context.Context, name string, input ExecuteInput) (string, error) {
 	tool, ok := r.Get(name)
 	if !ok {
 		return "", fmt.Errorf("unknown tool: %s", name)
