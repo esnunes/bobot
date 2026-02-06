@@ -49,10 +49,11 @@ func TestCreateTopic(t *testing.T) {
 		t.Errorf("expected status 204, got %d: %s", w.Code, w.Body.String())
 	}
 
-	// HTMX pattern: redirect to the new topic
-	redirect := w.Header().Get("HX-Location")
-	if redirect != "/topics/1" {
-		t.Errorf("expected HX-Location '/topics/1', got %q", redirect)
+	// HTMX pattern: trigger client-side redirect
+	trigger := w.Header().Get("HX-Trigger")
+	expectedTrigger := `{"bobot:redirect": {"path": "/topics/1"}}`
+	if trigger != expectedTrigger {
+		t.Errorf("expected HX-Trigger %q, got %q", expectedTrigger, trigger)
 	}
 
 	// Verify topic was created in DB
