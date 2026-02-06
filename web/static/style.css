@@ -183,14 +183,14 @@ header {
   max-width: var(--sizes-max-message-width);
 }
 
-.message.user {
+.message.user,
+.message.command {
   align-self: flex-end;
   align-items: flex-end;
 }
 
 .message.assistant,
-.message.system,
-.message.command {
+.message.system {
   align-self: flex-start;
   align-items: flex-start;
 }
@@ -211,7 +211,8 @@ header {
   overflow-wrap: anywhere;
 }
 
-.message.user .message-bubble {
+.message.user .message-bubble,
+.message.command .message-bubble {
   background: var(--colors-accent-light);
 }
 
@@ -225,7 +226,8 @@ header {
   overflow-wrap: anywhere;
 }
 
-.message.user:not(:has(.message-bubble)) {
+.message.user:not(:has(.message-bubble)),
+.message.command:not(:has(.message-bubble)) {
   background: var(--colors-accent-light);
 }
 

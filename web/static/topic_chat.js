@@ -131,9 +131,7 @@ window.TopicChatClient = class TopicChatClient {
         const content = msg.content || msg.Content;
         const displayName = msg.display_name || msg.DisplayName;
 
-        // Map command to user styling, system to assistant styling
-        const displayRole = role === 'command' ? 'user' : (role === 'system' ? 'assistant' : role);
-        msgEl.className = `message ${displayRole}`;
+        msgEl.className = `message ${role}`;
 
         if ((role === 'user' || role === 'command') && displayName) {
             const nameEl = document.createElement('div');
@@ -208,9 +206,7 @@ window.TopicChatClient = class TopicChatClient {
     prependMessage(msg) {
         const msgEl = document.createElement('div');
         const role = msg.Role;
-        // Map command to user styling, system to assistant styling
-        const displayRole = role === 'command' ? 'user' : (role === 'system' ? 'assistant' : role);
-        msgEl.className = `message ${displayRole}`;
+        msgEl.className = `message ${role}`;
 
         if ((role === 'user' || role === 'command') && msg.DisplayName) {
             const nameEl = document.createElement('div');

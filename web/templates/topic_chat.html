@@ -9,7 +9,7 @@
     <main class="chat-messages" id="messages">
         {{range .Messages}}
         <div class="message {{.Role}}" data-message-id="{{.ID}}">
-            {{if eq .Role "user"}}
+            {{if or (eq .Role "user") (eq .Role "command")}}
             <div class="message-sender">{{.DisplayName}}</div>
             {{end}}
             <div class="message-content">{{.Content}}</div>
