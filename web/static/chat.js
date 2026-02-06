@@ -22,20 +22,26 @@ window.ChatClient ||= class ChatClient {
 
     async init() {
         this.wsContainer.connect();
-        this.initFromDOM();
+        this.loadInitialMessages();
         await this.syncMessages();
         this.setupEventListeners();
         this.scrollToBottom();
     }
 
-    initFromDOM() {
-        const messageEls = this.messagesEl.querySelectorAll('[data-message-id]');
-        if (messageEls.length > 0) {
-            this.oldestMessageId = parseInt(messageEls[0].dataset.messageId, 10);
-            const lastMessage = messageEls[messageEls.length - 1];
-            if (lastMessage.dataset.createdAt) {
-                this.updateLastSeenTimestamp(lastMessage.dataset.createdAt);
-            }
+    loadInitialMessages() {
+        var dataEl = document.querySelector('script[data-page-data]');
+        if (!dataEl) return;
+
+        var data = JSON.parse(dataEl.textContent);
+        var messages = data.messages || [];
+
+        messages.forEach(function(msg) {
+            this.addMessage(msg.content, msg.role, msg.id, false);
+        }.bind(this));
+
+        if (messages.length > 0) {
+            this.oldestMessageId = messages[0].id;
+            this.updateLastSeenTimestamp(messages[messages.length - 1].created_at);
         }
     }
 
@@ -170,7 +176,16 @@ window.ChatClient ||= class ChatClient {
         const msgEl = document.createElement('div');
         const self = (role === 'user' || role === 'command') ? ' self' : '';
         msgEl.className = `message ${role}${self}`;
-        msgEl.textContent = content;
+
+        var html = MessageRenderer.renderMessageContent(content, role);
+        if (html !== null) {
+            msgEl.innerHTML = html;
+            msgEl.classList.add('markdown-content');
+            MessageRenderer.highlightCodeBlocks(msgEl);
+        } else {
+            msgEl.textContent = content;
+        }
+
         if (id) {
             msgEl.setAttribute('data-message-id', id);
         }
@@ -184,7 +199,16 @@ window.ChatClient ||= class ChatClient {
         const msgEl = document.createElement('div');
         const self = (role === 'user' || role === 'command') ? ' self' : '';
         msgEl.className = `message ${role}${self}`;
-        msgEl.textContent = content;
+
+        var html = MessageRenderer.renderMessageContent(content, role);
+        if (html !== null) {
+            msgEl.innerHTML = html;
+            msgEl.classList.add('markdown-content');
+            MessageRenderer.highlightCodeBlocks(msgEl);
+        } else {
+            msgEl.textContent = content;
+        }
+
         if (id) {
             msgEl.setAttribute('data-message-id', id);
         }

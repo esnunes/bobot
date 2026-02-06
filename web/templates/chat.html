@@ -7,9 +7,6 @@
     </header>
 
     <main class="chat-messages" id="messages">
-        {{range .Messages}}
-        <div class="message {{.Role}}{{if or (eq .Role "user") (eq .Role "command")}} self{{end}}" data-message-id="{{.ID}}" data-created-at="{{.CreatedAt}}">{{.Content}}</div>
-        {{end}}
     </main>
 
     <footer class="chat-input">
@@ -26,5 +23,11 @@
     </div>
 </div>
 
+<script type="application/json" data-page-data>{{.PageDataJSON}}</script>
+<link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css">
+<script src="https://unpkg.com/marked@15.0.7/marked.min.js"></script>
+<script src="https://unpkg.com/dompurify@3.2.4/dist/purify.min.js"></script>
+<script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
+<script src="/static/message-renderer.js"></script>
 <script src="/static/chat.js"></script>
 {{end}}

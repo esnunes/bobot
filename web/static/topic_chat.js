@@ -27,18 +27,25 @@ window.TopicChatClient = class TopicChatClient {
 
     init() {
         this.wsContainer.connect();
-        this.initFromDOM();
+        this.loadInitialMessages();
         this.setupEventListeners();
         this.scrollToBottom();
     }
 
-    initFromDOM() {
-        const container = document.querySelector('[data-page="topic-chat"]');
-        this.currentUserId = parseInt(container.dataset.currentUserId, 10);
+    loadInitialMessages() {
+        var dataEl = document.querySelector('script[data-page-data]');
+        if (!dataEl) return;
 
-        const messageEls = this.messagesEl.querySelectorAll('[data-message-id]');
-        if (messageEls.length > 0) {
-            this.oldestMessageId = parseInt(messageEls[0].dataset.messageId, 10);
+        var data = JSON.parse(dataEl.textContent);
+        this.currentUserId = data.current_user_id;
+
+        var messages = data.messages || [];
+        messages.forEach(function(msg) {
+            this.addMessage(msg, false);
+        }.bind(this));
+
+        if (messages.length > 0) {
+            this.oldestMessageId = messages[0].id;
         }
     }
 
@@ -131,6 +138,7 @@ window.TopicChatClient = class TopicChatClient {
         const content = msg.content || msg.Content;
         const displayName = msg.display_name || msg.DisplayName;
         const userId = msg.user_id || msg.UserID;
+        const id = msg.id || msg.ID;
         const self = (userId === this.currentUserId) ? ' self' : '';
 
         msgEl.className = `message ${role}${self}`;
@@ -144,11 +152,21 @@ window.TopicChatClient = class TopicChatClient {
 
         const contentEl = document.createElement('div');
         contentEl.className = 'message-content';
-        contentEl.textContent = content;
-        msgEl.appendChild(contentEl);
 
-        if (msg.ID) {
-            msgEl.setAttribute('data-message-id', msg.ID);
+        var html = MessageRenderer.renderMessageContent(content, role);
+        if (html !== null) {
+            contentEl.innerHTML = html;
+            contentEl.classList.add('markdown-content');
+            // Highlight after inserting into DOM
+            msgEl.appendChild(contentEl);
+            MessageRenderer.highlightCodeBlocks(contentEl);
+        } else {
+            contentEl.textContent = content;
+            msgEl.appendChild(contentEl);
+        }
+
+        if (id) {
+            msgEl.setAttribute('data-message-id', id);
         }
 
         this.messagesEl.appendChild(msgEl);
@@ -207,24 +225,37 @@ window.TopicChatClient = class TopicChatClient {
 
     prependMessage(msg) {
         const msgEl = document.createElement('div');
-        const role = msg.Role;
-        const self = (msg.UserID === this.currentUserId) ? ' self' : '';
+        const role = msg.role || msg.Role;
+        const content = msg.content || msg.Content;
+        const displayName = msg.display_name || msg.DisplayName;
+        const userId = msg.user_id || msg.UserID;
+        const id = msg.id || msg.ID;
+        const self = (userId === this.currentUserId) ? ' self' : '';
         msgEl.className = `message ${role}${self}`;
 
-        if (msg.DisplayName) {
+        if (displayName) {
             const nameEl = document.createElement('div');
             nameEl.className = 'message-sender';
-            nameEl.textContent = msg.DisplayName;
+            nameEl.textContent = displayName;
             msgEl.appendChild(nameEl);
         }
 
         const contentEl = document.createElement('div');
         contentEl.className = 'message-content';
-        contentEl.textContent = msg.Content;
-        msgEl.appendChild(contentEl);
 
-        if (msg.ID) {
-            msgEl.setAttribute('data-message-id', msg.ID);
+        var html = MessageRenderer.renderMessageContent(content, role);
+        if (html !== null) {
+            contentEl.innerHTML = html;
+            contentEl.classList.add('markdown-content');
+            msgEl.appendChild(contentEl);
+            MessageRenderer.highlightCodeBlocks(contentEl);
+        } else {
+            contentEl.textContent = content;
+            msgEl.appendChild(contentEl);
+        }
+
+        if (id) {
+            msgEl.setAttribute('data-message-id', id);
         }
 
         this.messagesEl.insertBefore(msgEl, this.messagesEl.firstChild);

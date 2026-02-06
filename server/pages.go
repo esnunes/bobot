@@ -2,6 +2,7 @@
 package server
 
 import (
+	"encoding/json"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -43,6 +44,7 @@ type PageData struct {
 	TopicName     string
 	OwnerID       int64
 	CurrentUserID int64
+	PageDataJSON  template.JS
 }
 
 func (s *Server) loadTemplates() error {
@@ -157,9 +159,16 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 
 	dbMessages, _ := s.db.GetPrivateChatRecentMessages(userData.UserID, 50)
 
-	messages := make([]MessageView, 0, len(dbMessages))
+	type chatMessageJSON struct {
+		ID        int64  `json:"id"`
+		Role      string `json:"role"`
+		Content   string `json:"content"`
+		CreatedAt string `json:"created_at"`
+	}
+
+	jsonMessages := make([]chatMessageJSON, 0, len(dbMessages))
 	for _, m := range dbMessages {
-		messages = append(messages, MessageView{
+		jsonMessages = append(jsonMessages, chatMessageJSON{
 			ID:        m.ID,
 			Role:      m.Role,
 			Content:   m.Content,
@@ -167,9 +176,13 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	jsonData, _ := json.Marshal(map[string]any{
+		"messages": jsonMessages,
+	})
+
 	s.templates["chat"].Execute(w, PageData{
-		Title:    "Chat",
-		Messages: messages,
+		Title:        "Chat",
+		PageDataJSON: template.JS(jsonData),
 	})
 }
 
@@ -232,10 +245,19 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	type topicMessageJSON struct {
+		ID          int64  `json:"id"`
+		Role        string `json:"role"`
+		Content     string `json:"content"`
+		CreatedAt   string `json:"created_at"`
+		UserID      int64  `json:"user_id"`
+		DisplayName string `json:"display_name"`
+	}
+
 	dbMessages, _ := s.db.GetTopicRecentMessages(topicID, 50)
-	messages := make([]MessageView, 0, len(dbMessages))
+	jsonMessages := make([]topicMessageJSON, 0, len(dbMessages))
 	for _, m := range dbMessages {
-		mv := MessageView{
+		jm := topicMessageJSON{
 			ID:        m.ID,
 			Role:      m.Role,
 			Content:   m.Content,
@@ -244,14 +266,19 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		switch m.Role {
 		case "user", "command":
 			if user, err := s.db.GetUserByID(m.SenderID); err == nil {
-				mv.UserID = user.ID
-				mv.DisplayName = user.DisplayName
+				jm.UserID = user.ID
+				jm.DisplayName = user.DisplayName
 			}
 		case "assistant", "system":
-			mv.DisplayName = "bobot"
+			jm.DisplayName = "bobot"
 		}
-		messages = append(messages, mv)
+		jsonMessages = append(jsonMessages, jm)
 	}
+
+	jsonData, _ := json.Marshal(map[string]any{
+		"current_user_id": userData.UserID,
+		"messages":        jsonMessages,
+	})
 
 	s.templates["topic_chat"].Execute(w, PageData{
 		Title:         "Topic Chat",
@@ -260,6 +287,6 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		OwnerID:       topic.OwnerID,
 		CurrentUserID: userData.UserID,
 		Members:       members,
-		Messages:      messages,
+		PageDataJSON:  template.JS(jsonData),
 	})
 }
