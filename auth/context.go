@@ -21,3 +21,22 @@ func UserDataFromContext(ctx context.Context) UserData {
 	data, _ := ctx.Value(userDataKey{}).(UserData)
 	return data
 }
+
+type chatDataKey struct{}
+
+type ChatData struct {
+	ReceiverID *int64
+	TopicID    *int64
+}
+
+// ContextWithChatData returns a new context with the chat data stored.
+func ContextWithChatData(ctx context.Context, data ChatData) context.Context {
+	return context.WithValue(ctx, chatDataKey{}, data)
+}
+
+// ChatDataFromContext extracts the chat data from the context.
+// Returns zero values if no chat data is present.
+func ChatDataFromContext(ctx context.Context) ChatData {
+	data, _ := ctx.Value(chatDataKey{}).(ChatData)
+	return data
+}
