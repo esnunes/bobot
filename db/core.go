@@ -298,6 +298,14 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Migrate: add case-insensitive unique index for active topic names
+	_, err = c.db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_topics_name_active ON topics(LOWER(name)) WHERE deleted_at IS NULL
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -974,6 +982,27 @@ func (c *CoreDB) GetTopicByID(id int64) (*Topic, error) {
 	err := c.db.QueryRow(
 		"SELECT id, name, owner_id, deleted_at, created_at FROM topics WHERE id = ? AND deleted_at IS NULL",
 		id,
+	).Scan(&topic.ID, &topic.Name, &topic.OwnerID, &deletedAt, &topic.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if deletedAt.Valid {
+		topic.DeletedAt = &deletedAt.Time
+	}
+	return &topic, nil
+}
+
+// GetTopicByName retrieves an active topic by name (case-insensitive).
+func (c *CoreDB) GetTopicByName(name string) (*Topic, error) {
+	var topic Topic
+	var deletedAt sql.NullTime
+	err := c.db.QueryRow(
+		"SELECT id, name, owner_id, deleted_at, created_at FROM topics WHERE LOWER(name) = LOWER(?) AND deleted_at IS NULL",
+		name,
 	).Scan(&topic.ID, &topic.Name, &topic.OwnerID, &deletedAt, &topic.CreatedAt)
 
 	if err == sql.ErrNoRows {

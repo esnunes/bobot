@@ -8,7 +8,6 @@ import (
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
-	"github.com/esnunes/bobot/tools"
 )
 
 func setupTestDB(t *testing.T) *db.CoreDB {
@@ -32,7 +31,7 @@ func TestUserTool_InviteCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "invite"})
+	result, err := tool.Execute(ctx, map[string]any{"command": "invite"})
 	if err != nil {
 		t.Fatalf("failed to execute invite: %v", err)
 	}
@@ -55,7 +54,7 @@ func TestUserTool_BlockCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "block victim"})
+	result, err := tool.Execute(ctx, map[string]any{"command": "block", "username": "victim"})
 	if err != nil {
 		t.Fatalf("failed to execute block: %v", err)
 	}
@@ -83,7 +82,7 @@ func TestUserTool_NonAdminDenied(t *testing.T) {
 		Role:   "user",
 	})
 
-	_, err := tool.Execute(ctx, tools.ExecuteInput{Args: "list"})
+	_, err := tool.Execute(ctx, map[string]any{"command": "list"})
 	if err == nil {
 		t.Error("expected error for non-admin")
 	}
@@ -104,7 +103,7 @@ func TestUserTool_CannotBlockSelf(t *testing.T) {
 		Role:   "admin",
 	})
 
-	_, err := tool.Execute(ctx, tools.ExecuteInput{Args: "block admin"})
+	_, err := tool.Execute(ctx, map[string]any{"command": "block", "username": "admin"})
 	if err == nil {
 		t.Error("expected error when blocking self")
 	}
@@ -123,7 +122,7 @@ func TestUserTool_ListCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "list"})
+	result, err := tool.Execute(ctx, map[string]any{"command": "list"})
 	if err != nil {
 		t.Fatalf("failed to execute list: %v", err)
 	}
@@ -147,7 +146,7 @@ func TestUserTool_UnblockCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "unblock blocked"})
+	result, err := tool.Execute(ctx, map[string]any{"command": "unblock", "username": "blocked"})
 	if err != nil {
 		t.Fatalf("failed to execute unblock: %v", err)
 	}
@@ -177,7 +176,7 @@ func TestUserTool_InvitesCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "invites"})
+	result, err := tool.Execute(ctx, map[string]any{"command": "invites"})
 	if err != nil {
 		t.Fatalf("failed to execute invites: %v", err)
 	}
@@ -200,7 +199,7 @@ func TestUserTool_RevokeCommand(t *testing.T) {
 		Role:   "admin",
 	})
 
-	result, err := tool.Execute(ctx, tools.ExecuteInput{Args: "revoke torevoke"})
+	result, err := tool.Execute(ctx, map[string]any{"command": "revoke", "code": "torevoke"})
 	if err != nil {
 		t.Fatalf("failed to execute revoke: %v", err)
 	}
@@ -213,5 +212,80 @@ func TestUserTool_RevokeCommand(t *testing.T) {
 	invite, _ := coreDB.GetInviteByCode("torevoke")
 	if !invite.Revoked {
 		t.Error("expected invite to be revoked")
+	}
+}
+
+func TestUserTool_ParseArgs(t *testing.T) {
+	tool := &UserTool{}
+
+	tests := []struct {
+		name    string
+		raw     string
+		want    map[string]any
+		wantErr bool
+	}{
+		{
+			name:    "empty input",
+			raw:     "",
+			wantErr: true,
+		},
+		{
+			name: "invite command",
+			raw:  "invite",
+			want: map[string]any{"command": "invite"},
+		},
+		{
+			name: "list command",
+			raw:  "list",
+			want: map[string]any{"command": "list"},
+		},
+		{
+			name: "invites command",
+			raw:  "invites",
+			want: map[string]any{"command": "invites"},
+		},
+		{
+			name: "block with username",
+			raw:  "block alice",
+			want: map[string]any{"command": "block", "username": "alice"},
+		},
+		{
+			name: "unblock with username",
+			raw:  "unblock bob",
+			want: map[string]any{"command": "unblock", "username": "bob"},
+		},
+		{
+			name: "revoke with code",
+			raw:  "revoke abc123",
+			want: map[string]any{"command": "revoke", "code": "abc123"},
+		},
+		{
+			name: "block without username",
+			raw:  "block",
+			want: map[string]any{"command": "block"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tool.ParseArgs(tt.raw)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for k, v := range tt.want {
+				if got[k] != v {
+					t.Errorf("key %q: got %v, want %v", k, got[k], v)
+				}
+			}
+			if len(got) != len(tt.want) {
+				t.Errorf("got %d keys, want %d keys", len(got), len(tt.want))
+			}
+		})
 	}
 }

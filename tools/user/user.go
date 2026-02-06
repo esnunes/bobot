@@ -9,7 +9,6 @@ import (
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
-	"github.com/esnunes/bobot/tools"
 )
 
 type UserTool struct {
@@ -55,37 +54,56 @@ func (t *UserTool) AdminOnly() bool {
 	return true
 }
 
-func (t *UserTool) Execute(ctx context.Context, input tools.ExecuteInput) (string, error) {
+func (t *UserTool) ParseArgs(raw string) (map[string]any, error) {
+	parts := strings.Fields(raw)
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("missing command. Usage: /user <command>")
+	}
+
+	result := map[string]any{"command": parts[0]}
+
+	switch parts[0] {
+	case "block", "unblock":
+		if len(parts) > 1 {
+			result["username"] = parts[1]
+		}
+	case "revoke":
+		if len(parts) > 1 {
+			result["code"] = parts[1]
+		}
+	}
+
+	return result, nil
+}
+
+func (t *UserTool) Execute(ctx context.Context, input map[string]any) (string, error) {
 	userData := auth.UserDataFromContext(ctx)
 	// Check admin role
 	if userData.Role != "admin" {
 		return "", fmt.Errorf("this command requires admin privileges")
 	}
 
-	parts := strings.Fields(input.Args)
-	if len(parts) == 0 {
+	command, _ := input["command"].(string)
+	if command == "" {
 		return "", fmt.Errorf("missing command. Usage: /user <command>")
 	}
 
-	command := parts[0]
-	var arg string
-	if len(parts) > 1 {
-		arg = parts[1]
-	}
+	username, _ := input["username"].(string)
+	code, _ := input["code"].(string)
 
 	switch command {
 	case "invite":
 		return t.invite(userData.UserID)
 	case "block":
-		return t.block(userData.UserID, arg)
+		return t.block(userData.UserID, username)
 	case "unblock":
-		return t.unblock(arg)
+		return t.unblock(username)
 	case "list":
 		return t.list()
 	case "invites":
 		return t.listInvites()
 	case "revoke":
-		return t.revoke(arg)
+		return t.revoke(code)
 	default:
 		return "", fmt.Errorf("unknown command: %s", command)
 	}

@@ -28,13 +28,19 @@ type mockTool struct {
 	result string
 }
 
-func (m *mockTool) Name() string                { return "task" }
-func (m *mockTool) Description() string         { return "Manage tasks" }
-func (m *mockTool) Schema() interface{}         { return map[string]interface{}{"type": "object"} }
-func (m *mockTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
+func (m *mockTool) Name() string        { return "task" }
+func (m *mockTool) Description() string { return "Manage tasks" }
+func (m *mockTool) Schema() interface{} { return map[string]interface{}{"type": "object"} }
+func (m *mockTool) ParseArgs(raw string) (map[string]any, error) {
+	return map[string]any{"command": raw}, nil
+}
+func (m *mockTool) Execute(ctx context.Context, input map[string]any) (string, error) {
 	return m.result, nil
 }
 func (m *mockTool) AdminOnly() bool { return false }
+
+// Verify mockTool satisfies the Tool interface at compile time
+var _ tools.Tool = (*mockTool)(nil)
 
 func TestEngine_Chat_SimpleResponse(t *testing.T) {
 	mockProvider := &mockLLM{

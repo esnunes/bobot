@@ -84,7 +84,8 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, content string) {
 	// Check for slash commands
-	if response, handled := s.handleSlashCommand(ctx, content); handled {
+	receiverID := db.BobotUserID
+	if response, handled := s.handleSlashCommand(ctx, content, &receiverID, nil); handled {
 		// User sends command: sender=user, receiver=bobot
 		s.db.CreatePrivateMessageWithContextThreshold(
 			userID, db.BobotUserID, "command", content,
@@ -161,7 +162,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 	}
 
 	// Check for slash commands
-	if response, handled := s.handleSlashCommand(ctx, content); handled {
+	if response, handled := s.handleSlashCommand(ctx, content, nil, &topicID); handled {
 		// Save command message
 		s.db.CreateTopicMessageWithContext(
 			topicID, userID, "command", content,
@@ -282,19 +283,23 @@ func (s *Server) broadcastToTopic(topicID int64, data []byte) {
 
 // handleSlashCommand processes slash commands and returns the response.
 // Returns (response, true) if the message was a slash command, ("", false) otherwise.
-func (s *Server) handleSlashCommand(ctx context.Context, content string) (string, bool) {
+func (s *Server) handleSlashCommand(ctx context.Context, content string, receiverID *int64, topicID *int64) (string, bool) {
 	content = strings.TrimSpace(content)
 	if !strings.HasPrefix(content, "/") {
 		return "", false
 	}
 
-	parts := strings.Fields(content)
-	if len(parts) < 1 {
-		return "", false
+	// Split on first space: tool name vs rest
+	toolName := content[1:] // strip leading /
+	var args string
+	if idx := strings.IndexByte(toolName, ' '); idx != -1 {
+		args = toolName[idx+1:]
+		toolName = toolName[:idx]
 	}
 
-	// Extract tool name (without leading /)
-	toolName := parts[0][1:]
+	if toolName == "" {
+		return "", false
+	}
 
 	// Check if tool exists
 	tool, ok := s.registry.Get(toolName)
@@ -302,27 +307,17 @@ func (s *Server) handleSlashCommand(ctx context.Context, content string) (string
 		return "Error: unknown command /" + toolName, true
 	}
 
-	// Check if command is provided
-	if len(parts) < 2 {
-		return "Error: missing command. Usage: /" + toolName + " <command>", true
+	// Parse raw args into map
+	input, err := tool.ParseArgs(args)
+	if err != nil {
+		return "Error: " + err.Error(), true
 	}
 
-	command := parts[1]
-
-	// Build input for the tool
-	input := map[string]interface{}{
-		"command": command,
-	}
-
-	// Add additional arguments based on command
-	if len(parts) > 2 {
-		switch command {
-		case "block", "unblock":
-			input["username"] = parts[2]
-		case "revoke":
-			input["code"] = parts[2]
-		}
-	}
+	// Inject chat context (TopicID / ReceiverID) into Go context
+	ctx = auth.ContextWithChatData(ctx, auth.ChatData{
+		ReceiverID: receiverID,
+		TopicID:    topicID,
+	})
 
 	// Execute the tool
 	result, err := tool.Execute(ctx, input)

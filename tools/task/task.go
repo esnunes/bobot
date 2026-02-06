@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/esnunes/bobot/auth"
-	"github.com/esnunes/bobot/tools"
 )
 
 type TaskTool struct {
@@ -57,32 +56,48 @@ func (t *TaskTool) AdminOnly() bool {
 	return false
 }
 
-func (t *TaskTool) Execute(ctx context.Context, input tools.ExecuteInput) (string, error) {
+func (t *TaskTool) ParseArgs(raw string) (map[string]any, error) {
+	parts := strings.Fields(raw)
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("missing arguments. Usage: /task <command> <project> [title] [--status=pending|done]")
+	}
+
+	result := map[string]any{
+		"command": parts[0],
+		"project": parts[1],
+	}
+
+	// Parse optional title and status from remaining parts
+	remaining := parts[2:]
+	var titleParts []string
+	for _, p := range remaining {
+		if strings.HasPrefix(p, "--status=") {
+			result["status"] = strings.TrimPrefix(p, "--status=")
+		} else {
+			titleParts = append(titleParts, p)
+		}
+	}
+	if len(titleParts) > 0 {
+		result["title"] = strings.Join(titleParts, " ")
+	}
+
+	return result, nil
+}
+
+func (t *TaskTool) Execute(ctx context.Context, input map[string]any) (string, error) {
 	userData := auth.UserDataFromContext(ctx)
 	if userData.UserID == 0 {
 		return "", fmt.Errorf("user_id not found in context")
 	}
 
-	parts := strings.Fields(input.Args)
-	if len(parts) < 2 {
+	command, _ := input["command"].(string)
+	projectName, _ := input["project"].(string)
+	if command == "" || projectName == "" {
 		return "", fmt.Errorf("missing arguments. Usage: /task <command> <project> [title] [--status=pending|done]")
 	}
 
-	command := parts[0]
-	projectName := parts[1]
-
-	// Parse optional title and status from remaining parts
-	var title, status string
-	remaining := parts[2:]
-	var titleParts []string
-	for _, p := range remaining {
-		if strings.HasPrefix(p, "--status=") {
-			status = strings.TrimPrefix(p, "--status=")
-		} else {
-			titleParts = append(titleParts, p)
-		}
-	}
-	title = strings.Join(titleParts, " ")
+	title, _ := input["title"].(string)
+	status, _ := input["status"].(string)
 
 	project, err := t.db.GetOrCreateProject(userData.UserID, projectName)
 	if err != nil {

@@ -889,6 +889,71 @@ func TestSessionRevocations(t *testing.T) {
 	}
 }
 
+func TestGetTopicByName(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	db.CreateTopic("General", owner.ID)
+
+	// Exact match
+	topic, err := db.GetTopicByName("General")
+	if err != nil {
+		t.Fatalf("GetTopicByName failed: %v", err)
+	}
+	if topic.Name != "General" {
+		t.Errorf("expected name 'General', got %q", topic.Name)
+	}
+
+	// Case-insensitive match
+	topic, err = db.GetTopicByName("general")
+	if err != nil {
+		t.Fatalf("GetTopicByName case-insensitive failed: %v", err)
+	}
+	if topic.Name != "General" {
+		t.Errorf("expected name 'General', got %q", topic.Name)
+	}
+
+	// Not found
+	_, err = db.GetTopicByName("nonexistent")
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+
+	// Deleted topic not found
+	db.SoftDeleteTopic(topic.ID)
+	_, err = db.GetTopicByName("General")
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound for deleted topic, got %v", err)
+	}
+}
+
+func TestTopicNameUniqueCaseInsensitive(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	owner, _ := db.CreateUser("owner", "hash")
+	_, err := db.CreateTopic("General", owner.ID)
+	if err != nil {
+		t.Fatalf("first CreateTopic failed: %v", err)
+	}
+
+	// Creating topic with same name (different case) should fail
+	_, err = db.CreateTopic("general", owner.ID)
+	if err == nil {
+		t.Error("expected error when creating duplicate topic name (case-insensitive)")
+	}
+
+	// After deleting, should be able to create again
+	topic, _ := db.GetTopicByName("General")
+	db.SoftDeleteTopic(topic.ID)
+
+	_, err = db.CreateTopic("General", owner.ID)
+	if err != nil {
+		t.Fatalf("CreateTopic after delete failed: %v", err)
+	}
+}
+
 func TestDeleteOldSessionRevocations(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
