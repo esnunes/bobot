@@ -187,9 +187,10 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 
 		// Broadcast system response to all topic members
 		respJSON, _ := json.Marshal(map[string]interface{}{
-			"topic_id": topicID,
-			"role":     "system",
-			"content":  response,
+			"topic_id":     topicID,
+			"role":         "system",
+			"content":      response,
+			"display_name": "bobot",
 		})
 		s.broadcastToTopic(topicID, respJSON)
 		return
@@ -262,9 +263,10 @@ func (s *Server) handleTopicAssistantResponse(ctx context.Context, topicID int64
 
 	// Broadcast to topic
 	assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
-		"topic_id": topicID,
-		"role":     "assistant",
-		"content":  response,
+		"topic_id":     topicID,
+		"role":         "assistant",
+		"content":      response,
+		"display_name": "bobot",
 	})
 	s.broadcastToTopic(topicID, assistantMsgJSON)
 }

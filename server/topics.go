@@ -265,11 +265,14 @@ func (s *Server) handleTopicMessageHistory(w http.ResponseWriter, r *http.Reques
 			"Content":   m.Content,
 			"CreatedAt": m.CreatedAt,
 		}
-		if m.Role == "user" {
+		switch m.Role {
+		case "user", "command":
 			if user, err := s.db.GetUserByID(m.SenderID); err == nil {
 				item["UserID"] = user.ID
 				item["DisplayName"] = user.DisplayName
 			}
+		case "assistant", "system":
+			item["DisplayName"] = "bobot"
 		}
 		result = append(result, item)
 	}
@@ -314,11 +317,14 @@ func (s *Server) handleTopicMessageSync(w http.ResponseWriter, r *http.Request) 
 			"Content":   m.Content,
 			"CreatedAt": m.CreatedAt,
 		}
-		if m.Role == "user" {
+		switch m.Role {
+		case "user", "command":
 			if user, err := s.db.GetUserByID(m.SenderID); err == nil {
 				item["UserID"] = user.ID
 				item["DisplayName"] = user.DisplayName
 			}
+		case "assistant", "system":
+			item["DisplayName"] = "bobot"
 		}
 		result = append(result, item)
 	}

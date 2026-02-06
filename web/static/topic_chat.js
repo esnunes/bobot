@@ -133,7 +133,7 @@ window.TopicChatClient = class TopicChatClient {
 
         msgEl.className = `message ${role}`;
 
-        if ((role === 'user' || role === 'command') && displayName) {
+        if (displayName) {
             const nameEl = document.createElement('div');
             nameEl.className = 'message-sender';
             nameEl.textContent = displayName;
@@ -208,7 +208,7 @@ window.TopicChatClient = class TopicChatClient {
         const role = msg.Role;
         msgEl.className = `message ${role}`;
 
-        if ((role === 'user' || role === 'command') && msg.DisplayName) {
+        if (msg.DisplayName) {
             const nameEl = document.createElement('div');
             nameEl.className = 'message-sender';
             nameEl.textContent = msg.DisplayName;

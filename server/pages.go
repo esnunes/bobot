@@ -241,11 +241,14 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 			Content:   m.Content,
 			CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
-		if m.Role == "user" {
+		switch m.Role {
+		case "user", "command":
 			if user, err := s.db.GetUserByID(m.SenderID); err == nil {
 				mv.UserID = user.ID
 				mv.DisplayName = user.DisplayName
 			}
+		case "assistant", "system":
+			mv.DisplayName = "bobot"
 		}
 		messages = append(messages, mv)
 	}
