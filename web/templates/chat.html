@@ -8,7 +8,7 @@
 
     <main class="chat-messages" id="messages">
         {{range .Messages}}
-        <div class="message {{.Role}}" data-message-id="{{.ID}}" data-created-at="{{.CreatedAt}}">{{.Content}}</div>
+        <div class="message {{.Role}}{{if or (eq .Role "user") (eq .Role "command")}} self{{end}}" data-message-id="{{.ID}}" data-created-at="{{.CreatedAt}}">{{.Content}}</div>
         {{end}}
     </main>
 

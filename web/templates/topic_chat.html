@@ -8,7 +8,7 @@
 
     <main class="chat-messages" id="messages">
         {{range .Messages}}
-        <div class="message {{.Role}}" data-message-id="{{.ID}}">
+        <div class="message {{.Role}}{{if eq .UserID $.CurrentUserID}} self{{end}}" data-message-id="{{.ID}}">
             <div class="message-sender">{{.DisplayName}}</div>
             <div class="message-content">{{.Content}}</div>
         </div>

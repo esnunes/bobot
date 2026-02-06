@@ -130,8 +130,10 @@ window.TopicChatClient = class TopicChatClient {
         const role = msg.role || msg.Role;
         const content = msg.content || msg.Content;
         const displayName = msg.display_name || msg.DisplayName;
+        const userId = msg.user_id || msg.UserID;
+        const self = (userId === this.currentUserId) ? ' self' : '';
 
-        msgEl.className = `message ${role}`;
+        msgEl.className = `message ${role}${self}`;
 
         if (displayName) {
             const nameEl = document.createElement('div');
@@ -206,7 +208,8 @@ window.TopicChatClient = class TopicChatClient {
     prependMessage(msg) {
         const msgEl = document.createElement('div');
         const role = msg.Role;
-        msgEl.className = `message ${role}`;
+        const self = (msg.UserID === this.currentUserId) ? ' self' : '';
+        msgEl.className = `message ${role}${self}`;
 
         if (msg.DisplayName) {
             const nameEl = document.createElement('div');

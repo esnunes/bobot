@@ -183,14 +183,12 @@ header {
   max-width: var(--sizes-max-message-width);
 }
 
-.message.user,
-.message.command {
+.message.self {
   align-self: flex-end;
   align-items: flex-end;
 }
 
-.message.assistant,
-.message.system {
+.message:not(.self) {
   align-self: flex-start;
   align-items: flex-start;
 }
@@ -211,8 +209,7 @@ header {
   overflow-wrap: anywhere;
 }
 
-.message.user .message-bubble,
-.message.command .message-bubble {
+.message.self .message-bubble {
   background: var(--colors-accent-light);
 }
 
@@ -226,8 +223,7 @@ header {
   overflow-wrap: anywhere;
 }
 
-.message.user:not(:has(.message-bubble)),
-.message.command:not(:has(.message-bubble)) {
+.message.self:not(:has(.message-bubble)) {
   background: var(--colors-accent-light);
 }
 

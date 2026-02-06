@@ -168,7 +168,8 @@ window.ChatClient ||= class ChatClient {
 
     addMessage(content, role, id = null, scroll = true) {
         const msgEl = document.createElement('div');
-        msgEl.className = `message ${role}`;
+        const self = (role === 'user' || role === 'command') ? ' self' : '';
+        msgEl.className = `message ${role}${self}`;
         msgEl.textContent = content;
         if (id) {
             msgEl.setAttribute('data-message-id', id);
@@ -181,7 +182,8 @@ window.ChatClient ||= class ChatClient {
 
     prependMessage(content, role, id = null) {
         const msgEl = document.createElement('div');
-        msgEl.className = `message ${role}`;
+        const self = (role === 'user' || role === 'command') ? ' self' : '';
+        msgEl.className = `message ${role}${self}`;
         msgEl.textContent = content;
         if (id) {
             msgEl.setAttribute('data-message-id', id);
