@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/esnunes/bobot/assistant"
@@ -56,6 +57,17 @@ func main() {
 			}
 			coreDB.CreateMessage(db.BobotUserID, user.ID, "assistant", db.WelcomeMessage)
 			log.Printf("Created initial admin user: %s", cfg.InitUser)
+		}
+	}
+
+	// Handle subcommands
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "update-profiles":
+			runUpdateProfiles(cfg, coreDB)
+			return
+		default:
+			log.Fatalf("Unknown command: %s", os.Args[1])
 		}
 	}
 
