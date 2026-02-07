@@ -265,6 +265,18 @@ func TestSignup_ValidInvite(t *testing.T) {
 	if invite.UsedBy == nil {
 		t.Error("invite should be marked as used")
 	}
+
+	// Verify welcome message was sent
+	messages, err := srv.db.GetPrivateChatMessages(user.ID, 10)
+	if err != nil {
+		t.Fatalf("failed to get messages: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("expected 1 welcome message, got %d", len(messages))
+	}
+	if messages[0].Content != db.WelcomeMessage {
+		t.Errorf("expected welcome message content, got %s", messages[0].Content)
+	}
 }
 
 func TestSignup_InvalidInvite(t *testing.T) {

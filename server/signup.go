@@ -2,11 +2,13 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/esnunes/bobot/auth"
+	"github.com/esnunes/bobot/db"
 )
 
 func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +112,11 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 			Code:  code,
 		})
 		return
+	}
+
+	// Send welcome message from Bobot
+	if _, err := s.db.CreateMessage(db.BobotUserID, user.ID, "assistant", db.WelcomeMessage); err != nil {
+		log.Printf("failed to create welcome message for user %d: %v", user.ID, err)
 	}
 
 	// Mark invite as used

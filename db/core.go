@@ -17,6 +17,23 @@ var ErrNotFound = errors.New("not found")
 // This user is created during migration with ID 0.
 const BobotUserID = int64(0)
 
+const WelcomeMessage = `
+👋 Olá! Seja muito bem-vindo(a)!
+
+Quero te conhecer melhor para poder te ajudar da melhor forma possível 😊.
+
+Se puder, me conte rapidinho:
+
+- Qual o seu nome?
+- Onde você mora (cidade e país)?
+
+🌎 **Idioma / Language**
+
+Se você preferir outro idioma, pode responder nele.
+
+If you prefer another language, just reply in that language. I will continue assisting you using it.
+`
+
 type User struct {
 	ID           int64
 	Username     string

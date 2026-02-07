@@ -50,10 +50,11 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to hash initial password: %v", err)
 			}
-			_, err = coreDB.CreateUserFull(cfg.InitUser, hash, cfg.InitUser, "admin")
+			user, err := coreDB.CreateUserFull(cfg.InitUser, hash, cfg.InitUser, "admin")
 			if err != nil {
 				log.Fatalf("Failed to create initial user: %v", err)
 			}
+			coreDB.CreateMessage(db.BobotUserID, user.ID, "assistant", db.WelcomeMessage)
 			log.Printf("Created initial admin user: %s", cfg.InitUser)
 		}
 	}
