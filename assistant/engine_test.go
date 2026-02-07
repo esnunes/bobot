@@ -3,6 +3,7 @@ package assistant
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/esnunes/bobot/auth"
@@ -51,7 +52,7 @@ func TestEngine_Chat_SimpleResponse(t *testing.T) {
 
 	registry := tools.NewRegistry()
 	mockCtxProvider := &mockContextProvider{messages: nil}
-	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider)
+	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider, nil)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	result, err := engine.Chat(ctx, "Hi")
@@ -80,7 +81,7 @@ func TestEngine_Chat_WithToolUse(t *testing.T) {
 	registry.Register(&mockTool{result: "Tasks: milk, eggs"})
 
 	mockCtxProvider := &mockContextProvider{messages: nil}
-	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider)
+	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider, nil)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	result, err := engine.Chat(ctx, "What's on my list?")
@@ -128,7 +129,7 @@ func TestEngine_ChatWithContext(t *testing.T) {
 	}
 
 	registry := tools.NewRegistry()
-	engine := NewEngine(mockProv, registry, nil, mockCtxProvider)
+	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, nil)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
 	_, err := engine.Chat(ctx, "new question")
@@ -161,7 +162,7 @@ func TestEngine_ChatWithConversation(t *testing.T) {
 
 	mockCtxProvider := &mockContextProvider{messages: nil}
 	registry := tools.NewRegistry()
-	engine := NewEngine(mockProv, registry, nil, mockCtxProvider)
+	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, nil)
 
 	conversation := []string{
 		"[Alice]: Hello @bobot",
@@ -184,5 +185,76 @@ func TestEngine_ChatWithConversation(t *testing.T) {
 	// Should have 2 messages from conversation
 	if len(capturedMessages) != 2 {
 		t.Errorf("expected 2 messages, got %d", len(capturedMessages))
+	}
+}
+
+type mockProfileProvider struct {
+	profiles map[int64]string
+}
+
+func (m *mockProfileProvider) GetUserProfile(userID int64) (string, int64, error) {
+	content, ok := m.profiles[userID]
+	if !ok {
+		return "", 0, nil
+	}
+	return content, 0, nil
+}
+
+func TestEngine_Chat_InjectsProfile(t *testing.T) {
+	var capturedSystemPrompt string
+	mockProv := &mockProvider{
+		chatFunc: func(ctx context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedSystemPrompt = req.SystemPrompt
+			return &llm.ChatResponse{Content: "Hello Eduardo!"}, nil
+		},
+	}
+
+	mockCtxProvider := &mockContextProvider{messages: nil}
+	mockProfile := &mockProfileProvider{
+		profiles: map[int64]string{
+			1: "Eduardo lives in Berlin. Prefers concise responses.",
+		},
+	}
+
+	registry := tools.NewRegistry()
+	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, mockProfile)
+
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
+	_, err := engine.Chat(ctx, "Hi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(capturedSystemPrompt, "Eduardo lives in Berlin") {
+		t.Error("expected system prompt to contain user profile")
+	}
+	if !strings.Contains(capturedSystemPrompt, "<user-profile>") {
+		t.Error("expected system prompt to contain <user-profile> tags")
+	}
+}
+
+func TestEngine_Chat_NoProfileNoInjection(t *testing.T) {
+	var capturedSystemPrompt string
+	mockProv := &mockProvider{
+		chatFunc: func(ctx context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedSystemPrompt = req.SystemPrompt
+			return &llm.ChatResponse{Content: "Hello!"}, nil
+		},
+	}
+
+	mockCtxProvider := &mockContextProvider{messages: nil}
+	mockProfile := &mockProfileProvider{profiles: map[int64]string{}}
+
+	registry := tools.NewRegistry()
+	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, mockProfile)
+
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
+	_, err := engine.Chat(ctx, "Hi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(capturedSystemPrompt, "<user-profile>") {
+		t.Error("expected system prompt to NOT contain profile tags when profile is empty")
 	}
 }
