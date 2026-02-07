@@ -46,7 +46,7 @@ func main() {
 	// Create initial user if configured and no users exist
 	if cfg.InitUser != "" && cfg.InitPass != "" {
 		count, _ := coreDB.UserCount()
-		if count == 0 {
+		if count == 1 {
 			hash, err := auth.HashPassword(cfg.InitPass)
 			if err != nil {
 				log.Fatalf("Failed to hash initial password: %v", err)
