@@ -323,6 +323,19 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Create user_profiles table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS user_profiles (
+			user_id INTEGER PRIMARY KEY REFERENCES users(id),
+			content TEXT NOT NULL DEFAULT '',
+			last_message_id INTEGER NOT NULL DEFAULT 0,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -926,6 +939,76 @@ func (c *CoreDB) ListUsers() ([]User, error) {
 		SELECT id, username, password_hash, display_name, role, blocked, created_at
 		FROM users
 		ORDER BY created_at ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		var blocked int
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &blocked, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		u.Blocked = blocked == 1
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+// GetUserProfile returns the profile content and last processed message ID for a user.
+// Returns empty content and 0 if no profile exists yet.
+func (c *CoreDB) GetUserProfile(userID int64) (string, int64, error) {
+	var content string
+	var lastMessageID int64
+	err := c.db.QueryRow(
+		"SELECT content, last_message_id FROM user_profiles WHERE user_id = ?",
+		userID,
+	).Scan(&content, &lastMessageID)
+
+	if err == sql.ErrNoRows {
+		return "", 0, nil
+	}
+	if err != nil {
+		return "", 0, err
+	}
+	return content, lastMessageID, nil
+}
+
+// UpsertUserProfile inserts or replaces a user's profile.
+func (c *CoreDB) UpsertUserProfile(userID int64, content string, lastMessageID int64) error {
+	_, err := c.db.Exec(
+		"INSERT INTO user_profiles (user_id, content, last_message_id, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET content = excluded.content, last_message_id = excluded.last_message_id, updated_at = CURRENT_TIMESTAMP",
+		userID, content, lastMessageID,
+	)
+	return err
+}
+
+// GetUserMessagesSince returns user-role private messages sent by a user since a given message ID.
+func (c *CoreDB) GetUserMessagesSince(userID int64, sinceMessageID int64) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE sender_id = ? AND role = 'user' AND topic_id IS NULL AND id > ?
+		ORDER BY id ASC
+	`, userID, sinceMessageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return c.scanMessages(rows)
+}
+
+// ListActiveUsers returns all non-blocked, non-system users.
+func (c *CoreDB) ListActiveUsers() ([]User, error) {
+	rows, err := c.db.Query(`
+		SELECT id, username, password_hash, display_name, role, blocked, created_at
+		FROM users
+		WHERE id != 0 AND blocked = 0
+		ORDER BY id ASC
 	`)
 	if err != nil {
 		return nil, err

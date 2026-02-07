@@ -22,19 +22,26 @@ type ContextMessage struct {
 	Content string
 }
 
+// ProfileProvider retrieves user profile data.
+type ProfileProvider interface {
+	GetUserProfile(userID int64) (string, int64, error)
+}
+
 type Engine struct {
 	provider        llm.Provider
 	registry        *tools.Registry
 	skills          []Skill
 	contextProvider ContextProvider
+	profileProvider ProfileProvider
 }
 
-func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill, contextProvider ContextProvider) *Engine {
+func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill, contextProvider ContextProvider, profileProvider ProfileProvider) *Engine {
 	return &Engine{
 		provider:        provider,
 		registry:        registry,
 		skills:          skills,
 		contextProvider: contextProvider,
+		profileProvider: profileProvider,
 	}
 }
 
@@ -47,6 +54,14 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 	// Build system prompt with role-filtered tools
 	llmTools := e.registry.ToLLMToolsForRole(userData.Role)
 	systemPrompt := BuildSystemPrompt(e.skills, llmTools)
+
+	// Inject user profile if available
+	if e.profileProvider != nil {
+		profileContent, _, err := e.profileProvider.GetUserProfile(userData.UserID)
+		if err == nil && profileContent != "" {
+			systemPrompt += "\n\n## User Profile\nThe following is known about the user you are chatting with:\n<user-profile>\n" + profileContent + "\n</user-profile>"
+		}
+	}
 
 	// Build messages with context
 	var messages []llm.Message

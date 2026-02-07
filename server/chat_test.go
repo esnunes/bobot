@@ -47,7 +47,7 @@ func setupChatTestServer(t *testing.T) (*Server, string) {
 	}
 
 	registry := tools.NewRegistry()
-	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{})
+	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{}, nil)
 
 	srv := NewWithAssistant(cfg, coreDB, engine, registry)
 
@@ -144,7 +144,7 @@ func TestChatWebSocket_SlashCommand(t *testing.T) {
 
 	registry := tools.NewRegistry()
 	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
-	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{})
+	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{}, nil)
 
 	srv := NewWithAssistant(cfg, coreDB, engine, registry)
 

@@ -5,8 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/db"
 )
+
+func TestCoreDBAdapter_ImplementsProfileProvider(t *testing.T) {
+	// Compile-time check that CoreDBAdapter implements ProfileProvider
+	var _ assistant.ProfileProvider = (*CoreDBAdapter)(nil)
+}
 
 func TestCoreDBAdapter_GetContextMessages(t *testing.T) {
 	tmpDir := t.TempDir()

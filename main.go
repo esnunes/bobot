@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/esnunes/bobot/assistant"
@@ -45,7 +46,7 @@ func main() {
 	// Create initial user if configured and no users exist
 	if cfg.InitUser != "" && cfg.InitPass != "" {
 		count, _ := coreDB.UserCount()
-		if count == 0 {
+		if count == 1 {
 			hash, err := auth.HashPassword(cfg.InitPass)
 			if err != nil {
 				log.Fatalf("Failed to hash initial password: %v", err)
@@ -56,6 +57,17 @@ func main() {
 			}
 			coreDB.CreateMessage(db.BobotUserID, user.ID, "assistant", db.WelcomeMessage)
 			log.Printf("Created initial admin user: %s", cfg.InitUser)
+		}
+	}
+
+	// Handle subcommands
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "update-profiles":
+			runUpdateProfiles(cfg, coreDB)
+			return
+		default:
+			log.Fatalf("Unknown command: %s", os.Args[1])
 		}
 	}
 
@@ -78,7 +90,7 @@ func main() {
 	contextAdapter := bobotcontext.NewCoreDBAdapter(coreDB)
 
 	// Initialize assistant engine with context
-	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter)
+	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter, contextAdapter)
 
 	// Initialize HTTP server
 	srv := server.NewWithAssistant(cfg, coreDB, engine, registry)

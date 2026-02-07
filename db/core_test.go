@@ -954,6 +954,135 @@ func TestTopicNameUniqueCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestCoreDB_UserProfilesTableExists(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Verify user_profiles table exists
+	var name string
+	err := db.db.QueryRow(
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='user_profiles'",
+	).Scan(&name)
+	if err != nil {
+		t.Fatalf("user_profiles table not found: %v", err)
+	}
+}
+
+func TestCoreDB_GetUserProfile_Empty(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("profileuser", "hash")
+
+	content, lastMsgID, err := db.GetUserProfile(user.ID)
+	if err != nil {
+		t.Fatalf("GetUserProfile failed: %v", err)
+	}
+	if content != "" {
+		t.Errorf("expected empty content, got %q", content)
+	}
+	if lastMsgID != 0 {
+		t.Errorf("expected lastMsgID=0, got %d", lastMsgID)
+	}
+}
+
+func TestCoreDB_UpsertUserProfile(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("profileuser", "hash")
+
+	// Insert new profile
+	err := db.UpsertUserProfile(user.ID, "Likes Go programming.", 42)
+	if err != nil {
+		t.Fatalf("UpsertUserProfile (insert) failed: %v", err)
+	}
+
+	content, lastMsgID, _ := db.GetUserProfile(user.ID)
+	if content != "Likes Go programming." {
+		t.Errorf("expected 'Likes Go programming.', got %q", content)
+	}
+	if lastMsgID != 42 {
+		t.Errorf("expected lastMsgID=42, got %d", lastMsgID)
+	}
+
+	// Update existing profile
+	err = db.UpsertUserProfile(user.ID, "Likes Go and Rust.", 100)
+	if err != nil {
+		t.Fatalf("UpsertUserProfile (update) failed: %v", err)
+	}
+
+	content, lastMsgID, _ = db.GetUserProfile(user.ID)
+	if content != "Likes Go and Rust." {
+		t.Errorf("expected 'Likes Go and Rust.', got %q", content)
+	}
+	if lastMsgID != 100 {
+		t.Errorf("expected lastMsgID=100, got %d", lastMsgID)
+	}
+}
+
+func TestCoreDB_GetUserMessagesSince(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("msguser", "hash")
+
+	// Create mixed messages
+	msg1, _ := db.CreateMessage(user.ID, BobotUserID, "user", "Hello")        // user msg
+	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi!")                  // assistant msg
+	msg3, _ := db.CreateMessage(user.ID, BobotUserID, "user", "How are you?") // user msg
+
+	// Get messages since before all messages
+	msgs, err := db.GetUserMessagesSince(user.ID, 0)
+	if err != nil {
+		t.Fatalf("GetUserMessagesSince failed: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Errorf("expected 2 user messages, got %d", len(msgs))
+	}
+
+	// Get messages since msg1 (should only return msg3)
+	msgs, err = db.GetUserMessagesSince(user.ID, msg1.ID)
+	if err != nil {
+		t.Fatalf("GetUserMessagesSince failed: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Errorf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0].ID != msg3.ID {
+		t.Errorf("expected message ID %d, got %d", msg3.ID, msgs[0].ID)
+	}
+}
+
+func TestCoreDB_ListActiveUsers(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	db.CreateUserFull("active1", "hash", "Active One", "user")
+	db.CreateUserFull("active2", "hash", "Active Two", "admin")
+	blocked, _ := db.CreateUserFull("blocked", "hash", "Blocked", "user")
+	db.BlockUser(blocked.ID)
+
+	users, err := db.ListActiveUsers()
+	if err != nil {
+		t.Fatalf("ListActiveUsers failed: %v", err)
+	}
+
+	// Should return active1 and active2, exclude bobot (id=0) and blocked user
+	if len(users) != 2 {
+		t.Errorf("expected 2 active users, got %d", len(users))
+	}
+
+	for _, u := range users {
+		if u.ID == BobotUserID {
+			t.Error("should not include bobot system user")
+		}
+		if u.Blocked {
+			t.Error("should not include blocked users")
+		}
+	}
+}
+
 func TestDeleteOldSessionRevocations(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
