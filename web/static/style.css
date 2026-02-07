@@ -24,6 +24,10 @@ button {
   font-size: inherit;
   line-height: inherit;
   cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+  }
 }
 
 .hidden {
@@ -145,6 +149,7 @@ header {
     font-weight: var(--font-weights-medium);
     color: var(--colors-text);
     text-align: center;
+    text-transform: uppercase;
   }
 
   button {
