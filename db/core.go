@@ -958,6 +958,25 @@ func (c *CoreDB) ListUsers() ([]User, error) {
 	return users, rows.Err()
 }
 
+// GetUserProfile returns the profile content and last processed message ID for a user.
+// Returns empty content and 0 if no profile exists yet.
+func (c *CoreDB) GetUserProfile(userID int64) (string, int64, error) {
+	var content string
+	var lastMessageID int64
+	err := c.db.QueryRow(
+		"SELECT content, last_message_id FROM user_profiles WHERE user_id = ?",
+		userID,
+	).Scan(&content, &lastMessageID)
+
+	if err == sql.ErrNoRows {
+		return "", 0, nil
+	}
+	if err != nil {
+		return "", 0, err
+	}
+	return content, lastMessageID, nil
+}
+
 // CreateTopic creates a new topic with the given name and owner.
 func (c *CoreDB) CreateTopic(name string, ownerID int64) (*Topic, error) {
 	result, err := c.db.Exec(

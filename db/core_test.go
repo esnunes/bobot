@@ -968,6 +968,24 @@ func TestCoreDB_UserProfilesTableExists(t *testing.T) {
 	}
 }
 
+func TestCoreDB_GetUserProfile_Empty(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("profileuser", "hash")
+
+	content, lastMsgID, err := db.GetUserProfile(user.ID)
+	if err != nil {
+		t.Fatalf("GetUserProfile failed: %v", err)
+	}
+	if content != "" {
+		t.Errorf("expected empty content, got %q", content)
+	}
+	if lastMsgID != 0 {
+		t.Errorf("expected lastMsgID=0, got %d", lastMsgID)
+	}
+}
+
 func TestDeleteOldSessionRevocations(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
