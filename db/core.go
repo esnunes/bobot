@@ -986,6 +986,22 @@ func (c *CoreDB) UpsertUserProfile(userID int64, content string, lastMessageID i
 	return err
 }
 
+// GetUserMessagesSince returns user-role private messages sent by a user since a given message ID.
+func (c *CoreDB) GetUserMessagesSince(userID int64, sinceMessageID int64) ([]Message, error) {
+	rows, err := c.db.Query(`
+		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		FROM messages
+		WHERE sender_id = ? AND role = 'user' AND topic_id IS NULL AND id > ?
+		ORDER BY id ASC
+	`, userID, sinceMessageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return c.scanMessages(rows)
+}
+
 // CreateTopic creates a new topic with the given name and owner.
 func (c *CoreDB) CreateTopic(name string, ownerID int64) (*Topic, error) {
 	result, err := c.db.Exec(

@@ -1021,6 +1021,39 @@ func TestCoreDB_UpsertUserProfile(t *testing.T) {
 	}
 }
 
+func TestCoreDB_GetUserMessagesSince(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("msguser", "hash")
+
+	// Create mixed messages
+	msg1, _ := db.CreateMessage(user.ID, BobotUserID, "user", "Hello")        // user msg
+	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi!")                  // assistant msg
+	msg3, _ := db.CreateMessage(user.ID, BobotUserID, "user", "How are you?") // user msg
+
+	// Get messages since before all messages
+	msgs, err := db.GetUserMessagesSince(user.ID, 0)
+	if err != nil {
+		t.Fatalf("GetUserMessagesSince failed: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Errorf("expected 2 user messages, got %d", len(msgs))
+	}
+
+	// Get messages since msg1 (should only return msg3)
+	msgs, err = db.GetUserMessagesSince(user.ID, msg1.ID)
+	if err != nil {
+		t.Fatalf("GetUserMessagesSince failed: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Errorf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0].ID != msg3.ID {
+		t.Errorf("expected message ID %d, got %d", msg3.ID, msgs[0].ID)
+	}
+}
+
 func TestDeleteOldSessionRevocations(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
