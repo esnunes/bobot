@@ -323,6 +323,19 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Create user_profiles table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS user_profiles (
+			user_id INTEGER PRIMARY KEY REFERENCES users(id),
+			content TEXT NOT NULL DEFAULT '',
+			last_message_id INTEGER NOT NULL DEFAULT 0,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

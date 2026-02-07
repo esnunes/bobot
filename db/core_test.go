@@ -954,6 +954,20 @@ func TestTopicNameUniqueCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestCoreDB_UserProfilesTableExists(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Verify user_profiles table exists
+	var name string
+	err := db.db.QueryRow(
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='user_profiles'",
+	).Scan(&name)
+	if err != nil {
+		t.Fatalf("user_profiles table not found: %v", err)
+	}
+}
+
 func TestDeleteOldSessionRevocations(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
