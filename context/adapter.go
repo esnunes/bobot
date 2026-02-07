@@ -11,8 +11,9 @@ type CoreDBAdapter struct {
 	db *db.CoreDB
 }
 
-// Compile-time check that CoreDBAdapter implements ContextProvider.
+// Compile-time check that CoreDBAdapter implements ContextProvider and ProfileProvider.
 var _ assistant.ContextProvider = (*CoreDBAdapter)(nil)
+var _ assistant.ProfileProvider = (*CoreDBAdapter)(nil)
 
 // NewCoreDBAdapter creates a new adapter.
 func NewCoreDBAdapter(coreDB *db.CoreDB) *CoreDBAdapter {
@@ -34,4 +35,9 @@ func (a *CoreDBAdapter) GetContextMessages(userID int64) ([]assistant.ContextMes
 		}
 	}
 	return result, nil
+}
+
+// GetUserProfile returns the profile content and last message ID for a user.
+func (a *CoreDBAdapter) GetUserProfile(userID int64) (string, int64, error) {
+	return a.db.GetUserProfile(userID)
 }

@@ -78,7 +78,7 @@ func main() {
 	contextAdapter := bobotcontext.NewCoreDBAdapter(coreDB)
 
 	// Initialize assistant engine with context
-	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter)
+	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter, contextAdapter)
 
 	// Initialize HTTP server
 	srv := server.NewWithAssistant(cfg, coreDB, engine, registry)
