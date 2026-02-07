@@ -1054,6 +1054,35 @@ func TestCoreDB_GetUserMessagesSince(t *testing.T) {
 	}
 }
 
+func TestCoreDB_ListActiveUsers(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	db.CreateUserFull("active1", "hash", "Active One", "user")
+	db.CreateUserFull("active2", "hash", "Active Two", "admin")
+	blocked, _ := db.CreateUserFull("blocked", "hash", "Blocked", "user")
+	db.BlockUser(blocked.ID)
+
+	users, err := db.ListActiveUsers()
+	if err != nil {
+		t.Fatalf("ListActiveUsers failed: %v", err)
+	}
+
+	// Should return active1 and active2, exclude bobot (id=0) and blocked user
+	if len(users) != 2 {
+		t.Errorf("expected 2 active users, got %d", len(users))
+	}
+
+	for _, u := range users {
+		if u.ID == BobotUserID {
+			t.Error("should not include bobot system user")
+		}
+		if u.Blocked {
+			t.Error("should not include blocked users")
+		}
+	}
+}
+
 func TestDeleteOldSessionRevocations(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()

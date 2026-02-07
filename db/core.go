@@ -1002,6 +1002,32 @@ func (c *CoreDB) GetUserMessagesSince(userID int64, sinceMessageID int64) ([]Mes
 	return c.scanMessages(rows)
 }
 
+// ListActiveUsers returns all non-blocked, non-system users.
+func (c *CoreDB) ListActiveUsers() ([]User, error) {
+	rows, err := c.db.Query(`
+		SELECT id, username, password_hash, display_name, role, blocked, created_at
+		FROM users
+		WHERE id != 0 AND blocked = 0
+		ORDER BY id ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		var blocked int
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &blocked, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		u.Blocked = blocked == 1
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
 // CreateTopic creates a new topic with the given name and owner.
 func (c *CoreDB) CreateTopic(name string, ownerID int64) (*Topic, error) {
 	result, err := c.db.Exec(
