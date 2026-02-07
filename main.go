@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/esnunes/bobot/assistant"
-	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/config"
 	bobotcontext "github.com/esnunes/bobot/context"
 	"github.com/esnunes/bobot/db"
@@ -43,26 +42,12 @@ func main() {
 	}
 	defer taskDB.Close()
 
-	// Create initial user if configured and no users exist
-	if cfg.InitUser != "" && cfg.InitPass != "" {
-		count, _ := coreDB.UserCount()
-		if count == 1 {
-			hash, err := auth.HashPassword(cfg.InitPass)
-			if err != nil {
-				log.Fatalf("Failed to hash initial password: %v", err)
-			}
-			user, err := coreDB.CreateUserFull(cfg.InitUser, hash, cfg.InitUser, "admin")
-			if err != nil {
-				log.Fatalf("Failed to create initial user: %v", err)
-			}
-			coreDB.CreateMessage(db.BobotUserID, user.ID, "assistant", db.WelcomeMessage)
-			log.Printf("Created initial admin user: %s", cfg.InitUser)
-		}
-	}
-
 	// Handle subcommands
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "create-admin":
+			runCreateAdmin(coreDB)
+			return
 		case "update-profiles":
 			runUpdateProfiles(cfg, coreDB)
 			return
