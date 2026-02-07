@@ -977,6 +977,15 @@ func (c *CoreDB) GetUserProfile(userID int64) (string, int64, error) {
 	return content, lastMessageID, nil
 }
 
+// UpsertUserProfile inserts or replaces a user's profile.
+func (c *CoreDB) UpsertUserProfile(userID int64, content string, lastMessageID int64) error {
+	_, err := c.db.Exec(
+		"INSERT INTO user_profiles (user_id, content, last_message_id, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET content = excluded.content, last_message_id = excluded.last_message_id, updated_at = CURRENT_TIMESTAMP",
+		userID, content, lastMessageID,
+	)
+	return err
+}
+
 // CreateTopic creates a new topic with the given name and owner.
 func (c *CoreDB) CreateTopic(name string, ownerID int64) (*Topic, error) {
 	result, err := c.db.Exec(

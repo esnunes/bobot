@@ -986,6 +986,41 @@ func TestCoreDB_GetUserProfile_Empty(t *testing.T) {
 	}
 }
 
+func TestCoreDB_UpsertUserProfile(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("profileuser", "hash")
+
+	// Insert new profile
+	err := db.UpsertUserProfile(user.ID, "Likes Go programming.", 42)
+	if err != nil {
+		t.Fatalf("UpsertUserProfile (insert) failed: %v", err)
+	}
+
+	content, lastMsgID, _ := db.GetUserProfile(user.ID)
+	if content != "Likes Go programming." {
+		t.Errorf("expected 'Likes Go programming.', got %q", content)
+	}
+	if lastMsgID != 42 {
+		t.Errorf("expected lastMsgID=42, got %d", lastMsgID)
+	}
+
+	// Update existing profile
+	err = db.UpsertUserProfile(user.ID, "Likes Go and Rust.", 100)
+	if err != nil {
+		t.Fatalf("UpsertUserProfile (update) failed: %v", err)
+	}
+
+	content, lastMsgID, _ = db.GetUserProfile(user.ID)
+	if content != "Likes Go and Rust." {
+		t.Errorf("expected 'Likes Go and Rust.', got %q", content)
+	}
+	if lastMsgID != 100 {
+		t.Errorf("expected lastMsgID=100, got %d", lastMsgID)
+	}
+}
+
 func TestDeleteOldSessionRevocations(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
