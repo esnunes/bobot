@@ -63,6 +63,7 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 			systemPrompt += "\n\n## User Profile\nThe following is known about the user you are chatting with:\n<user-profile>\n" + profileContent + "\n</user-profile>"
 		}
 	}
+	slog.Debug("private chat system prompt", "content", systemPrompt)
 
 	// Build messages with context
 	var messages []llm.Message

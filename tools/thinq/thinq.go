@@ -18,7 +18,7 @@ func NewThinqTool(client *Client, db *ThinqDB) *ThinqTool {
 	return &ThinqTool{client: client, db: db}
 }
 
-func (t *ThinqTool) Name() string   { return "thinq" }
+func (t *ThinqTool) Name() string    { return "thinq" }
 func (t *ThinqTool) AdminOnly() bool { return false }
 
 func (t *ThinqTool) Description() string {
@@ -36,7 +36,7 @@ func (t *ThinqTool) Schema() any {
 			},
 			"device": map[string]any{
 				"type":        "string",
-				"description": "Device ID or alias name",
+				"description": "Device ID or alias name, required for the commands status, power, and set",
 			},
 			"power": map[string]any{
 				"type":        "string",
