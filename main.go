@@ -104,9 +104,11 @@ func main() {
 
 	// Create context adapter
 	contextAdapter := bobotcontext.NewCoreDBAdapter(coreDB)
+	messageSaver := bobotcontext.NewCoreDBMessageSaver(coreDB, cfg.Context.TokensStart, cfg.Context.TokensMax)
 
 	// Initialize assistant engine with context
 	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter, contextAdapter)
+	engine.SetMessageSaver(messageSaver)
 
 	// Initialize HTTP server
 	srv := server.NewWithAssistant(cfg, coreDB, engine, registry)

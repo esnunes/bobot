@@ -115,7 +115,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send welcome message from Bobot
-	if _, err := s.db.CreateMessage(db.BobotUserID, user.ID, "assistant", db.WelcomeMessage); err != nil {
+	if _, err := s.db.CreateMessage(db.BobotUserID, user.ID, "assistant", db.WelcomeMessage, db.WelcomeMessage); err != nil {
 		log.Printf("failed to create welcome message for user %d: %v", user.ID, err)
 	}
 

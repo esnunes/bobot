@@ -88,7 +88,7 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 	if response, handled := s.handleSlashCommand(ctx, content, &receiverID, nil); handled {
 		// User sends command: sender=user, receiver=bobot
 		s.db.CreatePrivateMessageWithContextThreshold(
-			userID, db.BobotUserID, "command", content,
+			userID, db.BobotUserID, "command", content, content,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
@@ -100,7 +100,7 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 
 		// System response: sender=bobot, receiver=user
 		s.db.CreatePrivateMessageWithContextThreshold(
-			db.BobotUserID, userID, "system", response,
+			db.BobotUserID, userID, "system", response, response,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
@@ -114,7 +114,7 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 
 	// Save user message: sender=user, receiver=bobot
 	s.db.CreatePrivateMessageWithContextThreshold(
-		userID, db.BobotUserID, "user", content,
+		userID, db.BobotUserID, "user", content, content,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
 
@@ -125,18 +125,12 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 	})
 	s.connections.Broadcast(userID, userMsgJSON)
 
-	// Get assistant response
+	// Get assistant response (engine persists assistant messages internally)
 	response, err := s.engine.Chat(ctx, content)
 	if err != nil {
 		log.Printf("assistant error: %v", err)
 		response = "Sorry, I encountered an error. Please try again."
 	}
-
-	// Save assistant message: sender=bobot, receiver=user
-	s.db.CreatePrivateMessageWithContextThreshold(
-		db.BobotUserID, userID, "assistant", response,
-		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
-	)
 
 	// Broadcast assistant response
 	assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
@@ -165,7 +159,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 	if response, handled := s.handleSlashCommand(ctx, content, nil, &topicID); handled {
 		// Save command message
 		s.db.CreateTopicMessageWithContext(
-			topicID, userID, "command", content,
+			topicID, userID, "command", content, content,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
@@ -181,7 +175,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 
 		// Save system response
 		s.db.CreateTopicMessageWithContext(
-			topicID, userID, "system", response,
+			topicID, userID, "system", response, response,
 			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 		)
 
@@ -198,7 +192,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 
 	// Save user message
 	s.db.CreateTopicMessageWithContext(
-		topicID, userID, "user", content,
+		topicID, userID, "user", content, content,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
 
@@ -254,7 +248,7 @@ func (s *Server) handleTopicAssistantResponse(ctx context.Context, topicID int64
 
 	// Save assistant message using bobot user ID
 	_, err = s.db.CreateTopicMessageWithContext(
-		topicID, db.BobotUserID, "assistant", response,
+		topicID, db.BobotUserID, "assistant", response, response,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
 	if err != nil {

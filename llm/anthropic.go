@@ -123,9 +123,17 @@ func (c *AnthropicClient) Chat(ctx context.Context, req *ChatRequest) (*ChatResp
 		return nil, err
 	}
 
+	return buildChatResponse(&apiResp), nil
+}
+
+func buildChatResponse(apiResp *anthropicResponse) *ChatResponse {
 	result := &ChatResponse{
 		StopType: apiResp.StopReason,
 	}
+
+	// Build RawContent as JSON array of content blocks
+	rawBytes, _ := json.Marshal(apiResp.Content)
+	result.RawContent = string(rawBytes)
 
 	for _, content := range apiResp.Content {
 		switch content.Type {
@@ -140,5 +148,5 @@ func (c *AnthropicClient) Chat(ctx context.Context, req *ChatRequest) (*ChatResp
 		}
 	}
 
-	return result, nil
+	return result
 }
