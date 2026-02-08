@@ -92,3 +92,76 @@ func TestContextWindowing_AtomicExchange(t *testing.T) {
 		t.Error("context window starts with a tool_result message — should start with a real user message")
 	}
 }
+
+func TestFullConversationWithToolUse(t *testing.T) {
+	tmpDir := t.TempDir()
+	coreDB, err := NewCoreDB(filepath.Join(tmpDir, "test.db"))
+	if err != nil {
+		t.Fatalf("failed to create db: %v", err)
+	}
+	defer coreDB.Close()
+
+	user, _ := coreDB.CreateUser("testuser", "hash")
+	tokensStart := 1000
+	tokensMax := 4000
+
+	// Simulate: user asks about weather
+	coreDB.CreatePrivateMessageWithContextThreshold(
+		user.ID, BobotUserID, "user", "What's the weather in Paris?",
+		"\"What's the weather in Paris?\"",
+		tokensStart, tokensMax,
+	)
+
+	// Assistant responds with tool_use
+	assistantToolUseRaw := `[{"type":"text","text":"Let me check the weather."},{"type":"tool_use","id":"toolu_01","name":"get_weather","input":{"location":"Paris"}}]`
+	coreDB.CreatePrivateMessageWithContextThreshold(
+		BobotUserID, user.ID, "assistant", "Let me check the weather.", assistantToolUseRaw,
+		tokensStart, tokensMax,
+	)
+
+	// Tool result
+	toolResultRaw := `[{"type":"tool_result","tool_use_id":"toolu_01","content":"{\"temp\":18,\"condition\":\"sunny\"}"}]`
+	coreDB.CreatePrivateMessageWithContextThreshold(
+		user.ID, BobotUserID, "user", "", toolResultRaw,
+		tokensStart, tokensMax,
+	)
+
+	// Assistant final response
+	finalRaw := `[{"type":"text","text":"It's 18°C and sunny in Paris!"}]`
+	coreDB.CreatePrivateMessageWithContextThreshold(
+		BobotUserID, user.ID, "assistant", "It's 18°C and sunny in Paris!", finalRaw,
+		tokensStart, tokensMax,
+	)
+
+	// Get context messages
+	msgs, err := coreDB.GetPrivateChatContextMessages(user.ID)
+	if err != nil {
+		t.Fatalf("failed to get context: %v", err)
+	}
+
+	// Should have 4 messages: user, assistant+tool_use, tool_result, assistant_final
+	if len(msgs) != 4 {
+		t.Fatalf("expected 4 context messages, got %d", len(msgs))
+	}
+
+	// Verify roles
+	expectedRoles := []string{"user", "assistant", "user", "assistant"}
+	for i, expected := range expectedRoles {
+		if msgs[i].Role != expected {
+			t.Errorf("msg %d: expected role '%s', got '%s'", i, expected, msgs[i].Role)
+		}
+	}
+
+	// Verify raw_content is preserved
+	if msgs[1].RawContent != assistantToolUseRaw {
+		t.Errorf("assistant tool_use raw_content not preserved")
+	}
+	if msgs[2].RawContent != toolResultRaw {
+		t.Errorf("tool_result raw_content not preserved")
+	}
+
+	// Verify tool_result has empty content
+	if msgs[2].Content != "" {
+		t.Errorf("tool_result should have empty content, got '%s'", msgs[2].Content)
+	}
+}
