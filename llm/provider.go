@@ -27,9 +27,10 @@ type Tool struct {
 }
 
 type ChatResponse struct {
-	Content   string
-	ToolCalls []ToolCall
-	StopType  string
+	Content    string
+	RawContent string // JSON-encoded content array from API response
+	ToolCalls  []ToolCall
+	StopType   string
 }
 
 type ToolCall struct {
