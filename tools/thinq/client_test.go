@@ -24,15 +24,13 @@ func TestClient_ListDevices(t *testing.T) {
 		}
 
 		json.NewEncoder(w).Encode(map[string]any{
-			"response": map[string]any{
-				"devices": []map[string]any{
-					{
-						"deviceId": "dev-1",
-						"deviceInfo": map[string]any{
-							"alias":      "Bedroom AC",
-							"deviceType": "DEVICE_AIR_CONDITIONER",
-							"modelName":  "LG-AC-01",
-						},
+			"response": []map[string]any{
+				{
+					"deviceId": "dev-1",
+					"deviceInfo": map[string]any{
+						"alias":      "Bedroom AC",
+						"deviceType": "DEVICE_AIR_CONDITIONER",
+						"modelName":  "LG-AC-01",
 					},
 				},
 			},

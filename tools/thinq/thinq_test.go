@@ -17,23 +17,21 @@ func setupTestTool(t *testing.T) (*ThinqTool, *httptest.Server) {
 		switch {
 		case r.URL.Path == "/devices" && r.Method == http.MethodGet:
 			json.NewEncoder(w).Encode(map[string]any{
-				"response": map[string]any{
-					"devices": []map[string]any{
-						{
-							"deviceId": "dev-1",
-							"deviceInfo": map[string]any{
-								"alias":      "Bedroom AC",
-								"deviceType": "DEVICE_AIR_CONDITIONER",
-								"modelName":  "LG-AC-01",
-							},
+				"response": []map[string]any{
+					{
+						"deviceId": "dev-1",
+						"deviceInfo": map[string]any{
+							"alias":      "Bedroom AC",
+							"deviceType": "DEVICE_AIR_CONDITIONER",
+							"modelName":  "LG-AC-01",
 						},
-						{
-							"deviceId": "dev-2",
-							"deviceInfo": map[string]any{
-								"alias":      "Living Room AC",
-								"deviceType": "DEVICE_AIR_CONDITIONER",
-								"modelName":  "LG-AC-02",
-							},
+					},
+					{
+						"deviceId": "dev-2",
+						"deviceInfo": map[string]any{
+							"alias":      "Living Room AC",
+							"deviceType": "DEVICE_AIR_CONDITIONER",
+							"modelName":  "LG-AC-02",
 						},
 					},
 				},

@@ -67,7 +67,7 @@ func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 }
 
-func (c *Client) do(req *http.Request) (map[string]any, error) {
+func (c *Client) do(req *http.Request) (any, error) {
 	c.setHeaders(req)
 
 	resp, err := c.http.Do(req)
@@ -95,12 +95,7 @@ func (c *Client) do(req *http.Request) (map[string]any, error) {
 		return nil, fmt.Errorf("unexpected response format: missing 'response' field")
 	}
 
-	responseMap, ok := response.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response format: 'response' is not an object")
-	}
-
-	return responseMap, nil
+	return response, nil
 }
 
 func (c *Client) ListDevices() ([]Device, error) {
@@ -114,9 +109,9 @@ func (c *Client) ListDevices() ([]Device, error) {
 		return nil, err
 	}
 
-	rawDevices, ok := resp["devices"].([]any)
+	rawDevices, ok := resp.([]any)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response: missing 'devices' array")
+		return nil, fmt.Errorf("unexpected response: 'response' is not an array")
 	}
 
 	var devices []Device
@@ -151,7 +146,15 @@ func (c *Client) GetState(deviceID string) (map[string]any, error) {
 		return nil, err
 	}
 
-	return c.do(req)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	m, ok := resp.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response format for device state")
+	}
+	return m, nil
 }
 
 func (c *Client) Control(deviceID string, command map[string]any) (map[string]any, error) {
@@ -166,5 +169,13 @@ func (c *Client) Control(deviceID string, command map[string]any) (map[string]an
 	}
 	req.Header.Set("x-conditional-control", "true")
 
-	return c.do(req)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	m, ok := resp.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response format for device control")
+	}
+	return m, nil
 }
