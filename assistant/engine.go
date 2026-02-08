@@ -3,6 +3,7 @@ package assistant
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -19,8 +20,9 @@ type ContextProvider interface {
 
 // ContextMessage represents a message for context (simplified from db.Message).
 type ContextMessage struct {
-	Role    string
-	Content string
+	Role       string
+	Content    string
+	RawContent string
 }
 
 // ProfileProvider retrieves user profile data.
@@ -72,10 +74,13 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 	contextMsgs, err := e.contextProvider.GetContextMessages(userData.UserID)
 	if err == nil {
 		for _, cm := range contextMsgs {
-			messages = append(messages, llm.Message{
-				Role:    cm.Role,
-				Content: cm.Content,
-			})
+			msg := llm.Message{Role: cm.Role}
+			if cm.RawContent != "" {
+				msg.Content = parseRawContent(cm.RawContent)
+			} else {
+				msg.Content = cm.Content
+			}
+			messages = append(messages, msg)
 		}
 	}
 
@@ -182,4 +187,25 @@ Keep responses concise and relevant to the conversation.`
 	}
 
 	return resp.Content, nil
+}
+
+// parseRawContent converts stored raw_content back to the appropriate type
+// for the LLM Message.Content field (string or []map[string]any).
+func parseRawContent(raw string) interface{} {
+	if len(raw) == 0 {
+		return ""
+	}
+	// If it starts with '[', it's a JSON array (tool blocks)
+	if raw[0] == '[' {
+		var arr []map[string]any
+		if err := json.Unmarshal([]byte(raw), &arr); err == nil {
+			return arr
+		}
+	}
+	// Otherwise treat as plain string — strip surrounding quotes if present
+	var s string
+	if err := json.Unmarshal([]byte(raw), &s); err == nil {
+		return s
+	}
+	return raw
 }
