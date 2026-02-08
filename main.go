@@ -4,9 +4,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/config"
@@ -22,7 +24,24 @@ import (
 	"github.com/esnunes/bobot/tools/user"
 )
 
+func parseLogLevel(s string) slog.Level {
+	switch strings.ToLower(s) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
 func main() {
+	// Configure structured logging
+	logLevel := parseLogLevel(os.Getenv("LOG_LEVEL"))
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
