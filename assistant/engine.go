@@ -4,6 +4,7 @@ package assistant
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/esnunes/bobot/auth"
@@ -62,6 +63,7 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 			systemPrompt += "\n\n## User Profile\nThe following is known about the user you are chatting with:\n<user-profile>\n" + profileContent + "\n</user-profile>"
 		}
 	}
+	slog.Debug("private chat system prompt", "content", systemPrompt)
 
 	// Build messages with context
 	var messages []llm.Message
@@ -103,6 +105,7 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 		// Build assistant message with tool use
 		toolUseContent := make([]map[string]any, 0)
 		for _, tc := range resp.ToolCalls {
+			slog.Info("llm tool call requested", "tool", tc.Name, "id", tc.ID, "input", tc.Input)
 			toolUseContent = append(toolUseContent, map[string]any{
 				"type":  "tool_use",
 				"id":    tc.ID,
@@ -120,7 +123,10 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 		for _, tc := range resp.ToolCalls {
 			result, err := e.registry.Execute(ctx, tc.Name, tc.Input)
 			if err != nil {
+				slog.Error("llm tool call failed", "tool", tc.Name, "id", tc.ID, "error", err)
 				result = fmt.Sprintf("Error: %v", err)
+			} else {
+				slog.Info("llm tool call result", "tool", tc.Name, "id", tc.ID, "result", result)
 			}
 			toolResults = append(toolResults, map[string]any{
 				"type":        "tool_result",

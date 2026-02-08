@@ -39,6 +39,8 @@ func BuildSystemPrompt(skills []Skill, tools []llm.Tool) string {
 		for _, tool := range tools {
 			sb.WriteString(fmt.Sprintf("- **%s**: %s\n", tool.Name, tool.Description))
 		}
+		sb.WriteString("\n**Note**: Tool results must not be cached. Always execute the tool for each new request, even if the same tool was called recently.\n")
+		sb.WriteString("You must only invoke tools by producing a proper tool_use block using the tools provided via the API tool definitions. Never simulate or approximate a tool call by writing tool names, XML tags, or pseudo-function calls in your text responses. If you want to use a tool, use the structured tool_use mechanism — never output a textual imitation of one.\n")
 	}
 
 	return sb.String()
