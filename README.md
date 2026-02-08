@@ -2,8 +2,6 @@
 
 ## ideas
 
-- create a routine to extract user details / preferences from 1:1s and group
-	messages, store them in markdown.
 - add a weather tool
 - add a web_search tool
 - add a web_fetch tool

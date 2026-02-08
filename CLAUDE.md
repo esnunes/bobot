@@ -1,0 +1,1 @@
+- always create worktrees in the `<project-root-folder/.worktrees`
