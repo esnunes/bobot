@@ -666,7 +666,7 @@ func (c *CoreDB) CreatePrivateMessageWithContextThreshold(senderID, receiverID i
 		if contextTokens > tokensMax {
 			targetThreshold := tokensMax - tokensStart
 
-			// Find the new chunk start
+			// Find the new chunk start — must be a real message, not a tool_result
 			var newChunkStartID int64
 			var subtractValue int
 			err := c.db.QueryRow(`
@@ -674,6 +674,7 @@ func (c *CoreDB) CreatePrivateMessageWithContextThreshold(senderID, receiverID i
 				WHERE topic_id IS NULL
 				  AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
 				  AND context_tokens < ?
+				  AND content != ''
 				ORDER BY id DESC LIMIT 1
 			`, senderID, receiverID, receiverID, senderID, targetThreshold).Scan(&newChunkStartID, &subtractValue)
 
