@@ -233,6 +233,118 @@ func TestEngine_Chat_InjectsProfile(t *testing.T) {
 	}
 }
 
+type savedMessage struct {
+	UserID     int64
+	Role       string
+	Content    string
+	RawContent string
+}
+
+type mockMessageSaver struct {
+	messages []savedMessage
+}
+
+func (m *mockMessageSaver) SaveMessage(userID int64, role, content, rawContent string) error {
+	m.messages = append(m.messages, savedMessage{
+		UserID:     userID,
+		Role:       role,
+		Content:    content,
+		RawContent: rawContent,
+	})
+	return nil
+}
+
+func TestEngine_Chat_PersistsToolLoop(t *testing.T) {
+	mockProv := &mockLLM{
+		responses: []*llm.ChatResponse{
+			{
+				Content:    "Let me check.",
+				RawContent: `[{"type":"text","text":"Let me check."},{"type":"tool_use","id":"call_1","name":"task","input":{"command":"list"}}]`,
+				StopType:   "tool_use",
+				ToolCalls: []llm.ToolCall{
+					{ID: "call_1", Name: "task", Input: map[string]interface{}{"command": "list"}},
+				},
+			},
+			{
+				Content:    "Here are your tasks.",
+				RawContent: `[{"type":"text","text":"Here are your tasks."}]`,
+				StopType:   "end_turn",
+			},
+		},
+	}
+
+	registry := tools.NewRegistry()
+	registry.Register(&mockTool{result: "Tasks: milk"})
+
+	saver := &mockMessageSaver{}
+	mockCtxProvider := &mockContextProvider{messages: nil}
+	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, nil)
+	engine.SetMessageSaver(saver)
+
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
+	result, err := engine.Chat(ctx, "What's on my list?")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "Here are your tasks." {
+		t.Errorf("unexpected result: %s", result)
+	}
+
+	// Should have saved 3 messages:
+	// 1. assistant tool_use message
+	// 2. user tool_result message
+	// 3. assistant final response
+	if len(saver.messages) != 3 {
+		t.Fatalf("expected 3 saved messages, got %d", len(saver.messages))
+	}
+
+	// First: assistant tool_use
+	if saver.messages[0].Role != "assistant" {
+		t.Errorf("msg 0: expected role 'assistant', got '%s'", saver.messages[0].Role)
+	}
+	if saver.messages[0].Content != "Let me check." {
+		t.Errorf("msg 0: expected content 'Let me check.', got '%s'", saver.messages[0].Content)
+	}
+
+	// Second: user tool_result (content should be empty)
+	if saver.messages[1].Role != "user" {
+		t.Errorf("msg 1: expected role 'user', got '%s'", saver.messages[1].Role)
+	}
+	if saver.messages[1].Content != "" {
+		t.Errorf("msg 1: expected empty content for tool_result, got '%s'", saver.messages[1].Content)
+	}
+
+	// Third: assistant final response
+	if saver.messages[2].Role != "assistant" {
+		t.Errorf("msg 2: expected role 'assistant', got '%s'", saver.messages[2].Role)
+	}
+	if saver.messages[2].Content != "Here are your tasks." {
+		t.Errorf("msg 2: expected content 'Here are your tasks.', got '%s'", saver.messages[2].Content)
+	}
+}
+
+func TestEngine_Chat_NoSaver_StillWorks(t *testing.T) {
+	mockProv := &mockLLM{
+		responses: []*llm.ChatResponse{
+			{Content: "Hello!", RawContent: `[{"type":"text","text":"Hello!"}]`, StopType: "end_turn"},
+		},
+	}
+
+	registry := tools.NewRegistry()
+	mockCtxProvider := &mockContextProvider{messages: nil}
+	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, nil)
+	// No saver set — should still work
+
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
+	result, err := engine.Chat(ctx, "Hi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "Hello!" {
+		t.Errorf("expected 'Hello!', got '%s'", result)
+	}
+}
+
 func TestEngine_Chat_NoProfileNoInjection(t *testing.T) {
 	var capturedSystemPrompt string
 	mockProv := &mockProvider{

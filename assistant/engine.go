@@ -30,12 +30,18 @@ type ProfileProvider interface {
 	GetUserProfile(userID int64) (string, int64, error)
 }
 
+// MessageSaver persists messages during the chat loop.
+type MessageSaver interface {
+	SaveMessage(userID int64, role, content, rawContent string) error
+}
+
 type Engine struct {
 	provider        llm.Provider
 	registry        *tools.Registry
 	skills          []Skill
 	contextProvider ContextProvider
 	profileProvider ProfileProvider
+	messageSaver    MessageSaver
 }
 
 func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill, contextProvider ContextProvider, profileProvider ProfileProvider) *Engine {
@@ -46,6 +52,10 @@ func NewEngine(provider llm.Provider, registry *tools.Registry, skills []Skill, 
 		contextProvider: contextProvider,
 		profileProvider: profileProvider,
 	}
+}
+
+func (e *Engine) SetMessageSaver(saver MessageSaver) {
+	e.messageSaver = saver
 }
 
 // Chat processes a user message and returns the assistant's response.
@@ -102,8 +112,11 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 			return "", fmt.Errorf("LLM error: %w", err)
 		}
 
-		// If no tool calls, return the response
+		// If no tool calls, save final response and return
 		if len(resp.ToolCalls) == 0 {
+			if e.messageSaver != nil {
+				e.messageSaver.SaveMessage(userData.UserID, "assistant", resp.Content, resp.RawContent)
+			}
 			return resp.Content, nil
 		}
 
@@ -122,6 +135,11 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 			Role:    "assistant",
 			Content: toolUseContent,
 		})
+
+		// Save assistant tool_use message
+		if e.messageSaver != nil {
+			e.messageSaver.SaveMessage(userData.UserID, "assistant", resp.Content, resp.RawContent)
+		}
 
 		// Execute tools and add results
 		toolResults := make([]map[string]any, 0)
@@ -143,6 +161,12 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 			Role:    "user",
 			Content: toolResults,
 		})
+
+		// Save tool_result message
+		if e.messageSaver != nil {
+			rawToolResults, _ := json.Marshal(toolResults)
+			e.messageSaver.SaveMessage(userData.UserID, "user", "", string(rawToolResults))
+		}
 	}
 
 	return "", fmt.Errorf("max iterations reached")

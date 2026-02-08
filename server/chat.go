@@ -125,18 +125,12 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 	})
 	s.connections.Broadcast(userID, userMsgJSON)
 
-	// Get assistant response
+	// Get assistant response (engine persists assistant messages internally)
 	response, err := s.engine.Chat(ctx, content)
 	if err != nil {
 		log.Printf("assistant error: %v", err)
 		response = "Sorry, I encountered an error. Please try again."
 	}
-
-	// Save assistant message: sender=bobot, receiver=user
-	s.db.CreatePrivateMessageWithContextThreshold(
-		db.BobotUserID, userID, "assistant", response, response,
-		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
-	)
 
 	// Broadcast assistant response
 	assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
