@@ -17,6 +17,7 @@ import (
 	"github.com/esnunes/bobot/skills"
 	"github.com/esnunes/bobot/tools"
 	"github.com/esnunes/bobot/tools/task"
+	"github.com/esnunes/bobot/tools/thinq"
 	"github.com/esnunes/bobot/tools/topic"
 	"github.com/esnunes/bobot/tools/user"
 )
@@ -61,6 +62,17 @@ func main() {
 	registry.Register(task.NewTaskTool(taskDB))
 	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
 	registry.Register(topic.NewTopicTool(coreDB))
+
+	// Initialize ThinQ tool (optional, only if configured)
+	if thinqToken := os.Getenv("THINQ_TOKEN"); thinqToken != "" {
+		thinqClient := thinq.NewClient(thinqToken, os.Getenv("THINQ_COUNTRY"), os.Getenv("THINQ_CLIENT_ID"))
+		thinqDB, err := thinq.NewThinqDB(filepath.Join(cfg.DataDir, "tool_thinq.db"))
+		if err != nil {
+			log.Fatalf("Failed to initialize thinq database: %v", err)
+		}
+		defer thinqDB.Close()
+		registry.Register(thinq.NewThinqTool(thinqClient, thinqDB))
+	}
 
 	// Load embedded skills
 	loadedSkills, err := assistant.LoadSkills(skills.FS)
