@@ -51,6 +51,7 @@ type Message struct {
 	TopicID       *int64 // nil for 1:1 chats, set for topic messages
 	Role          string
 	Content       string
+	RawContent    string
 	Tokens        int
 	ContextTokens int
 	CreatedAt     time.Time
@@ -246,6 +247,11 @@ func (c *CoreDB) migrate() error {
 
 	// Migrate: rename user_id to sender_id
 	if err := c.renameColumnIfExists("messages", "user_id", "sender_id"); err != nil {
+		return err
+	}
+
+	// Migrate: add raw_content column to messages
+	if err := c.addColumnIfMissing("messages", "raw_content", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
 
@@ -509,10 +515,10 @@ func (c *CoreDB) UserCount() (int, error) {
 	return count, err
 }
 
-func (c *CoreDB) CreateMessage(senderID, receiverID int64, role, content string) (*Message, error) {
+func (c *CoreDB) CreateMessage(senderID, receiverID int64, role, content, rawContent string) (*Message, error) {
 	result, err := c.db.Exec(
-		"INSERT INTO messages (sender_id, receiver_id, role, content) VALUES (?, ?, ?, ?)",
-		senderID, receiverID, role, content,
+		"INSERT INTO messages (sender_id, receiver_id, role, content, raw_content) VALUES (?, ?, ?, ?, ?)",
+		senderID, receiverID, role, content, rawContent,
 	)
 	if err != nil {
 		return nil, err
@@ -525,12 +531,13 @@ func (c *CoreDB) CreateMessage(senderID, receiverID int64, role, content string)
 		ReceiverID: &receiverID,
 		Role:       role,
 		Content:    content,
+		RawContent: rawContent,
 		CreatedAt:  time.Now(),
 	}, nil
 }
 
-func (c *CoreDB) CreateMessageWithContext(senderID, receiverID int64, role, content string) (*Message, error) {
-	tokens := len(content) / 4
+func (c *CoreDB) CreateMessageWithContext(senderID, receiverID int64, role, content, rawContent string) (*Message, error) {
+	tokens := len(rawContent) / 4
 
 	// Get the latest message's context state for this private chat (bidirectional)
 	var prevContextTokens, prevTokens int
@@ -553,8 +560,8 @@ func (c *CoreDB) CreateMessageWithContext(senderID, receiverID int64, role, cont
 	}
 
 	result, err := c.db.Exec(
-		"INSERT INTO messages (sender_id, receiver_id, role, content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?)",
-		senderID, receiverID, role, content, tokens, contextTokens,
+		"INSERT INTO messages (sender_id, receiver_id, role, content, raw_content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		senderID, receiverID, role, content, rawContent, tokens, contextTokens,
 	)
 	if err != nil {
 		return nil, err
@@ -567,6 +574,7 @@ func (c *CoreDB) CreateMessageWithContext(senderID, receiverID int64, role, cont
 		ReceiverID:    &receiverID,
 		Role:          role,
 		Content:       content,
+		RawContent:    rawContent,
 		Tokens:        tokens,
 		ContextTokens: contextTokens,
 		CreatedAt:     time.Now(),
@@ -576,7 +584,7 @@ func (c *CoreDB) CreateMessageWithContext(senderID, receiverID int64, role, cont
 // GetPrivateChatMessages returns messages for a private chat between a user and Bobot.
 func (c *CoreDB) GetPrivateChatMessages(userID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id IS NULL
 		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
@@ -596,7 +604,7 @@ func (c *CoreDB) scanMessages(rows *sql.Rows) ([]Message, error) {
 	for rows.Next() {
 		var m Message
 		var receiverID, topicID sql.NullInt64
-		if err := rows.Scan(&m.ID, &m.SenderID, &receiverID, &topicID, &m.Role, &m.Content, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.SenderID, &receiverID, &topicID, &m.Role, &m.Content, &m.RawContent, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		if receiverID.Valid {
@@ -614,8 +622,8 @@ func (c *CoreDB) scanMessages(rows *sql.Rows) ([]Message, error) {
 func (c *CoreDB) GetPrivateChatRecentMessages(userID int64, limit int) ([]Message, error) {
 	// Get the most recent N messages, but return in chronological order
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at FROM (
-			SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at FROM (
+			SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 			FROM messages
 			WHERE topic_id IS NULL
 			  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
@@ -632,8 +640,8 @@ func (c *CoreDB) GetPrivateChatRecentMessages(userID int64, limit int) ([]Messag
 }
 
 // CreatePrivateMessageWithContextThreshold creates a private message with context window management.
-func (c *CoreDB) CreatePrivateMessageWithContextThreshold(senderID, receiverID int64, role, content string, tokensStart, tokensMax int) (*Message, error) {
-	tokens := len(content) / 4
+func (c *CoreDB) CreatePrivateMessageWithContextThreshold(senderID, receiverID int64, role, content, rawContent string, tokensStart, tokensMax int) (*Message, error) {
+	tokens := len(rawContent) / 4
 
 	// Get the latest message's context state (for private chats, bidirectional)
 	var prevContextTokens, prevTokens int
@@ -701,8 +709,8 @@ func (c *CoreDB) CreatePrivateMessageWithContextThreshold(senderID, receiverID i
 	}
 
 	result, err := c.db.Exec(
-		"INSERT INTO messages (sender_id, receiver_id, role, content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?)",
-		senderID, receiverID, role, content, tokens, contextTokens,
+		"INSERT INTO messages (sender_id, receiver_id, role, content, raw_content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		senderID, receiverID, role, content, rawContent, tokens, contextTokens,
 	)
 	if err != nil {
 		return nil, err
@@ -715,6 +723,7 @@ func (c *CoreDB) CreatePrivateMessageWithContextThreshold(senderID, receiverID i
 		ReceiverID:    &receiverID,
 		Role:          role,
 		Content:       content,
+		RawContent:    rawContent,
 		Tokens:        tokens,
 		ContextTokens: contextTokens,
 		CreatedAt:     time.Now(),
@@ -722,12 +731,12 @@ func (c *CoreDB) CreatePrivateMessageWithContextThreshold(senderID, receiverID i
 }
 
 // CreateTopicMessage creates a message in a topic chat.
-func (c *CoreDB) CreateTopicMessage(topicID, senderID int64, role, content string) (*Message, error) {
-	tokens := len(content) / 4
+func (c *CoreDB) CreateTopicMessage(topicID, senderID int64, role, content, rawContent string) (*Message, error) {
+	tokens := len(rawContent) / 4
 
 	result, err := c.db.Exec(
-		"INSERT INTO messages (topic_id, sender_id, role, content, tokens) VALUES (?, ?, ?, ?, ?)",
-		topicID, senderID, role, content, tokens,
+		"INSERT INTO messages (topic_id, sender_id, role, content, raw_content, tokens) VALUES (?, ?, ?, ?, ?, ?)",
+		topicID, senderID, role, content, rawContent, tokens,
 	)
 	if err != nil {
 		return nil, err
@@ -735,13 +744,14 @@ func (c *CoreDB) CreateTopicMessage(topicID, senderID int64, role, content strin
 
 	id, _ := result.LastInsertId()
 	return &Message{
-		ID:        id,
-		SenderID:  senderID,
-		TopicID:   &topicID,
-		Role:      role,
-		Content:   content,
-		Tokens:    tokens,
-		CreatedAt: time.Now(),
+		ID:         id,
+		SenderID:   senderID,
+		TopicID:    &topicID,
+		Role:       role,
+		Content:    content,
+		RawContent: rawContent,
+		Tokens:     tokens,
+		CreatedAt:  time.Now(),
 	}, nil
 }
 
@@ -766,7 +776,7 @@ func (c *CoreDB) GetPrivateChatContextMessages(userID int64) ([]Message, error) 
 
 	// Fetch all messages from chunk start to present, excluding command/system roles
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id IS NULL
 		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
@@ -785,7 +795,7 @@ func (c *CoreDB) GetPrivateChatContextMessages(userID int64) ([]Message, error) 
 // GetPrivateChatMessagesBefore returns messages before a given ID for a private chat.
 func (c *CoreDB) GetPrivateChatMessagesBefore(userID, beforeID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id IS NULL
 		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
@@ -804,7 +814,7 @@ func (c *CoreDB) GetPrivateChatMessagesBefore(userID, beforeID int64, limit int)
 // GetPrivateChatMessagesSince returns messages since a given time for a private chat.
 func (c *CoreDB) GetPrivateChatMessagesSince(userID int64, since time.Time) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id IS NULL
 		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
@@ -989,7 +999,7 @@ func (c *CoreDB) UpsertUserProfile(userID int64, content string, lastMessageID i
 // GetUserMessagesSince returns user-role private messages sent by a user since a given message ID.
 func (c *CoreDB) GetUserMessagesSince(userID int64, sinceMessageID int64) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE sender_id = ? AND role = 'user' AND topic_id IS NULL AND id > ?
 		ORDER BY id ASC
@@ -1183,8 +1193,8 @@ func (c *CoreDB) GetTopicMembers(topicID int64) ([]TopicMember, error) {
 // GetTopicRecentMessages returns the most recent messages for a topic.
 func (c *CoreDB) GetTopicRecentMessages(topicID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at FROM (
-			SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at FROM (
+			SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 			FROM messages
 			WHERE topic_id = ?
 			ORDER BY created_at DESC
@@ -1202,7 +1212,7 @@ func (c *CoreDB) GetTopicRecentMessages(topicID int64, limit int) ([]Message, er
 // GetTopicMessagesBefore returns messages before a given ID for a topic.
 func (c *CoreDB) GetTopicMessagesBefore(topicID, beforeID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND id < ?
 		ORDER BY id DESC
@@ -1219,7 +1229,7 @@ func (c *CoreDB) GetTopicMessagesBefore(topicID, beforeID int64, limit int) ([]M
 // GetTopicMessagesSince returns messages since a given time for a topic.
 func (c *CoreDB) GetTopicMessagesSince(topicID int64, since time.Time) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND created_at > ?
 		ORDER BY id ASC
@@ -1233,8 +1243,8 @@ func (c *CoreDB) GetTopicMessagesSince(topicID int64, since time.Time) ([]Messag
 }
 
 // CreateTopicMessageWithContext creates a topic message with context tracking.
-func (c *CoreDB) CreateTopicMessageWithContext(topicID, senderID int64, role, content string, tokensStart, tokensMax int) (*Message, error) {
-	tokens := len(content) / 4
+func (c *CoreDB) CreateTopicMessageWithContext(topicID, senderID int64, role, content, rawContent string, tokensStart, tokensMax int) (*Message, error) {
+	tokens := len(rawContent) / 4
 
 	// Get the latest topic message's context state
 	var prevContextTokens, prevTokens int
@@ -1288,8 +1298,8 @@ func (c *CoreDB) CreateTopicMessageWithContext(topicID, senderID int64, role, co
 	}
 
 	result, err := c.db.Exec(
-		"INSERT INTO messages (topic_id, sender_id, role, content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?)",
-		topicID, senderID, role, content, tokens, contextTokens,
+		"INSERT INTO messages (topic_id, sender_id, role, content, raw_content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		topicID, senderID, role, content, rawContent, tokens, contextTokens,
 	)
 	if err != nil {
 		return nil, err
@@ -1302,6 +1312,7 @@ func (c *CoreDB) CreateTopicMessageWithContext(topicID, senderID int64, role, co
 		TopicID:       &topicID,
 		Role:          role,
 		Content:       content,
+		RawContent:    rawContent,
 		Tokens:        tokens,
 		ContextTokens: contextTokens,
 		CreatedAt:     time.Now(),
@@ -1325,7 +1336,7 @@ func (c *CoreDB) GetTopicContextMessages(topicID int64) ([]Message, error) {
 	}
 
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, tokens, context_tokens, created_at
+		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND id >= ? AND role IN ('user', 'assistant')
 		ORDER BY id ASC

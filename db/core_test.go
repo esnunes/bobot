@@ -172,7 +172,7 @@ func TestCoreDB_Messages(t *testing.T) {
 	user, _ := db.CreateUser("msguser", "hash")
 
 	// Create messages: user sends to bobot
-	msg1, err := db.CreateMessage(user.ID, BobotUserID, "user", "Hello")
+	msg1, err := db.CreateMessage(user.ID, BobotUserID, "user", "Hello", "Hello")
 	if err != nil {
 		t.Fatalf("failed to create message: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestCoreDB_Messages(t *testing.T) {
 	}
 
 	// Bobot responds to user
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi there!")
+	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi there!", "Hi there!")
 
 	// Get messages
 	messages, err := db.GetPrivateChatMessages(user.ID, 10)
@@ -209,7 +209,7 @@ func TestCoreDB_GetMessagesLimit(t *testing.T) {
 	user, _ := db.CreateUser("limituser", "hash")
 
 	for i := 0; i < 5; i++ {
-		db.CreateMessage(user.ID, BobotUserID, "user", "msg")
+		db.CreateMessage(user.ID, BobotUserID, "user", "msg", "msg")
 	}
 
 	messages, _ := db.GetPrivateChatMessages(user.ID, 3)
@@ -243,7 +243,7 @@ func TestCoreDB_CreateMessageWithTokens(t *testing.T) {
 	user, _ := db.CreateUser("tokenuser", "hash")
 
 	// First message starts a chunk (context_tokens = 0)
-	msg1, err := db.CreateMessageWithContext(user.ID, BobotUserID, "user", "Hello world")
+	msg1, err := db.CreateMessageWithContext(user.ID, BobotUserID, "user", "Hello world", "Hello world")
 	if err != nil {
 		t.Fatalf("failed to create message: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestCoreDB_CreateMessageWithTokens(t *testing.T) {
 	}
 
 	// Second message continues the chunk (bobot responds to user)
-	msg2, _ := db.CreateMessageWithContext(BobotUserID, user.ID, "assistant", "Hi there, how can I help?")
+	msg2, _ := db.CreateMessageWithContext(BobotUserID, user.ID, "assistant", "Hi there, how can I help?", "Hi there, how can I help?")
 	// "Hi there, how can I help?" = 25 chars / 4 = 6 tokens
 	if msg2.Tokens != 6 {
 		t.Errorf("expected 6 tokens, got %d", msg2.Tokens)
@@ -280,20 +280,20 @@ func TestCoreDB_ChunkReset(t *testing.T) {
 	// Each 4 chars = 1 token (integer division)
 
 	// msg1: "aaaa" = 4 chars = 1 token, ctx=0 (first message)
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "aaaa", 10, 30)
+	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "aaaa", "aaaa", 10, 30)
 
 	// msg2: "bbbbbbbb" = 8 chars = 2 tokens, ctx = 0 + 1 + 2 = 3
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "bbbbbbbb", 10, 30)
+	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "bbbbbbbb", "bbbbbbbb", 10, 30)
 
 	// msg3: "cccccccccccc" = 12 chars = 3 tokens, ctx = 3 + 2 + 3 = 8
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "cccccccccccc", 10, 30)
+	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "cccccccccccc", "cccccccccccc", 10, 30)
 
 	// msg4: "dddddddddddddddd" = 16 chars = 4 tokens, ctx = 8 + 3 + 4 = 15
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "dddddddddddddddd", 10, 30)
+	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "dddddddddddddddd", "dddddddddddddddd", 10, 30)
 
 	// msg5: "eeeeeeeeeeeeeeeeeeee" = 20 chars = 5 tokens, ctx = 15 + 4 + 5 = 24
 	// 24 < 30, no reset yet
-	msg5, _ := db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "eeeeeeeeeeeeeeeeeeee", 10, 30)
+	msg5, _ := db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "eeeeeeeeeeeeeeeeeeee", "eeeeeeeeeeeeeeeeeeee", 10, 30)
 
 	if msg5.ContextTokens != 24 {
 		t.Errorf("expected context_tokens=24, got %d", msg5.ContextTokens)
@@ -307,7 +307,7 @@ func TestCoreDB_ChunkReset(t *testing.T) {
 	//   msg4: 15 - 15 = 0
 	//   msg5: 24 - 15 = 9
 	// Then add msg6: ctx = 9 + 5 + 6 = 20
-	msg6, _ := db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "ffffffffffffffffffffffff", 10, 30)
+	msg6, _ := db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "ffffffffffffffffffffffff", "ffffffffffffffffffffffff", 10, 30)
 
 	if msg6.ContextTokens != 20 {
 		t.Errorf("expected context_tokens=20 after reset, got %d", msg6.ContextTokens)
@@ -338,13 +338,13 @@ func TestCoreDB_GetContextMessages(t *testing.T) {
 	user, _ := db.CreateUser("ctxuser", "hash")
 
 	// Create some messages - small thresholds for testing
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "aaaa", 10, 20)         // msg1: ctx=0
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "bbbb", 10, 20)    // msg2: ctx=2
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "cccc", 10, 20)         // msg3: ctx=3
+	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "aaaa", "aaaa", 10, 20)         // msg1: ctx=0
+	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "bbbb", "bbbb", 10, 20)    // msg2: ctx=2
+	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "cccc", "cccc", 10, 20)         // msg3: ctx=3
 
 	// Force a reset by adding messages that exceed threshold
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", strings.Repeat("d", 40), 10, 20) // tokens=10, exceeds
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "eeee", 10, 20)          // msg5
+	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", strings.Repeat("d", 40), strings.Repeat("d", 40), 10, 20) // tokens=10, exceeds
+	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "eeee", "eeee", 10, 20)          // msg5
 
 	// Get context messages (should only return from most recent chunk start)
 	messages, err := db.GetPrivateChatContextMessages(user.ID)
@@ -372,7 +372,7 @@ func TestCoreDB_GetMessagesBefore(t *testing.T) {
 	// Create 5 messages
 	var lastID int64
 	for i := 0; i < 5; i++ {
-		msg, _ := db.CreateMessage(user.ID, BobotUserID, "user", fmt.Sprintf("msg%d", i))
+		msg, _ := db.CreateMessage(user.ID, BobotUserID, "user", fmt.Sprintf("msg%d", i), fmt.Sprintf("msg%d", i))
 		lastID = msg.ID
 	}
 
@@ -404,14 +404,14 @@ func TestCoreDB_GetMessagesSince(t *testing.T) {
 
 	// Create messages with time gaps
 	// Note: SQLite CURRENT_TIMESTAMP has second precision, so we need >1s gap
-	db.CreateMessage(user.ID, BobotUserID, "user", "old message")
+	db.CreateMessage(user.ID, BobotUserID, "user", "old message", "old message")
 	time.Sleep(1100 * time.Millisecond)
 
 	since := time.Now()
 	time.Sleep(1100 * time.Millisecond)
 
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "new message 1")
-	db.CreateMessage(user.ID, BobotUserID, "user", "new message 2")
+	db.CreateMessage(BobotUserID, user.ID, "assistant", "new message 1", "new message 1")
+	db.CreateMessage(user.ID, BobotUserID, "user", "new message 2", "new message 2")
 
 	messages, err := db.GetPrivateChatMessagesSince(user.ID, since)
 	if err != nil {
@@ -431,7 +431,7 @@ func TestCoreDB_GetRecentMessagesIncludesTokens(t *testing.T) {
 	user, _ := db.CreateUser("recentuser", "hash")
 
 	// Create message with context tracking
-	db.CreateMessageWithContext(user.ID, BobotUserID, "user", "Hello world")
+	db.CreateMessageWithContext(user.ID, BobotUserID, "user", "Hello world", "Hello world")
 
 	messages, err := db.GetPrivateChatRecentMessages(user.ID, 10)
 	if err != nil {
@@ -799,7 +799,7 @@ func TestCreateTopicMessage(t *testing.T) {
 	owner, _ := db.CreateUser("owner", "hash")
 	topic, _ := db.CreateTopic("Test Topic", owner.ID)
 
-	msg, err := db.CreateTopicMessage(topic.ID, owner.ID, "user", "Hello topic!")
+	msg, err := db.CreateTopicMessage(topic.ID, owner.ID, "user", "Hello topic!", "Hello topic!")
 	if err != nil {
 		t.Fatalf("CreateTopicMessage failed: %v", err)
 	}
@@ -819,9 +819,9 @@ func TestGetTopicRecentMessages(t *testing.T) {
 	owner, _ := db.CreateUser("owner", "hash")
 	topic, _ := db.CreateTopic("Test Topic", owner.ID)
 
-	db.CreateTopicMessage(topic.ID, owner.ID, "user", "Message 1")
-	db.CreateTopicMessage(topic.ID, owner.ID, "assistant", "Response 1")
-	db.CreateTopicMessage(topic.ID, owner.ID, "user", "Message 2")
+	db.CreateTopicMessage(topic.ID, owner.ID, "user", "Message 1", "Message 1")
+	db.CreateTopicMessage(topic.ID, owner.ID, "assistant", "Response 1", "Response 1")
+	db.CreateTopicMessage(topic.ID, owner.ID, "user", "Message 2", "Message 2")
 
 	msgs, err := db.GetTopicRecentMessages(topic.ID, 10)
 	if err != nil {
@@ -840,8 +840,8 @@ func TestGetTopicContextMessages(t *testing.T) {
 	owner, _ := db.CreateUser("owner", "hash")
 	topic, _ := db.CreateTopic("Test Topic", owner.ID)
 
-	db.CreateTopicMessageWithContext(topic.ID, owner.ID, "user", "Hello", 1000, 80000)
-	db.CreateTopicMessageWithContext(topic.ID, owner.ID, "assistant", "Hi there", 1000, 80000)
+	db.CreateTopicMessageWithContext(topic.ID, owner.ID, "user", "Hello", "Hello", 1000, 80000)
+	db.CreateTopicMessageWithContext(topic.ID, owner.ID, "assistant", "Hi there", "Hi there", 1000, 80000)
 
 	msgs, err := db.GetTopicContextMessages(topic.ID)
 	if err != nil {
@@ -1028,9 +1028,9 @@ func TestCoreDB_GetUserMessagesSince(t *testing.T) {
 	user, _ := db.CreateUser("msguser", "hash")
 
 	// Create mixed messages
-	msg1, _ := db.CreateMessage(user.ID, BobotUserID, "user", "Hello")        // user msg
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi!")                  // assistant msg
-	msg3, _ := db.CreateMessage(user.ID, BobotUserID, "user", "How are you?") // user msg
+	msg1, _ := db.CreateMessage(user.ID, BobotUserID, "user", "Hello", "Hello")        // user msg
+	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi!", "Hi!")                  // assistant msg
+	msg3, _ := db.CreateMessage(user.ID, BobotUserID, "user", "How are you?", "How are you?") // user msg
 
 	// Get messages since before all messages
 	msgs, err := db.GetUserMessagesSince(user.ID, 0)
