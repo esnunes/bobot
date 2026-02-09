@@ -627,6 +627,7 @@ func (c *CoreDB) GetPrivateChatRecentMessages(userID int64, limit int) ([]Messag
 			FROM messages
 			WHERE topic_id IS NULL
 			  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
+			  AND content != ''
 			ORDER BY id DESC
 			LIMIT ?
 		) ORDER BY id ASC
@@ -801,6 +802,7 @@ func (c *CoreDB) GetPrivateChatMessagesBefore(userID, beforeID int64, limit int)
 		WHERE topic_id IS NULL
 		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
 		  AND id < ?
+		  AND content != ''
 		ORDER BY id DESC
 		LIMIT ?
 	`, userID, userID, beforeID, limit)
@@ -820,6 +822,7 @@ func (c *CoreDB) GetPrivateChatMessagesSince(userID int64, since time.Time) ([]M
 		WHERE topic_id IS NULL
 		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
 		  AND created_at > ?
+		  AND content != ''
 		ORDER BY id ASC
 	`, userID, userID, since.UTC())
 	if err != nil {
@@ -1198,6 +1201,7 @@ func (c *CoreDB) GetTopicRecentMessages(topicID int64, limit int) ([]Message, er
 			SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 			FROM messages
 			WHERE topic_id = ?
+			  AND content != ''
 			ORDER BY created_at DESC
 			LIMIT ?
 		) ORDER BY created_at ASC
@@ -1216,6 +1220,7 @@ func (c *CoreDB) GetTopicMessagesBefore(topicID, beforeID int64, limit int) ([]M
 		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND id < ?
+		  AND content != ''
 		ORDER BY id DESC
 		LIMIT ?
 	`, topicID, beforeID, limit)
@@ -1233,6 +1238,7 @@ func (c *CoreDB) GetTopicMessagesSince(topicID int64, since time.Time) ([]Messag
 		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND created_at > ?
+		  AND content != ''
 		ORDER BY id ASC
 	`, topicID, since.UTC())
 	if err != nil {
