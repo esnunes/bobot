@@ -6,16 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/llm"
 	"github.com/esnunes/bobot/tools"
 )
 
-// ContextProvider retrieves context messages for a user.
+// ContextProvider retrieves context messages for a user or topic.
 type ContextProvider interface {
 	GetContextMessages(userID int64) ([]ContextMessage, error)
+	GetTopicContextMessages(topicID int64) ([]ContextMessage, error)
 }
 
 // ContextMessage represents a message for context (simplified from db.Message).
@@ -25,14 +25,23 @@ type ContextMessage struct {
 	RawContent string
 }
 
-// ProfileProvider retrieves user profile data.
+// ProfileProvider retrieves user or topic profile data.
 type ProfileProvider interface {
 	GetUserProfile(userID int64) (string, int64, error)
+	GetTopicMemberProfiles(topicID int64) (string, error)
 }
 
 // MessageSaver persists messages during the chat loop.
 type MessageSaver interface {
 	SaveMessage(userID int64, role, content, rawContent string) error
+	SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error
+}
+
+// ChatOptions configures a Chat call.
+type ChatOptions struct {
+	Message     string
+	TopicID     int64  // if > 0, topic chat; 0 means private chat
+	DisplayName string // sender's display name (for topic message attribution)
 }
 
 type Engine struct {
@@ -60,28 +69,46 @@ func (e *Engine) SetMessageSaver(saver MessageSaver) {
 
 // Chat processes a user message and returns the assistant's response.
 // The context must contain the user ID (set by auth middleware).
-func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
-	// Get user data from context
+// For topic chats (TopicID > 0), it fetches topic context, injects member profiles,
+// prepends [DisplayName] to user messages, and saves via SaveTopicMessage.
+// For private chats (TopicID == 0), it behaves as before.
+func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 	userData := auth.UserDataFromContext(ctx)
 
 	// Build system prompt with role-filtered tools
 	llmTools := e.registry.ToLLMToolsForRole(userData.Role)
 	systemPrompt := BuildSystemPrompt(e.skills, llmTools)
 
-	// Inject user profile if available
-	if e.profileProvider != nil {
-		profileContent, _, err := e.profileProvider.GetUserProfile(userData.UserID)
-		if err == nil && profileContent != "" {
-			systemPrompt += "\n\n## User Profile\nThe following is known about the user you are chatting with:\n<user-profile>\n" + profileContent + "\n</user-profile>"
+	// Inject profiles
+	if opts.TopicID > 0 {
+		// Topic chat: inject all member profiles
+		if e.profileProvider != nil {
+			profiles, err := e.profileProvider.GetTopicMemberProfiles(opts.TopicID)
+			if err == nil && profiles != "" {
+				systemPrompt += "\n\n" + profiles
+			}
+		}
+	} else {
+		// Private chat: inject single user profile
+		if e.profileProvider != nil {
+			profileContent, _, err := e.profileProvider.GetUserProfile(userData.UserID)
+			if err == nil && profileContent != "" {
+				systemPrompt += "\n\n## User Profile\nThe following is known about the user you are chatting with:\n<user-profile>\n" + profileContent + "\n</user-profile>"
+			}
 		}
 	}
-	slog.Debug("private chat system prompt", "content", systemPrompt)
-
-	// Build messages with context
-	var messages []llm.Message
+	slog.Debug("chat system prompt", "content", systemPrompt, "topicID", opts.TopicID)
 
 	// Get context messages
-	contextMsgs, err := e.contextProvider.GetContextMessages(userData.UserID)
+	var contextMsgs []ContextMessage
+	var err error
+	if opts.TopicID > 0 {
+		contextMsgs, err = e.contextProvider.GetTopicContextMessages(opts.TopicID)
+	} else {
+		contextMsgs, err = e.contextProvider.GetContextMessages(userData.UserID)
+	}
+
+	var messages []llm.Message
 	if err == nil {
 		for _, cm := range contextMsgs {
 			msg := llm.Message{Role: cm.Role}
@@ -94,11 +121,32 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 		}
 	}
 
-	// Add the new user message
+	// Add the new user message (with attribution for topic chat)
+	userContent := opts.Message
+	if opts.TopicID > 0 && opts.DisplayName != "" {
+		userContent = fmt.Sprintf("[%s]: %s", opts.DisplayName, opts.Message)
+	}
 	messages = append(messages, llm.Message{
 		Role:    "user",
-		Content: message,
+		Content: userContent,
 	})
+
+	// Set ChatData for tool calls in topic chat
+	if opts.TopicID > 0 {
+		ctx = auth.ContextWithChatData(ctx, auth.ChatData{TopicID: &opts.TopicID})
+	}
+
+	// Helper to save messages (private or topic)
+	save := func(role, content, rawContent string) {
+		if e.messageSaver == nil {
+			return
+		}
+		if opts.TopicID > 0 {
+			e.messageSaver.SaveTopicMessage(opts.TopicID, userData.UserID, role, content, rawContent)
+		} else {
+			e.messageSaver.SaveMessage(userData.UserID, role, content, rawContent)
+		}
+	}
 
 	// Loop for tool use
 	maxIterations := 10
@@ -114,9 +162,7 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 
 		// If no tool calls, save final response and return
 		if len(resp.ToolCalls) == 0 {
-			if e.messageSaver != nil {
-				e.messageSaver.SaveMessage(userData.UserID, "assistant", resp.Content, resp.RawContent)
-			}
+			save("assistant", resp.Content, resp.RawContent)
 			return resp.Content, nil
 		}
 
@@ -137,9 +183,7 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 		})
 
 		// Save assistant tool_use message
-		if e.messageSaver != nil {
-			e.messageSaver.SaveMessage(userData.UserID, "assistant", resp.Content, resp.RawContent)
-		}
+		save("assistant", resp.Content, resp.RawContent)
 
 		// Execute tools and add results
 		toolResults := make([]map[string]any, 0)
@@ -163,54 +207,11 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 		})
 
 		// Save tool_result message
-		if e.messageSaver != nil {
-			rawToolResults, _ := json.Marshal(toolResults)
-			e.messageSaver.SaveMessage(userData.UserID, "user", "", string(rawToolResults))
-		}
+		rawToolResults, _ := json.Marshal(toolResults)
+		save("user", "", string(rawToolResults))
 	}
 
 	return "", fmt.Errorf("max iterations reached")
-}
-
-// ChatWithContext processes a topic conversation and returns the assistant's response.
-// The conversation is a list of lines formatted as "[Name]: message content" for users
-// or "[assistant]: message content" for assistant messages.
-func (e *Engine) ChatWithContext(ctx context.Context, conversation []string) (string, error) {
-	// Build messages from conversation
-	var messages []llm.Message
-
-	// Add conversation history
-	for _, line := range conversation {
-		if strings.HasPrefix(line, "[assistant]:") {
-			content := strings.TrimPrefix(line, "[assistant]: ")
-			messages = append(messages, llm.Message{
-				Role:    "assistant",
-				Content: content,
-			})
-		} else {
-			messages = append(messages, llm.Message{
-				Role:    "user",
-				Content: line,
-			})
-		}
-	}
-
-	// Add system prompt for topic context
-	systemPrompt := `You are a helpful AI assistant participating in a topic chat.
-Messages are formatted as [Name]: message content.
-Only respond when specifically addressed with @bobot.
-Keep responses concise and relevant to the conversation.`
-
-	resp, err := e.provider.Chat(ctx, &llm.ChatRequest{
-		SystemPrompt: systemPrompt,
-		Messages:     messages,
-		Tools:        nil, // No tools for group chat for now
-	})
-	if err != nil {
-		return "", fmt.Errorf("LLM error: %w", err)
-	}
-
-	return resp.Content, nil
 }
 
 // parseRawContent converts stored raw_content back to the appropriate type

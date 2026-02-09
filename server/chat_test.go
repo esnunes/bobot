@@ -32,6 +32,10 @@ func (m *mockContextProvider) GetContextMessages(userID int64) ([]assistant.Cont
 	return nil, nil
 }
 
+func (m *mockContextProvider) GetTopicContextMessages(topicID int64) ([]assistant.ContextMessage, error) {
+	return nil, nil
+}
+
 func setupChatTestServer(t *testing.T) (*Server, string) {
 	tmpDir := t.TempDir()
 	coreDB, _ := db.NewCoreDB(tmpDir + "/core.db")

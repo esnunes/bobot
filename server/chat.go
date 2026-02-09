@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
 )
@@ -126,7 +127,7 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 	s.connections.Broadcast(userID, userMsgJSON)
 
 	// Get assistant response (engine persists assistant messages internally)
-	response, err := s.engine.Chat(ctx, content)
+	response, err := s.engine.Chat(ctx, assistant.ChatOptions{Message: content})
 	if err != nil {
 		log.Printf("assistant error: %v", err)
 		response = "Sorry, I encountered an error. Please try again."
@@ -190,9 +191,10 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 		return
 	}
 
-	// Save user message
+	// Save user message (raw_content includes display name for LLM context)
+	rawContent := fmt.Sprintf("[%s]: %s", user.DisplayName, content)
 	s.db.CreateTopicMessageWithContext(
-		topicID, userID, "user", content, content,
+		topicID, userID, "user", content, rawContent,
 		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
 	)
 
@@ -208,7 +210,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 
 	// Check if assistant should respond
 	if shouldTriggerAssistant(content) {
-		s.handleTopicAssistantResponse(ctx, topicID)
+		s.handleTopicAssistantResponse(ctx, userID, topicID, content, user.DisplayName)
 	}
 }
 
@@ -216,43 +218,15 @@ func shouldTriggerAssistant(content string) bool {
 	return strings.Contains(strings.ToLower(content), "@bobot")
 }
 
-func (s *Server) handleTopicAssistantResponse(ctx context.Context, topicID int64) {
-	// Get context messages
-	messages, err := s.db.GetTopicContextMessages(topicID)
-	if err != nil {
-		log.Printf("failed to get topic context: %v", err)
-		return
-	}
-
-	// Build conversation for LLM with user attribution
-	var conversation []string
-	for _, m := range messages {
-		if m.Role == "user" {
-			user, _ := s.db.GetUserByID(m.SenderID)
-			name := "User"
-			if user != nil && user.DisplayName != "" {
-				name = user.DisplayName
-			}
-			conversation = append(conversation, fmt.Sprintf("[%s]: %s", name, m.Content))
-		} else {
-			conversation = append(conversation, fmt.Sprintf("[assistant]: %s", m.Content))
-		}
-	}
-
-	// Get response from engine
-	response, err := s.engine.ChatWithContext(ctx, conversation)
+func (s *Server) handleTopicAssistantResponse(ctx context.Context, userID, topicID int64, content, displayName string) {
+	response, err := s.engine.Chat(ctx, assistant.ChatOptions{
+		Message:     content,
+		TopicID:     topicID,
+		DisplayName: displayName,
+	})
 	if err != nil {
 		log.Printf("assistant error: %v", err)
 		response = "Sorry, I encountered an error. Please try again."
-	}
-
-	// Save assistant message using bobot user ID
-	_, err = s.db.CreateTopicMessageWithContext(
-		topicID, db.BobotUserID, "assistant", response, response,
-		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
-	)
-	if err != nil {
-		log.Printf("failed to save assistant message: %v", err)
 	}
 
 	// Broadcast to topic

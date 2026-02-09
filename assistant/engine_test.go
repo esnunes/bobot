@@ -55,7 +55,7 @@ func TestEngine_Chat_SimpleResponse(t *testing.T) {
 	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider, nil)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	result, err := engine.Chat(ctx, "Hi")
+	result, err := engine.Chat(ctx, ChatOptions{Message: "Hi"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestEngine_Chat_WithToolUse(t *testing.T) {
 	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider, nil)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	result, err := engine.Chat(ctx, "What's on my list?")
+	result, err := engine.Chat(ctx, ChatOptions{Message: "What's on my list?"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -110,7 +110,11 @@ func (m *mockContextProvider) GetContextMessages(userID int64) ([]ContextMessage
 	return m.messages, nil
 }
 
-func TestEngine_ChatWithContext(t *testing.T) {
+func (m *mockContextProvider) GetTopicContextMessages(topicID int64) ([]ContextMessage, error) {
+	return m.messages, nil
+}
+
+func TestEngine_Chat_WithContextMessages(t *testing.T) {
 	// Create a mock provider that captures the messages sent
 	var capturedMessages []llm.Message
 	mockProv := &mockProvider{
@@ -132,7 +136,7 @@ func TestEngine_ChatWithContext(t *testing.T) {
 	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, nil)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	_, err := engine.Chat(ctx, "new question")
+	_, err := engine.Chat(ctx, ChatOptions{Message: "new question"})
 	if err != nil {
 		t.Fatalf("chat failed: %v", err)
 	}
@@ -148,43 +152,186 @@ func TestEngine_ChatWithContext(t *testing.T) {
 	}
 }
 
-func TestEngine_ChatWithConversation(t *testing.T) {
-	// Create a mock provider that captures the messages sent
-	var capturedMessages []llm.Message
+type mockTopicContextProvider struct {
+	privateMessages []ContextMessage
+	topicMessages   []ContextMessage
+}
+
+func (m *mockTopicContextProvider) GetContextMessages(userID int64) ([]ContextMessage, error) {
+	return m.privateMessages, nil
+}
+
+func (m *mockTopicContextProvider) GetTopicContextMessages(topicID int64) ([]ContextMessage, error) {
+	return m.topicMessages, nil
+}
+
+type mockTopicProfileProvider struct {
+	userProfiles  map[int64]string
+	topicProfiles map[int64]string
+}
+
+func (m *mockTopicProfileProvider) GetUserProfile(userID int64) (string, int64, error) {
+	content := m.userProfiles[userID]
+	return content, 0, nil
+}
+
+func (m *mockTopicProfileProvider) GetTopicMemberProfiles(topicID int64) (string, error) {
+	return m.topicProfiles[topicID], nil
+}
+
+type mockTopicMessageSaver struct {
+	privateMessages []savedMessage
+	topicMessages   []savedTopicMessage
+}
+
+type savedTopicMessage struct {
+	TopicID    int64
+	UserID     int64
+	Role       string
+	Content    string
+	RawContent string
+}
+
+func (m *mockTopicMessageSaver) SaveMessage(userID int64, role, content, rawContent string) error {
+	m.privateMessages = append(m.privateMessages, savedMessage{
+		UserID: userID, Role: role, Content: content, RawContent: rawContent,
+	})
+	return nil
+}
+
+func (m *mockTopicMessageSaver) SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error {
+	m.topicMessages = append(m.topicMessages, savedTopicMessage{
+		TopicID: topicID, UserID: userID, Role: role, Content: content, RawContent: rawContent,
+	})
+	return nil
+}
+
+func TestEngine_Chat_TopicSimpleResponse(t *testing.T) {
 	var capturedSystemPrompt string
+	var capturedMessages []llm.Message
 	mockProv := &mockProvider{
 		chatFunc: func(ctx context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
-			capturedMessages = req.Messages
 			capturedSystemPrompt = req.SystemPrompt
-			return &llm.ChatResponse{Content: "Test response"}, nil
+			capturedMessages = req.Messages
+			return &llm.ChatResponse{Content: "Got it!"}, nil
 		},
 	}
 
-	mockCtxProvider := &mockContextProvider{messages: nil}
+	topicCtx := &mockTopicContextProvider{
+		topicMessages: []ContextMessage{
+			{Role: "user", Content: "hello", RawContent: "[Alice]: hello"},
+			{Role: "assistant", Content: "hi there", RawContent: "hi there"},
+		},
+	}
+
+	topicProfile := &mockTopicProfileProvider{
+		topicProfiles: map[int64]string{
+			42: "## Topic Members\n\n<member name=\"Alice\">\nLikes coffee.\n</member>",
+		},
+	}
+
+	saver := &mockTopicMessageSaver{}
 	registry := tools.NewRegistry()
-	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, nil)
+	engine := NewEngine(mockProv, registry, nil, topicCtx, topicProfile)
+	engine.SetMessageSaver(saver)
 
-	conversation := []string{
-		"[Alice]: Hello @bobot",
-		"[Bob]: Yes, please help us",
-	}
-
-	response, err := engine.ChatWithContext(context.Background(), conversation)
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1, Role: "user"})
+	result, err := engine.Chat(ctx, ChatOptions{
+		Message:     "Hey @bobot, what's up?",
+		TopicID:     42,
+		DisplayName: "Bob",
+	})
 	if err != nil {
-		t.Fatalf("ChatWithContext failed: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if response == "" {
-		t.Error("expected non-empty response")
-	}
-
-	// Check system prompt contains group chat instructions
-	if capturedSystemPrompt == "" {
-		t.Error("expected non-empty system prompt")
+	if result != "Got it!" {
+		t.Errorf("expected 'Got it!', got '%s'", result)
 	}
 
-	// Should have 2 messages from conversation
-	if len(capturedMessages) != 2 {
-		t.Errorf("expected 2 messages, got %d", len(capturedMessages))
+	// System prompt should contain topic member profiles
+	if !strings.Contains(capturedSystemPrompt, "Topic Members") {
+		t.Error("expected system prompt to contain topic member profiles")
+	}
+	if !strings.Contains(capturedSystemPrompt, "Alice") {
+		t.Error("expected system prompt to contain Alice's profile")
+	}
+
+	// Should NOT contain single user profile section
+	if strings.Contains(capturedSystemPrompt, "<user-profile>") {
+		t.Error("expected system prompt to NOT contain <user-profile> tags in topic chat")
+	}
+
+	// Context messages should use raw_content
+	if len(capturedMessages) < 3 {
+		t.Fatalf("expected at least 3 messages, got %d", len(capturedMessages))
+	}
+	// First context message should use raw_content (with attribution)
+	if capturedMessages[0].Content != "[Alice]: hello" {
+		t.Errorf("expected first context message to be '[Alice]: hello', got '%v'", capturedMessages[0].Content)
+	}
+
+	// New user message should have DisplayName prepended
+	lastMsg := capturedMessages[len(capturedMessages)-1]
+	if lastMsg.Content != "[Bob]: Hey @bobot, what's up?" {
+		t.Errorf("expected last message to be '[Bob]: Hey @bobot, what's up?', got '%v'", lastMsg.Content)
+	}
+
+	// Should have saved via SaveTopicMessage, not SaveMessage
+	if len(saver.topicMessages) != 1 {
+		t.Fatalf("expected 1 topic message saved, got %d", len(saver.topicMessages))
+	}
+	if saver.topicMessages[0].TopicID != 42 {
+		t.Errorf("expected topicID 42, got %d", saver.topicMessages[0].TopicID)
+	}
+	if len(saver.privateMessages) != 0 {
+		t.Errorf("expected 0 private messages saved, got %d", len(saver.privateMessages))
+	}
+}
+
+func TestEngine_Chat_TopicWithTools(t *testing.T) {
+	mockProv := &mockLLM{
+		responses: []*llm.ChatResponse{
+			{
+				Content:    "Let me check.",
+				RawContent: `[{"type":"text","text":"Let me check."},{"type":"tool_use","id":"call_1","name":"task","input":{"command":"list"}}]`,
+				StopType:   "tool_use",
+				ToolCalls: []llm.ToolCall{
+					{ID: "call_1", Name: "task", Input: map[string]interface{}{"command": "list"}},
+				},
+			},
+			{Content: "Here are the tasks.", StopType: "end_turn"},
+		},
+	}
+
+	registry := tools.NewRegistry()
+	registry.Register(&mockTool{result: "Tasks: milk"})
+
+	topicCtx := &mockTopicContextProvider{}
+	saver := &mockTopicMessageSaver{}
+	engine := NewEngine(mockProv, registry, nil, topicCtx, nil)
+	engine.SetMessageSaver(saver)
+
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1, Role: "user"})
+	result, err := engine.Chat(ctx, ChatOptions{
+		Message:     "list tasks",
+		TopicID:     10,
+		DisplayName: "Alice",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "Here are the tasks." {
+		t.Errorf("unexpected result: %s", result)
+	}
+
+	// Should have saved 3 topic messages (tool_use, tool_result, final response)
+	if len(saver.topicMessages) != 3 {
+		t.Fatalf("expected 3 topic messages, got %d", len(saver.topicMessages))
+	}
+	for _, m := range saver.topicMessages {
+		if m.TopicID != 10 {
+			t.Errorf("expected topicID 10, got %d", m.TopicID)
+		}
 	}
 }
 
@@ -198,6 +345,10 @@ func (m *mockProfileProvider) GetUserProfile(userID int64) (string, int64, error
 		return "", 0, nil
 	}
 	return content, 0, nil
+}
+
+func (m *mockProfileProvider) GetTopicMemberProfiles(topicID int64) (string, error) {
+	return "", nil
 }
 
 func TestEngine_Chat_InjectsProfile(t *testing.T) {
@@ -220,7 +371,7 @@ func TestEngine_Chat_InjectsProfile(t *testing.T) {
 	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, mockProfile)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	_, err := engine.Chat(ctx, "Hi")
+	_, err := engine.Chat(ctx, ChatOptions{Message: "Hi"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -254,6 +405,10 @@ func (m *mockMessageSaver) SaveMessage(userID int64, role, content, rawContent s
 	return nil
 }
 
+func (m *mockMessageSaver) SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error {
+	return nil
+}
+
 func TestEngine_Chat_PersistsToolLoop(t *testing.T) {
 	mockProv := &mockLLM{
 		responses: []*llm.ChatResponse{
@@ -282,7 +437,7 @@ func TestEngine_Chat_PersistsToolLoop(t *testing.T) {
 	engine.SetMessageSaver(saver)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	result, err := engine.Chat(ctx, "What's on my list?")
+	result, err := engine.Chat(ctx, ChatOptions{Message: "What's on my list?"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -336,7 +491,7 @@ func TestEngine_Chat_NoSaver_StillWorks(t *testing.T) {
 	// No saver set — should still work
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	result, err := engine.Chat(ctx, "Hi")
+	result, err := engine.Chat(ctx, ChatOptions{Message: "Hi"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -361,7 +516,7 @@ func TestEngine_Chat_NoProfileNoInjection(t *testing.T) {
 	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, mockProfile)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	_, err := engine.Chat(ctx, "Hi")
+	_, err := engine.Chat(ctx, ChatOptions{Message: "Hi"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
