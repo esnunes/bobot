@@ -55,7 +55,7 @@ func TestEngine_Chat_SimpleResponse(t *testing.T) {
 	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider, nil)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	result, err := engine.Chat(ctx, "Hi")
+	result, err := engine.Chat(ctx, ChatOptions{Message: "Hi"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestEngine_Chat_WithToolUse(t *testing.T) {
 	engine := NewEngine(mockProvider, registry, nil, mockCtxProvider, nil)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	result, err := engine.Chat(ctx, "What's on my list?")
+	result, err := engine.Chat(ctx, ChatOptions{Message: "What's on my list?"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestEngine_ChatWithContext(t *testing.T) {
 	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, nil)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	_, err := engine.Chat(ctx, "new question")
+	_, err := engine.Chat(ctx, ChatOptions{Message: "new question"})
 	if err != nil {
 		t.Fatalf("chat failed: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestEngine_Chat_InjectsProfile(t *testing.T) {
 	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, mockProfile)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	_, err := engine.Chat(ctx, "Hi")
+	_, err := engine.Chat(ctx, ChatOptions{Message: "Hi"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestEngine_Chat_PersistsToolLoop(t *testing.T) {
 	engine.SetMessageSaver(saver)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	result, err := engine.Chat(ctx, "What's on my list?")
+	result, err := engine.Chat(ctx, ChatOptions{Message: "What's on my list?"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestEngine_Chat_NoSaver_StillWorks(t *testing.T) {
 	// No saver set — should still work
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	result, err := engine.Chat(ctx, "Hi")
+	result, err := engine.Chat(ctx, ChatOptions{Message: "Hi"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -361,7 +361,7 @@ func TestEngine_Chat_NoProfileNoInjection(t *testing.T) {
 	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, mockProfile)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	_, err := engine.Chat(ctx, "Hi")
+	_, err := engine.Chat(ctx, ChatOptions{Message: "Hi"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

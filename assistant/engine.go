@@ -35,6 +35,13 @@ type MessageSaver interface {
 	SaveMessage(userID int64, role, content, rawContent string) error
 }
 
+// ChatOptions configures a Chat call.
+type ChatOptions struct {
+	Message     string
+	TopicID     int64  // if > 0, topic chat; 0 means private chat
+	DisplayName string // sender's display name (for topic message attribution)
+}
+
 type Engine struct {
 	provider        llm.Provider
 	registry        *tools.Registry
@@ -60,7 +67,7 @@ func (e *Engine) SetMessageSaver(saver MessageSaver) {
 
 // Chat processes a user message and returns the assistant's response.
 // The context must contain the user ID (set by auth middleware).
-func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
+func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 	// Get user data from context
 	userData := auth.UserDataFromContext(ctx)
 
@@ -97,7 +104,7 @@ func (e *Engine) Chat(ctx context.Context, message string) (string, error) {
 	// Add the new user message
 	messages = append(messages, llm.Message{
 		Role:    "user",
-		Content: message,
+		Content: opts.Message,
 	})
 
 	// Loop for tool use

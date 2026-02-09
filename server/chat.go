@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
 )
@@ -126,7 +127,7 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 	s.connections.Broadcast(userID, userMsgJSON)
 
 	// Get assistant response (engine persists assistant messages internally)
-	response, err := s.engine.Chat(ctx, content)
+	response, err := s.engine.Chat(ctx, assistant.ChatOptions{Message: content})
 	if err != nil {
 		log.Printf("assistant error: %v", err)
 		response = "Sorry, I encountered an error. Please try again."
