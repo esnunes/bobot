@@ -3,6 +3,7 @@ package context
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/db"
@@ -65,5 +66,34 @@ func (a *CoreDBAdapter) GetUserProfile(userID int64) (string, int64, error) {
 
 // GetTopicMemberProfiles returns formatted profiles for all topic members.
 func (a *CoreDBAdapter) GetTopicMemberProfiles(topicID int64) (string, error) {
-	return "", fmt.Errorf("not implemented")
+	members, err := a.db.GetTopicMembers(topicID)
+	if err != nil {
+		return "", err
+	}
+
+	var sb strings.Builder
+	hasProfiles := false
+
+	for _, m := range members {
+		content, _, err := a.db.GetUserProfile(m.UserID)
+		if err != nil || content == "" {
+			continue
+		}
+
+		if !hasProfiles {
+			sb.WriteString("## Topic Members\nThe following are the profiles of the members in this topic:\n")
+			hasProfiles = true
+		}
+
+		name := m.DisplayName
+		if name == "" {
+			name = m.Username
+		}
+		fmt.Fprintf(&sb, "\n<member name=%q>\n%s\n</member>\n", name, content)
+	}
+
+	if !hasProfiles {
+		return "", nil
+	}
+	return sb.String(), nil
 }

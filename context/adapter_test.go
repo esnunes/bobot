@@ -3,6 +3,7 @@ package context
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/esnunes/bobot/assistant"
@@ -104,5 +105,66 @@ func TestCoreDBAdapter_GetTopicContextMessages(t *testing.T) {
 	}
 	if messages[1].Role != "assistant" {
 		t.Errorf("expected second message role 'assistant', got %s", messages[1].Role)
+	}
+}
+
+func TestCoreDBAdapter_GetTopicMemberProfiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	coreDB, _ := db.NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer coreDB.Close()
+
+	// Create users with profiles
+	user1, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
+	coreDB.UpsertUserProfile(user1.ID, "Alice is a morning person.", 0)
+
+	user2, _ := coreDB.CreateUserFull("bob", "hash", "Bob", "user")
+	coreDB.UpsertUserProfile(user2.ID, "Bob handles groceries.", 0)
+
+	// Create topic with both members
+	topic, _ := coreDB.CreateTopic("Family", user1.ID)
+	coreDB.AddTopicMember(topic.ID, user1.ID)
+	coreDB.AddTopicMember(topic.ID, user2.ID)
+
+	adapter := NewCoreDBAdapter(coreDB)
+	profiles, err := adapter.GetTopicMemberProfiles(topic.ID)
+	if err != nil {
+		t.Fatalf("failed to get profiles: %v", err)
+	}
+
+	if profiles == "" {
+		t.Fatal("expected non-empty profiles string")
+	}
+
+	// Should contain both members' profiles
+	if !strings.Contains(profiles, "Alice is a morning person.") {
+		t.Error("expected profiles to contain Alice's profile")
+	}
+	if !strings.Contains(profiles, "Bob handles groceries.") {
+		t.Error("expected profiles to contain Bob's profile")
+	}
+	if !strings.Contains(profiles, `name="Alice"`) {
+		t.Error("expected profiles to contain Alice's display name tag")
+	}
+	if !strings.Contains(profiles, `name="Bob"`) {
+		t.Error("expected profiles to contain Bob's display name tag")
+	}
+}
+
+func TestCoreDBAdapter_GetTopicMemberProfiles_NoProfiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	coreDB, _ := db.NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer coreDB.Close()
+
+	user1, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := coreDB.CreateTopic("Empty", user1.ID)
+
+	adapter := NewCoreDBAdapter(coreDB)
+	profiles, err := adapter.GetTopicMemberProfiles(topic.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if profiles != "" {
+		t.Errorf("expected empty profiles when no member has a profile, got '%s'", profiles)
 	}
 }
