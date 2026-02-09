@@ -1,8 +1,6 @@
 package context
 
 import (
-	"fmt"
-
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/db"
 )
@@ -21,7 +19,18 @@ func NewCoreDBMessageSaver(coreDB *db.CoreDB, tokensStart, tokensMax int) *CoreD
 }
 
 func (s *CoreDBMessageSaver) SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error {
-	return fmt.Errorf("not implemented")
+	var senderID int64
+	if role == "assistant" {
+		senderID = db.BobotUserID
+	} else {
+		senderID = userID
+	}
+
+	_, err := s.db.CreateTopicMessageWithContext(
+		topicID, senderID, role, content, rawContent,
+		s.tokensStart, s.tokensMax,
+	)
+	return err
 }
 
 func (s *CoreDBMessageSaver) SaveMessage(userID int64, role, content, rawContent string) error {
