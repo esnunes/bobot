@@ -2,7 +2,6 @@
 
 ## ideas
 
-- add a thinq tool (to interact with thinq devices)
 - add a weather tool
 - add a web_search tool
 - add a web_fetch tool
