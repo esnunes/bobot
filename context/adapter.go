@@ -42,7 +42,20 @@ func (a *CoreDBAdapter) GetContextMessages(userID int64) ([]assistant.ContextMes
 
 // GetTopicContextMessages returns context messages for a topic.
 func (a *CoreDBAdapter) GetTopicContextMessages(topicID int64) ([]assistant.ContextMessage, error) {
-	return nil, fmt.Errorf("not implemented")
+	messages, err := a.db.GetTopicContextMessages(topicID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]assistant.ContextMessage, len(messages))
+	for i, m := range messages {
+		result[i] = assistant.ContextMessage{
+			Role:       m.Role,
+			Content:    m.Content,
+			RawContent: m.RawContent,
+		}
+	}
+	return result, nil
 }
 
 // GetUserProfile returns the profile content and last message ID for a user.

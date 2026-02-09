@@ -66,3 +66,43 @@ func TestCoreDBAdapter_GetContextMessages_RawContent(t *testing.T) {
 		t.Errorf("expected raw_content preserved, got '%s'", messages[0].RawContent)
 	}
 }
+
+func TestCoreDBAdapter_GetTopicContextMessages(t *testing.T) {
+	tmpDir := t.TempDir()
+	coreDB, _ := db.NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer coreDB.Close()
+
+	// Create user and topic
+	user1, _ := coreDB.CreateUser("alice", "hash")
+	topic, _ := coreDB.CreateTopic("Test Topic", user1.ID)
+
+	// Create topic messages with raw_content containing attribution
+	coreDB.CreateTopicMessageWithContext(
+		topic.ID, user1.ID, "user", "Hello", "[Alice]: Hello",
+		1000, 4000,
+	)
+	coreDB.CreateTopicMessageWithContext(
+		topic.ID, db.BobotUserID, "assistant", "Hi there", "Hi there",
+		1000, 4000,
+	)
+
+	adapter := NewCoreDBAdapter(coreDB)
+	messages, err := adapter.GetTopicContextMessages(topic.ID)
+	if err != nil {
+		t.Fatalf("failed to get topic messages: %v", err)
+	}
+
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(messages))
+	}
+
+	if messages[0].Role != "user" {
+		t.Errorf("expected first message role 'user', got %s", messages[0].Role)
+	}
+	if messages[0].RawContent != "[Alice]: Hello" {
+		t.Errorf("expected raw_content '[Alice]: Hello', got '%s'", messages[0].RawContent)
+	}
+	if messages[1].Role != "assistant" {
+		t.Errorf("expected second message role 'assistant', got %s", messages[1].Role)
+	}
+}
