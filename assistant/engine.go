@@ -13,9 +13,10 @@ import (
 	"github.com/esnunes/bobot/tools"
 )
 
-// ContextProvider retrieves context messages for a user.
+// ContextProvider retrieves context messages for a user or topic.
 type ContextProvider interface {
 	GetContextMessages(userID int64) ([]ContextMessage, error)
+	GetTopicContextMessages(topicID int64) ([]ContextMessage, error)
 }
 
 // ContextMessage represents a message for context (simplified from db.Message).
@@ -25,14 +26,16 @@ type ContextMessage struct {
 	RawContent string
 }
 
-// ProfileProvider retrieves user profile data.
+// ProfileProvider retrieves user or topic profile data.
 type ProfileProvider interface {
 	GetUserProfile(userID int64) (string, int64, error)
+	GetTopicMemberProfiles(topicID int64) (string, error)
 }
 
 // MessageSaver persists messages during the chat loop.
 type MessageSaver interface {
 	SaveMessage(userID int64, role, content, rawContent string) error
+	SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error
 }
 
 // ChatOptions configures a Chat call.

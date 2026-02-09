@@ -110,6 +110,10 @@ func (m *mockContextProvider) GetContextMessages(userID int64) ([]ContextMessage
 	return m.messages, nil
 }
 
+func (m *mockContextProvider) GetTopicContextMessages(topicID int64) ([]ContextMessage, error) {
+	return m.messages, nil
+}
+
 func TestEngine_ChatWithContext(t *testing.T) {
 	// Create a mock provider that captures the messages sent
 	var capturedMessages []llm.Message
@@ -200,6 +204,10 @@ func (m *mockProfileProvider) GetUserProfile(userID int64) (string, int64, error
 	return content, 0, nil
 }
 
+func (m *mockProfileProvider) GetTopicMemberProfiles(topicID int64) (string, error) {
+	return "", nil
+}
+
 func TestEngine_Chat_InjectsProfile(t *testing.T) {
 	var capturedSystemPrompt string
 	mockProv := &mockProvider{
@@ -251,6 +259,10 @@ func (m *mockMessageSaver) SaveMessage(userID int64, role, content, rawContent s
 		Content:    content,
 		RawContent: rawContent,
 	})
+	return nil
+}
+
+func (m *mockMessageSaver) SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error {
 	return nil
 }
 

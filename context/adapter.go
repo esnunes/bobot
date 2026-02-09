@@ -2,6 +2,8 @@
 package context
 
 import (
+	"fmt"
+
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/db"
 )
@@ -38,7 +40,17 @@ func (a *CoreDBAdapter) GetContextMessages(userID int64) ([]assistant.ContextMes
 	return result, nil
 }
 
+// GetTopicContextMessages returns context messages for a topic.
+func (a *CoreDBAdapter) GetTopicContextMessages(topicID int64) ([]assistant.ContextMessage, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 // GetUserProfile returns the profile content and last message ID for a user.
 func (a *CoreDBAdapter) GetUserProfile(userID int64) (string, int64, error) {
 	return a.db.GetUserProfile(userID)
+}
+
+// GetTopicMemberProfiles returns formatted profiles for all topic members.
+func (a *CoreDBAdapter) GetTopicMemberProfiles(topicID int64) (string, error) {
+	return "", fmt.Errorf("not implemented")
 }
