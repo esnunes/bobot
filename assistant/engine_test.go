@@ -114,7 +114,7 @@ func (m *mockContextProvider) GetTopicContextMessages(topicID int64) ([]ContextM
 	return m.messages, nil
 }
 
-func TestEngine_ChatWithContext(t *testing.T) {
+func TestEngine_Chat_WithContextMessages(t *testing.T) {
 	// Create a mock provider that captures the messages sent
 	var capturedMessages []llm.Message
 	mockProv := &mockProvider{

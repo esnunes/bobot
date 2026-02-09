@@ -214,12 +214,6 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 	return "", fmt.Errorf("max iterations reached")
 }
 
-// Deprecated: use Chat with ChatOptions{TopicID: ...} instead.
-// Kept temporarily until server callers are updated.
-func (e *Engine) ChatWithContext(ctx context.Context, conversation []string) (string, error) {
-	return "", fmt.Errorf("ChatWithContext is deprecated, use Chat with TopicID")
-}
-
 // parseRawContent converts stored raw_content back to the appropriate type
 // for the LLM Message.Content field (string or []map[string]any).
 func parseRawContent(raw string) interface{} {
