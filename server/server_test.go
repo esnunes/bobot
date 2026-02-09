@@ -244,8 +244,13 @@ func TestSignup_ValidInvite(t *testing.T) {
 
 	srv.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify HX-Redirect header
+	if loc := w.Header().Get("HX-Redirect"); loc != "/" {
+		t.Errorf("expected HX-Redirect '/', got %q", loc)
 	}
 
 	// Verify user was created
@@ -559,8 +564,8 @@ func TestHandleSignup_SetsSessionCookie(t *testing.T) {
 
 	s.router.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("Status = %d, want 200, body: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusNoContent {
+		t.Errorf("Status = %d, want 204, body: %s", rr.Code, rr.Body.String())
 	}
 
 	// Check for session cookie

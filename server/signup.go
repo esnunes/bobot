@@ -141,7 +141,8 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.setSessionCookie(w, token)
-	s.templates["authenticated"].Execute(w, PageData{Title: "Loading"})
+	w.Header().Set("HX-Redirect", "/")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
