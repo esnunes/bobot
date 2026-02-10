@@ -16,8 +16,9 @@ type Config struct {
 	Context  ContextConfig
 	History  HistoryConfig
 	Sync     SyncConfig
-	DataDir string
-	BaseURL string
+	DataDir           string
+	BaseURL           string
+	BraveSearchAPIKey string
 }
 
 type ServerConfig struct {
@@ -85,8 +86,9 @@ func Load() (*Config, error) {
 		Sync: SyncConfig{
 			MaxLookback: getEnvDurationOrDefault("BOBOT_SYNC_MAX_LOOKBACK", 24*time.Hour),
 		},
-		DataDir: getEnvOrDefault("BOBOT_DATA_DIR", "./data"),
-		BaseURL: getEnvOrDefault("BOBOT_BASE_URL", "http://localhost:8080"),
+		DataDir:           getEnvOrDefault("BOBOT_DATA_DIR", "./data"),
+		BaseURL:           getEnvOrDefault("BOBOT_BASE_URL", "http://localhost:8080"),
+		BraveSearchAPIKey: os.Getenv("BRAVE_SEARCH_API_KEY"),
 	}
 
 	if err := cfg.validate(); err != nil {

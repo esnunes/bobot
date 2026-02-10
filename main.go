@@ -22,6 +22,7 @@ import (
 	"github.com/esnunes/bobot/tools/thinq"
 	"github.com/esnunes/bobot/tools/topic"
 	"github.com/esnunes/bobot/tools/user"
+	"github.com/esnunes/bobot/tools/websearch"
 )
 
 func parseLogLevel(s string) slog.Level {
@@ -91,6 +92,11 @@ func main() {
 		}
 		defer thinqDB.Close()
 		registry.Register(thinq.NewThinqTool(thinqClient, thinqDB))
+	}
+
+	// Initialize web search tool (optional, only if configured)
+	if cfg.BraveSearchAPIKey != "" {
+		registry.Register(websearch.NewTool(cfg.BraveSearchAPIKey))
 	}
 
 	// Load embedded skills
