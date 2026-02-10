@@ -150,6 +150,11 @@ window.ChatClient ||= class ChatClient {
             }
         });
 
+        // Reset bobot confirm buttons when clicking elsewhere
+        document.addEventListener('click', () => {
+            MessageRenderer.resetConfirmingButtons();
+        });
+
         // Logout cleanup - clear chat-specific localStorage
         document.addEventListener('bobot:logout', () => {
             localStorage.removeItem('lastMessageTimestamp');
@@ -182,6 +187,11 @@ window.ChatClient ||= class ChatClient {
             msgEl.innerHTML = html;
             msgEl.classList.add('markdown-content');
             MessageRenderer.highlightCodeBlocks(msgEl);
+            MessageRenderer.processBobotTags(msgEl, (msg) => {
+                if (this.wsContainer.send({ content: msg })) {
+                    this.showTypingIndicator();
+                }
+            }, !!id);
         } else {
             msgEl.textContent = content;
         }
@@ -205,6 +215,11 @@ window.ChatClient ||= class ChatClient {
             msgEl.innerHTML = html;
             msgEl.classList.add('markdown-content');
             MessageRenderer.highlightCodeBlocks(msgEl);
+            MessageRenderer.processBobotTags(msgEl, (msg) => {
+                if (this.wsContainer.send({ content: msg })) {
+                    this.showTypingIndicator();
+                }
+            }, true);
         } else {
             msgEl.textContent = content;
         }
