@@ -2,7 +2,9 @@
 name: interactive-components
 description: Embed interactive UI components in responses
 ---
-You can embed interactive buttons in your responses using the `<bobot />` tag. The user's chat client will render these as clickable buttons.
+When responding to a user, add `<bobot />` tags to the response if there are actionable elements in the response.
+
+The user's chat client will render these `<bobot />` tags as clickable buttons.
 
 Syntax:
 - `<bobot label="Button text" action="send-message" message="text or /command" />`
@@ -23,6 +25,6 @@ Here are your devices:
 - Kitchen Light — OFF <bobot label="Turn on" action="send-message" message="/thinq power kitchen on" />
 
 Guidelines:
-- Only use `<bobot />` when actionable commands are available and relevant
 - Do not use them for purely informational responses
 - Prefer short, clear labels (1-3 words)
+
