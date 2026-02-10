@@ -93,6 +93,11 @@ window.TopicChatClient = class TopicChatClient {
             this.mentionBotBtn.addEventListener('click', () => this.mentionBot());
         }
 
+        // Reset bobot confirm buttons when clicking elsewhere
+        document.addEventListener('click', () => {
+            MessageRenderer.resetConfirmingButtons();
+        });
+
         this.messagesEl.addEventListener('scroll', () => {
             if (this.messagesEl.scrollTop < 100) {
                 this.loadMoreHistory();
@@ -160,6 +165,13 @@ window.TopicChatClient = class TopicChatClient {
             // Highlight after inserting into DOM
             msgEl.appendChild(contentEl);
             MessageRenderer.highlightCodeBlocks(contentEl);
+            MessageRenderer.processBobotTags(contentEl, (msg) => {
+                if (this.wsContainer.send({ content: msg, topic_id: this.topicId })) {
+                    if (msg.toLowerCase().includes('@bobot')) {
+                        this.showTypingIndicator();
+                    }
+                }
+            }, !!id);
         } else {
             contentEl.textContent = content;
             msgEl.appendChild(contentEl);
@@ -249,6 +261,13 @@ window.TopicChatClient = class TopicChatClient {
             contentEl.classList.add('markdown-content');
             msgEl.appendChild(contentEl);
             MessageRenderer.highlightCodeBlocks(contentEl);
+            MessageRenderer.processBobotTags(contentEl, (msg) => {
+                if (this.wsContainer.send({ content: msg, topic_id: this.topicId })) {
+                    if (msg.toLowerCase().includes('@bobot')) {
+                        this.showTypingIndicator();
+                    }
+                }
+            }, true);
         } else {
             contentEl.textContent = content;
             msgEl.appendChild(contentEl);

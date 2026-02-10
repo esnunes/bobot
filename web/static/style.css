@@ -739,3 +739,47 @@ header {
     transform: rotate(360deg);
   }
 }
+
+/* ============================================
+   BOBOT ACTION BUTTONS
+   ============================================ */
+.bobot-action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-0) var(--space-1);
+  background: var(--colors-border);
+  color: var(--colors-text);
+  border: var(--borders-thin);
+  border-radius: var(--radii-md);
+  font-family: var(--fonts-body);
+  font-size: var(--font-sizes-1);
+  font-weight: var(--font-weights-medium);
+  cursor: pointer;
+  transition: background-color var(--transitions-fast), color var(--transitions-fast), border-color var(--transitions-fast);
+  vertical-align: middle;
+  margin: 2px 4px;
+  line-height: var(--line-heights-normal);
+}
+
+.bobot-action-btn:hover {
+  background: var(--colors-border-strong);
+}
+
+.bobot-action-btn--confirming {
+  background: var(--colors-danger);
+  color: var(--colors-background);
+  border-color: var(--colors-danger);
+}
+
+.bobot-action-btn--confirming:hover {
+  background: var(--colors-danger-hover);
+  border-color: var(--colors-danger-hover);
+}
+
+.bobot-action-btn:disabled {
+  background: var(--colors-border);
+  color: var(--colors-text-secondary);
+  border-color: var(--colors-border);
+  opacity: var(--opacities-disabled);
+  cursor: default;
+}
