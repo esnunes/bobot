@@ -18,6 +18,7 @@ import (
 	"github.com/esnunes/bobot/server"
 	"github.com/esnunes/bobot/skills"
 	"github.com/esnunes/bobot/tools"
+	"github.com/esnunes/bobot/tools/skill"
 	"github.com/esnunes/bobot/tools/task"
 	"github.com/esnunes/bobot/tools/thinq"
 	"github.com/esnunes/bobot/tools/topic"
@@ -82,6 +83,7 @@ func main() {
 	registry.Register(task.NewTaskTool(taskDB))
 	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
 	registry.Register(topic.NewTopicTool(coreDB))
+	registry.Register(skill.NewSkillTool(coreDB))
 
 	// Initialize ThinQ tool (optional, only if configured)
 	if thinqToken := os.Getenv("THINQ_TOKEN"); thinqToken != "" {
@@ -115,6 +117,7 @@ func main() {
 	// Initialize assistant engine with context
 	engine := assistant.NewEngine(llmProvider, registry, loadedSkills, contextAdapter, contextAdapter)
 	engine.SetMessageSaver(messageSaver)
+	engine.SetSkillProvider(contextAdapter)
 
 	// Initialize HTTP server
 	srv := server.NewWithAssistant(cfg, coreDB, engine, registry)
