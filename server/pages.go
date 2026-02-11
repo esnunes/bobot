@@ -33,6 +33,13 @@ type MemberView struct {
 	DisplayName string
 }
 
+type SkillView struct {
+	ID          int64
+	Name        string
+	Description string
+	Content     string
+}
+
 type PageData struct {
 	Title         string
 	Error         string
@@ -44,6 +51,8 @@ type PageData struct {
 	TopicName     string
 	OwnerID       int64
 	CurrentUserID int64
+	Skills        []SkillView
+	Skill         *SkillView
 	PageDataJSON  template.JS
 }
 
@@ -83,6 +92,18 @@ func (s *Server) loadTemplates() error {
 		return err
 	}
 	s.templates["authenticated"] = authTmpl
+
+	skillsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/skills.html")
+	if err != nil {
+		return err
+	}
+	s.templates["skills"] = skillsTmpl
+
+	skillFormTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/skill_form.html")
+	if err != nil {
+		return err
+	}
+	s.templates["skill_form"] = skillFormTmpl
 
 	return nil
 }
