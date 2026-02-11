@@ -41,19 +41,24 @@ type SkillView struct {
 }
 
 type PageData struct {
-	Title         string
-	Error         string
-	Code          string
-	TopicID       int64
-	Topics        []TopicView
-	Messages      []MessageView
-	Members       []MemberView
-	TopicName     string
-	OwnerID       int64
-	CurrentUserID int64
-	Skills        []SkillView
-	Skill         *SkillView
-	PageDataJSON  template.JS
+	Title          string
+	Error          string
+	Code           string
+	TopicID        int64
+	Topics         []TopicView
+	Messages       []MessageView
+	Members        []MemberView
+	TopicName      string
+	OwnerID        int64
+	CurrentUserID  int64
+	Skills         []SkillView
+	Skill          *SkillView
+	VAPIDPublicKey string
+	PageDataJSON   template.JS
+}
+
+func (s *Server) vapidPublicKey() string {
+	return s.cfg.VAPID.PublicKey
 }
 
 func (s *Server) loadTemplates() error {
@@ -159,13 +164,15 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	// Check for "logout everywhere" parameter
-	if r.URL.Query().Get("all") == "true" {
-		// Try to get user from session cookie
-		if cookie, err := r.Cookie("session"); err == nil {
-			if token, err := s.session.DecryptToken(cookie.Value); err == nil {
+	// Try to get user from session cookie for cleanup
+	if cookie, err := r.Cookie("session"); err == nil {
+		if token, err := s.session.DecryptToken(cookie.Value); err == nil {
+			// Check for "logout everywhere" parameter
+			if r.URL.Query().Get("all") == "true" {
 				s.db.CreateSessionRevocation(token.UserID, "logout_all")
 			}
+			// Clean up push subscriptions
+			s.db.DeletePushSubscriptionsByUser(token.UserID)
 		}
 	}
 
@@ -202,8 +209,9 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 	})
 
 	s.templates["chat"].Execute(w, PageData{
-		Title:        "Chat",
-		PageDataJSON: template.JS(jsonData),
+		Title:          "Chat",
+		VAPIDPublicKey: s.vapidPublicKey(),
+		PageDataJSON:   template.JS(jsonData),
 	})
 }
 
@@ -302,12 +310,13 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 	})
 
 	s.templates["topic_chat"].Execute(w, PageData{
-		Title:         "Topic Chat",
-		TopicID:       topicID,
-		TopicName:     topic.Name,
-		OwnerID:       topic.OwnerID,
-		CurrentUserID: userData.UserID,
-		Members:       members,
-		PageDataJSON:  template.JS(jsonData),
+		Title:          "Topic Chat",
+		TopicID:        topicID,
+		TopicName:      topic.Name,
+		OwnerID:        topic.OwnerID,
+		CurrentUserID:  userData.UserID,
+		Members:        members,
+		VAPIDPublicKey: s.vapidPublicKey(),
+		PageDataJSON:   template.JS(jsonData),
 	})
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
+	"github.com/esnunes/bobot/push"
 )
 
 var upgrader = websocket.Upgrader{
@@ -139,6 +140,12 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 		"content": response,
 	})
 	s.connections.Broadcast(userID, assistantMsgJSON)
+
+	// Send push notification if user has no active connections
+	if s.pushSender != nil && s.connections.Count(userID) == 0 {
+		payload := push.BuildPayload("Bobot", push.TruncateMessage(response, 200), "/chat", fmt.Sprintf("msg-private-%d", userID))
+		go s.pushSender.NotifyUser(userID, payload)
+	}
 }
 
 func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int64, content string) {
@@ -208,6 +215,9 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 	})
 	s.broadcastToTopic(topicID, userMsgJSON)
 
+	// Send push to offline topic members (exclude sender)
+	s.pushToTopicMembers(topicID, userID, user.DisplayName, content)
+
 	// Check if assistant should respond
 	if shouldTriggerAssistant(content) {
 		s.handleTopicAssistantResponse(ctx, userID, topicID, content, user.DisplayName)
@@ -237,6 +247,42 @@ func (s *Server) handleTopicAssistantResponse(ctx context.Context, userID, topic
 		"display_name": "bobot",
 	})
 	s.broadcastToTopic(topicID, assistantMsgJSON)
+
+	// Send push to offline topic members (exclude nobody — all members get notified for bot responses)
+	s.pushToTopicMembers(topicID, db.BobotUserID, "Bobot", response)
+}
+
+// pushToTopicMembers sends push notifications to all offline members of a topic, excluding the sender.
+func (s *Server) pushToTopicMembers(topicID, senderID int64, senderName, content string) {
+	if s.pushSender == nil {
+		return
+	}
+
+	members, err := s.db.GetTopicMembers(topicID)
+	if err != nil {
+		return
+	}
+
+	topic, err := s.db.GetTopicByID(topicID)
+	if err != nil {
+		return
+	}
+
+	for _, member := range members {
+		if member.UserID == senderID || member.UserID == db.BobotUserID {
+			continue
+		}
+		if s.connections.Count(member.UserID) == 0 {
+			// Check if user is blocked
+			user, err := s.db.GetUserByID(member.UserID)
+			if err != nil || user.Blocked {
+				continue
+			}
+			title := fmt.Sprintf("%s in #%s", senderName, topic.Name)
+			payload := push.BuildPayload(title, push.TruncateMessage(content, 200), fmt.Sprintf("/topics/%d", topicID), fmt.Sprintf("msg-topic-%d", topicID))
+			go s.pushSender.NotifyUser(member.UserID, payload)
+		}
+	}
 }
 
 func (s *Server) broadcastToTopic(topicID int64, data []byte) {
