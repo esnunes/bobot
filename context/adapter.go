@@ -14,9 +14,10 @@ type CoreDBAdapter struct {
 	db *db.CoreDB
 }
 
-// Compile-time check that CoreDBAdapter implements ContextProvider and ProfileProvider.
+// Compile-time check that CoreDBAdapter implements ContextProvider, ProfileProvider, and SkillProvider.
 var _ assistant.ContextProvider = (*CoreDBAdapter)(nil)
 var _ assistant.ProfileProvider = (*CoreDBAdapter)(nil)
+var _ assistant.SkillProvider = (*CoreDBAdapter)(nil)
 
 // NewCoreDBAdapter creates a new adapter.
 func NewCoreDBAdapter(coreDB *db.CoreDB) *CoreDBAdapter {
@@ -96,4 +97,38 @@ func (a *CoreDBAdapter) GetTopicMemberProfiles(topicID int64) (string, error) {
 		return "", nil
 	}
 	return sb.String(), nil
+}
+
+// GetPrivateChatSkills returns user-defined skills for a user's private chat.
+func (a *CoreDBAdapter) GetPrivateChatSkills(userID int64) ([]assistant.Skill, error) {
+	rows, err := a.db.GetPrivateChatSkills(userID)
+	if err != nil {
+		return nil, err
+	}
+	skills := make([]assistant.Skill, len(rows))
+	for i, r := range rows {
+		skills[i] = assistant.Skill{
+			Name:        r.Name,
+			Description: r.Description,
+			Content:     r.Content,
+		}
+	}
+	return skills, nil
+}
+
+// GetTopicSkills returns user-defined skills for a topic.
+func (a *CoreDBAdapter) GetTopicSkills(topicID int64) ([]assistant.Skill, error) {
+	rows, err := a.db.GetTopicSkills(topicID)
+	if err != nil {
+		return nil, err
+	}
+	skills := make([]assistant.Skill, len(rows))
+	for i, r := range rows {
+		skills[i] = assistant.Skill{
+			Name:        r.Name,
+			Description: r.Description,
+			Content:     r.Content,
+		}
+	}
+	return skills, nil
 }

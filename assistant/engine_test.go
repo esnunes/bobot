@@ -525,3 +525,98 @@ func TestEngine_Chat_NoProfileNoInjection(t *testing.T) {
 		t.Error("expected system prompt to NOT contain profile tags when profile is empty")
 	}
 }
+
+type mockSkillProvider struct {
+	privateSkills map[int64][]Skill
+	topicSkills   map[int64][]Skill
+}
+
+func (m *mockSkillProvider) GetPrivateChatSkills(userID int64) ([]Skill, error) {
+	if m.privateSkills == nil {
+		return nil, nil
+	}
+	return m.privateSkills[userID], nil
+}
+
+func (m *mockSkillProvider) GetTopicSkills(topicID int64) ([]Skill, error) {
+	if m.topicSkills == nil {
+		return nil, nil
+	}
+	return m.topicSkills[topicID], nil
+}
+
+func TestEngine_MergesUserSkillsIntoPrompt(t *testing.T) {
+	var capturedSystemPrompt string
+	prov := &mockProvider{
+		chatFunc: func(ctx context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedSystemPrompt = req.SystemPrompt
+			return &llm.ChatResponse{Content: "ok", RawContent: `"ok"`}, nil
+		},
+	}
+
+	registry := tools.NewRegistry()
+	builtinSkills := []Skill{{Name: "builtin", Description: "Built-in skill", Content: "builtin content"}}
+
+	skillProvider := &mockSkillProvider{
+		privateSkills: map[int64][]Skill{
+			1: {{Name: "custom", Description: "Custom skill", Content: "custom content"}},
+		},
+	}
+
+	engine := NewEngine(prov, registry, builtinSkills, &mockContextProvider{}, nil)
+	engine.SetSkillProvider(skillProvider)
+	engine.SetMessageSaver(&mockMessageSaver{})
+
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1, Role: "user"})
+
+	engine.Chat(ctx, ChatOptions{Message: "hello"})
+
+	if capturedSystemPrompt == "" {
+		t.Fatal("expected system prompt to be set")
+	}
+
+	// Built-in skill should appear
+	if !strings.Contains(capturedSystemPrompt, "builtin content") {
+		t.Error("expected builtin skill in system prompt")
+	}
+	// User-defined skill should appear
+	if !strings.Contains(capturedSystemPrompt, "custom content") {
+		t.Error("expected custom skill in system prompt")
+	}
+	// Builtin should appear before custom
+	builtinIdx := strings.Index(capturedSystemPrompt, "builtin content")
+	customIdx := strings.Index(capturedSystemPrompt, "custom content")
+	if builtinIdx > customIdx {
+		t.Error("expected builtin skills before custom skills")
+	}
+}
+
+func TestEngine_TopicSkillsInTopicChat(t *testing.T) {
+	var capturedSystemPrompt string
+	prov := &mockProvider{
+		chatFunc: func(ctx context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			capturedSystemPrompt = req.SystemPrompt
+			return &llm.ChatResponse{Content: "ok", RawContent: `"ok"`}, nil
+		},
+	}
+
+	registry := tools.NewRegistry()
+
+	skillProvider := &mockSkillProvider{
+		topicSkills: map[int64][]Skill{
+			42: {{Name: "topic-skill", Description: "Topic skill", Content: "topic skill content"}},
+		},
+	}
+
+	engine := NewEngine(prov, registry, nil, &mockContextProvider{}, nil)
+	engine.SetSkillProvider(skillProvider)
+	engine.SetMessageSaver(&mockMessageSaver{})
+
+	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1, Role: "user"})
+
+	engine.Chat(ctx, ChatOptions{Message: "hello", TopicID: 42})
+
+	if !strings.Contains(capturedSystemPrompt, "topic skill content") {
+		t.Error("expected topic skill in system prompt")
+	}
+}

@@ -31,6 +31,12 @@ type ProfileProvider interface {
 	GetTopicMemberProfiles(topicID int64) (string, error)
 }
 
+// SkillProvider retrieves user-defined skills for the current chat scope.
+type SkillProvider interface {
+	GetPrivateChatSkills(userID int64) ([]Skill, error)
+	GetTopicSkills(topicID int64) ([]Skill, error)
+}
+
 // MessageSaver persists messages during the chat loop.
 type MessageSaver interface {
 	SaveMessage(userID int64, role, content, rawContent string) error
@@ -50,6 +56,7 @@ type Engine struct {
 	skills          []Skill
 	contextProvider ContextProvider
 	profileProvider ProfileProvider
+	skillProvider   SkillProvider
 	messageSaver    MessageSaver
 }
 
@@ -67,6 +74,10 @@ func (e *Engine) SetMessageSaver(saver MessageSaver) {
 	e.messageSaver = saver
 }
 
+func (e *Engine) SetSkillProvider(provider SkillProvider) {
+	e.skillProvider = provider
+}
+
 // Chat processes a user message and returns the assistant's response.
 // The context must contain the user ID (set by auth middleware).
 // For topic chats (TopicID > 0), it fetches topic context, injects member profiles,
@@ -77,7 +88,22 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 
 	// Build system prompt with role-filtered tools
 	llmTools := e.registry.ToLLMToolsForRole(userData.Role)
-	systemPrompt := BuildSystemPrompt(e.skills, llmTools)
+
+	// Merge built-in skills with user-defined skills
+	allSkills := append([]Skill{}, e.skills...)
+	if e.skillProvider != nil {
+		var userSkills []Skill
+		var skillErr error
+		if opts.TopicID > 0 {
+			userSkills, skillErr = e.skillProvider.GetTopicSkills(opts.TopicID)
+		} else {
+			userSkills, skillErr = e.skillProvider.GetPrivateChatSkills(userData.UserID)
+		}
+		if skillErr == nil {
+			allSkills = append(allSkills, userSkills...)
+		}
+	}
+	systemPrompt := BuildSystemPrompt(allSkills, llmTools)
 
 	// Inject profiles
 	if opts.TopicID > 0 {
