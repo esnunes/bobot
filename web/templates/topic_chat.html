@@ -27,6 +27,8 @@
             {{end}}
         </div>
         <hr>
+        <button class="menu-item" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">Skills</button>
+        <hr>
         {{if eq .OwnerID .CurrentUserID}}
         <button id="delete-btn" class="danger-btn">Delete Topic</button>
         {{else}}

@@ -1,0 +1,48 @@
+{{define "content"}}
+<div class="skill-form-container" data-page="skill-form">
+    <header>
+        {{if .TopicID}}
+        <button hx-get="/skills?topic_id={{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{else}}
+        <button hx-get="/skills" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{end}}
+        <h1>{{if .Skill}}Edit Skill{{else}}New Skill{{end}}</h1>
+        <div></div>
+    </header>
+
+    <main class="skill-form-body">
+        {{if .Skill}}
+        <form hx-post="/skills/{{.Skill.ID}}" hx-target="body" class="skill-form">
+        {{else}}
+        <form hx-post="/skills" hx-target="body" class="skill-form">
+        {{end}}
+            {{if .TopicID}}<input type="hidden" name="topic_id" value="{{.TopicID}}">{{end}}
+
+            <label for="skill-name">Name</label>
+            <input type="text" id="skill-name" name="name" placeholder="Skill name" required maxlength="100" {{if .Skill}}value="{{.Skill.Name}}" disabled{{else}}autofocus{{end}}>
+
+            <label for="skill-description">Description</label>
+            <input type="text" id="skill-description" name="description" placeholder="Short description (optional)" maxlength="200" {{if .Skill}}value="{{.Skill.Description}}"{{end}}>
+
+            <label for="skill-content">Content</label>
+            <textarea id="skill-content" name="content" placeholder="Markdown instructions for the skill..." rows="20">{{if .Skill}}{{.Skill.Content}}{{end}}</textarea>
+
+            <div class="skill-form-actions">
+                {{if .Skill}}
+                <button type="button" class="danger-btn" hx-delete="/skills/{{.Skill.ID}}" hx-confirm="Delete skill '{{.Skill.Name}}'?" hx-target="body">Delete</button>
+                <div class="skill-form-actions-right">
+                    <button type="button" hx-get="/skills{{if .TopicID}}?topic_id={{.TopicID}}{{end}}" hx-target="body">Cancel</button>
+                    <button type="submit" class="primary-btn">Save</button>
+                </div>
+                {{else}}
+                <div></div>
+                <div class="skill-form-actions-right">
+                    <button type="button" hx-get="/skills{{if .TopicID}}?topic_id={{.TopicID}}{{end}}" hx-target="body">Cancel</button>
+                    <button type="submit" class="primary-btn">Create</button>
+                </div>
+                {{end}}
+            </div>
+        </form>
+    </main>
+</div>
+{{end}}

@@ -19,6 +19,7 @@
 
 <div id="menu-overlay" class="menu-overlay hidden">
     <div class="menu">
+        <button class="menu-item" hx-get="/skills" hx-target="body">Skills</button>
         <button id="logout-btn" hx-post="/logout" hx-on::before-request="htmx.trigger(document.body, 'bobot:logout')">Logout</button>
     </div>
 </div>
