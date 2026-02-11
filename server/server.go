@@ -73,6 +73,13 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /api/topics/{id}/messages/history", s.sessionMiddleware(s.handleTopicMessageHistory))
 	s.router.HandleFunc("GET /api/topics/{id}/messages/sync", s.sessionMiddleware(s.handleTopicMessageSync))
 
+	// Skill routes (require auth)
+	s.router.HandleFunc("GET /api/skills", s.sessionMiddleware(s.handleListSkills))
+	s.router.HandleFunc("POST /api/skills", s.sessionMiddleware(s.handleCreateSkill))
+	s.router.HandleFunc("GET /api/skills/{id}", s.sessionMiddleware(s.handleGetSkill))
+	s.router.HandleFunc("PUT /api/skills/{id}", s.sessionMiddleware(s.handleUpdateSkill))
+	s.router.HandleFunc("DELETE /api/skills/{id}", s.sessionMiddleware(s.handleDeleteSkill))
+
 	// Page routes
 	s.router.HandleFunc("GET /{$}", s.handleLoginPage)
 	s.router.HandleFunc("POST /{$}", s.handleLoginPage)
