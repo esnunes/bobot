@@ -342,6 +342,41 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Create skills table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS skills (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			content TEXT NOT NULL DEFAULT '',
+			user_id INTEGER NOT NULL REFERENCES users(id),
+			topic_id INTEGER REFERENCES topics(id) ON DELETE CASCADE,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Unique skill name per private chat scope (case-insensitive)
+	_, err = c.db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_private_name
+		ON skills(user_id, LOWER(name)) WHERE topic_id IS NULL
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Unique skill name per topic scope (case-insensitive)
+	_, err = c.db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_topic_name
+		ON skills(topic_id, LOWER(name)) WHERE topic_id IS NOT NULL
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

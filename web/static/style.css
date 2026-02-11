@@ -741,6 +741,184 @@ header {
 }
 
 /* ============================================
+   SKILLS PAGE
+   ============================================ */
+.skills-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.skills-list {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--space-3) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-3) calc(var(--space-3) + env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skill-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-0);
+  padding: var(--space-2) var(--space-3);
+  background: var(--colors-surface);
+  border-radius: var(--radii-lg);
+  box-shadow: var(--shadows-low);
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow var(--transitions-fast);
+  border: 0;
+  text-align: left;
+}
+
+.skill-item:hover {
+  box-shadow: var(--shadows-medium);
+}
+
+.skill-name {
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-text);
+}
+
+.skill-description {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-text-secondary);
+}
+
+/* ============================================
+   SKILL FORM
+   ============================================ */
+.skill-form-container {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.skill-form-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-3) calc(var(--space-3) + env(safe-area-inset-left));
+}
+
+.skill-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  height: 100%;
+}
+
+.skill-form label {
+  font-size: var(--font-sizes-1);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacings-wide);
+}
+
+.skill-form input[type="text"] {
+  padding: var(--space-1) var(--space-2);
+  height: var(--sizes-input-height);
+  border: var(--borders-thin);
+  border-radius: var(--radii-md);
+  font-family: var(--fonts-body);
+  font-size: var(--font-sizes-2);
+  background: var(--colors-surface);
+  color: var(--colors-text);
+  outline: none;
+  transition: border-color var(--transitions-fast);
+}
+
+.skill-form input[type="text"]:focus {
+  border-color: var(--colors-accent);
+}
+
+.skill-form input[type="text"]:disabled {
+  opacity: var(--opacities-disabled);
+  cursor: not-allowed;
+}
+
+.skill-form input[type="text"]::placeholder {
+  color: var(--colors-text-secondary);
+}
+
+.skill-form textarea {
+  flex: 1;
+  min-height: 200px;
+  padding: var(--space-2);
+  border: var(--borders-thin);
+  border-radius: var(--radii-md);
+  font-family: var(--fonts-mono);
+  font-size: var(--font-sizes-1);
+  line-height: var(--line-heights-relaxed);
+  background: var(--colors-surface);
+  color: var(--colors-text);
+  outline: none;
+  resize: vertical;
+  transition: border-color var(--transitions-fast);
+}
+
+.skill-form textarea:focus {
+  border-color: var(--colors-accent);
+}
+
+.skill-form textarea::placeholder {
+  color: var(--colors-text-secondary);
+  font-family: var(--fonts-body);
+}
+
+.skill-form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) 0 calc(var(--space-2) + env(safe-area-inset-bottom));
+}
+
+.skill-form-actions-right {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.primary-btn {
+  padding: var(--space-1) var(--space-3);
+  background: var(--colors-accent);
+  color: var(--colors-background);
+  border: none;
+  border-radius: var(--radii-pill);
+  font-family: var(--fonts-body);
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+  transition: background-color var(--transitions-fast);
+}
+
+.primary-btn:hover {
+  background-color: var(--colors-accent-hover);
+}
+
+.skill-form-actions button[type="button"]:not(.danger-btn):not(.primary-btn) {
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  color: var(--colors-accent);
+  border: none;
+  border-radius: var(--radii-pill);
+  font-family: var(--fonts-body);
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+}
+
+.skill-form-actions .danger-btn {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radii-pill);
+  font-family: var(--fonts-body);
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+  border: none;
+}
+
+/* ============================================
    BOBOT ACTION BUTTONS
    ============================================ */
 .bobot-action-btn {

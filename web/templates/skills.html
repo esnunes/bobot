@@ -1,0 +1,31 @@
+{{define "content"}}
+<div class="skills-container" data-page="skills">
+    <header>
+        {{if .TopicID}}
+        <button hx-get="/topics/{{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{else}}
+        <button hx-get="/chat" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{end}}
+        <h1>{{if .TopicName}}Skills - {{.TopicName}}{{else}}Skills{{end}}</h1>
+        <div></div>
+    </header>
+
+    <main class="skills-list">
+        {{if .Skills}}
+            {{range .Skills}}
+            <button hx-get="/skills/{{.ID}}/edit" hx-target="body" class="skill-item">
+                <span class="skill-name">{{.Name}}</span>
+                {{if .Description}}<span class="skill-description">{{.Description}}</span>{{end}}
+            </button>
+            {{end}}
+        {{else}}
+            <div class="empty">No skills yet.</div>
+        {{end}}
+        {{if .TopicID}}
+        <button hx-get="/skills/new?topic_id={{.TopicID}}" hx-target="body" class="card-action">+ Create new skill</button>
+        {{else}}
+        <button hx-get="/skills/new" hx-target="body" class="card-action">+ Create new skill</button>
+        {{end}}
+    </main>
+</div>
+{{end}}
