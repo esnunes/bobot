@@ -188,9 +188,7 @@ window.ChatClient ||= class ChatClient {
             msgEl.classList.add('markdown-content');
             MessageRenderer.highlightCodeBlocks(msgEl);
             MessageRenderer.processBobotTags(msgEl, (msg) => {
-                if (this.wsContainer.send({ content: msg })) {
-                    this.showTypingIndicator();
-                }
+                this.wsContainer.send({ content: msg });
             }, !!id);
         } else {
             msgEl.textContent = content;
@@ -216,9 +214,7 @@ window.ChatClient ||= class ChatClient {
             msgEl.classList.add('markdown-content');
             MessageRenderer.highlightCodeBlocks(msgEl);
             MessageRenderer.processBobotTags(msgEl, (msg) => {
-                if (this.wsContainer.send({ content: msg })) {
-                    this.showTypingIndicator();
-                }
+                this.wsContainer.send({ content: msg });
             }, true);
         } else {
             msgEl.textContent = content;

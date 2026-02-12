@@ -166,11 +166,7 @@ window.TopicChatClient = class TopicChatClient {
             msgEl.appendChild(contentEl);
             MessageRenderer.highlightCodeBlocks(contentEl);
             MessageRenderer.processBobotTags(contentEl, (msg) => {
-                if (this.wsContainer.send({ content: msg, topic_id: this.topicId })) {
-                    if (msg.toLowerCase().includes('@bobot')) {
-                        this.showTypingIndicator();
-                    }
-                }
+                this.wsContainer.send({ content: msg, topic_id: this.topicId });
             }, !!id);
         } else {
             contentEl.textContent = content;
@@ -262,11 +258,7 @@ window.TopicChatClient = class TopicChatClient {
             msgEl.appendChild(contentEl);
             MessageRenderer.highlightCodeBlocks(contentEl);
             MessageRenderer.processBobotTags(contentEl, (msg) => {
-                if (this.wsContainer.send({ content: msg, topic_id: this.topicId })) {
-                    if (msg.toLowerCase().includes('@bobot')) {
-                        this.showTypingIndicator();
-                    }
-                }
+                this.wsContainer.send({ content: msg, topic_id: this.topicId });
             }, true);
         } else {
             contentEl.textContent = content;
