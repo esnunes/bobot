@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/esnunes/bobot/assistant"
@@ -56,7 +56,7 @@ func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.E
 	if cfg.VAPID.PublicKey != "" && cfg.VAPID.PrivateKey != "" {
 		ps, err := push.NewPushSender(coreDB, cfg.VAPID.PublicKey, cfg.VAPID.PrivateKey, cfg.VAPID.Subject)
 		if err != nil {
-			log.Printf("push: failed to initialize push sender: %v", err)
+			slog.Error("push: failed to initialize push sender", "error", err)
 		} else {
 			s.pushSender = ps
 		}
