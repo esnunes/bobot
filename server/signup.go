@@ -16,7 +16,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		code := r.URL.Query().Get("code")
 		if code == "" {
-			s.templates["signup"].Execute(w, PageData{
+			s.render(w, "signup", PageData{
 				Title: "Sign Up",
 				Error: "Invite code required",
 			})
@@ -26,14 +26,14 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 		// Validate code exists and is valid
 		invite, err := s.db.GetInviteByCode(code)
 		if err != nil || invite.UsedBy != nil || invite.Revoked {
-			s.templates["signup"].Execute(w, PageData{
+			s.render(w, "signup", PageData{
 				Title: "Sign Up",
 				Error: "Invalid or expired invite",
 			})
 			return
 		}
 
-		s.templates["signup"].Execute(w, PageData{
+		s.render(w, "signup", PageData{
 			Title: "Sign Up",
 			Code:  code,
 		})
@@ -42,7 +42,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 	// POST request - handle signup
 	if err := r.ParseForm(); err != nil {
-		s.templates["signup"].Execute(w, PageData{Title: "Sign Up", Error: "Invalid request"})
+		s.render(w, "signup", PageData{Title: "Sign Up", Error: "Invalid request"})
 		return
 	}
 
@@ -54,7 +54,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	// Validate invite code
 	invite, err := s.db.GetInviteByCode(code)
 	if err != nil || invite.UsedBy != nil || invite.Revoked {
-		s.templates["signup"].Execute(w, PageData{
+		s.render(w, "signup", PageData{
 			Title: "Sign Up",
 			Error: "Invalid or expired invite",
 			Code:  code,
@@ -64,7 +64,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 	// Validate username
 	if err := validateUsername(username); err != nil {
-		s.templates["signup"].Execute(w, PageData{
+		s.render(w, "signup", PageData{
 			Title: "Sign Up",
 			Error: err.Error(),
 			Code:  code,
@@ -74,7 +74,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 	// Validate display name
 	if err := validateDisplayName(displayName); err != nil {
-		s.templates["signup"].Execute(w, PageData{
+		s.render(w, "signup", PageData{
 			Title: "Sign Up",
 			Error: err.Error(),
 			Code:  code,
@@ -84,7 +84,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 	// Validate password
 	if err := validatePassword(password); err != nil {
-		s.templates["signup"].Execute(w, PageData{
+		s.render(w, "signup", PageData{
 			Title: "Sign Up",
 			Error: err.Error(),
 			Code:  code,
@@ -95,7 +95,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	// Hash password
 	passwordHash, err := auth.HashPassword(password)
 	if err != nil {
-		s.templates["signup"].Execute(w, PageData{
+		s.render(w, "signup", PageData{
 			Title: "Sign Up",
 			Error: "Internal error",
 			Code:  code,
@@ -106,7 +106,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	// Create user
 	user, err := s.db.CreateUserFull(username, passwordHash, displayName, "user")
 	if err != nil {
-		s.templates["signup"].Execute(w, PageData{
+		s.render(w, "signup", PageData{
 			Title: "Sign Up",
 			Error: "Username already taken",
 			Code:  code,
@@ -121,7 +121,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 	// Mark invite as used
 	if err := s.db.UseInvite(code, user.ID); err != nil {
-		s.templates["signup"].Execute(w, PageData{
+		s.render(w, "signup", PageData{
 			Title: "Sign Up",
 			Error: "Internal error",
 			Code:  code,
@@ -132,7 +132,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	// Create session token
 	token, err := s.session.CreateToken(user.ID, user.Role)
 	if err != nil {
-		s.templates["signup"].Execute(w, PageData{
+		s.render(w, "signup", PageData{
 			Title: "Sign Up",
 			Error: "Internal error",
 			Code:  code,
