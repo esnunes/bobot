@@ -56,7 +56,7 @@ func (s *Server) handleSkillsPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	s.templates["skills"].Execute(w, PageData{
+	s.render(w, "skills", PageData{
 		Title:     "Skills",
 		TopicID:   topicID,
 		TopicName: topicName,
@@ -107,7 +107,7 @@ func (s *Server) handleSkillFormPage(w http.ResponseWriter, r *http.Request) {
 			topicID = *skill.TopicID
 		}
 
-		s.templates["skill_form"].Execute(w, PageData{
+		s.render(w, "skill_form", PageData{
 			Title:   "Edit Skill",
 			TopicID: topicID,
 			Skill: &SkillView{
@@ -121,7 +121,7 @@ func (s *Server) handleSkillFormPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// New skill form
-	s.templates["skill_form"].Execute(w, PageData{
+	s.render(w, "skill_form", PageData{
 		Title:   "New Skill",
 		TopicID: topicID,
 	})

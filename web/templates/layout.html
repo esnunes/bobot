@@ -15,9 +15,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/tokens.css">
     <link rel="stylesheet" href="/static/style.css">
-    <link ref="manifest" href="/static/manifest.json">
+    <link rel="manifest" href="/static/manifest.json">
+    {{if .VAPIDPublicKey}}<meta name="vapid-key" content="{{.VAPIDPublicKey}}">{{end}}
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="/static/bobot.js" defer></script>
+    <script src="/static/push.js" defer></script>
     <script src="/static/ws-manager.js" defer></script>
 </head>
 <body hx-push-url="false">

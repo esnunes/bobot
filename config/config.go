@@ -16,9 +16,16 @@ type Config struct {
 	Context  ContextConfig
 	History  HistoryConfig
 	Sync     SyncConfig
+	VAPID    VAPIDConfig
 	DataDir           string
 	BaseURL           string
 	BraveSearchAPIKey string
+}
+
+type VAPIDConfig struct {
+	PublicKey  string // base64url-encoded 65-byte uncompressed P-256 public key
+	PrivateKey string // base64url-encoded 32-byte raw private key scalar
+	Subject    string // mailto: or https: URL
 }
 
 type ServerConfig struct {
@@ -85,6 +92,11 @@ func Load() (*Config, error) {
 		},
 		Sync: SyncConfig{
 			MaxLookback: getEnvDurationOrDefault("BOBOT_SYNC_MAX_LOOKBACK", 24*time.Hour),
+		},
+		VAPID: VAPIDConfig{
+			PublicKey:  os.Getenv("BOBOT_VAPID_PUBLIC_KEY"),
+			PrivateKey: os.Getenv("BOBOT_VAPID_PRIVATE_KEY"),
+			Subject:    os.Getenv("BOBOT_VAPID_SUBJECT"),
 		},
 		DataDir:           getEnvOrDefault("BOBOT_DATA_DIR", "./data"),
 		BaseURL:           getEnvOrDefault("BOBOT_BASE_URL", "http://localhost:8080"),

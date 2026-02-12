@@ -41,19 +41,25 @@ type SkillView struct {
 }
 
 type PageData struct {
-	Title         string
-	Error         string
-	Code          string
-	TopicID       int64
-	Topics        []TopicView
-	Messages      []MessageView
-	Members       []MemberView
-	TopicName     string
-	OwnerID       int64
-	CurrentUserID int64
-	Skills        []SkillView
-	Skill         *SkillView
-	PageDataJSON  template.JS
+	Title          string
+	Error          string
+	Code           string
+	TopicID        int64
+	Topics         []TopicView
+	Messages       []MessageView
+	Members        []MemberView
+	TopicName      string
+	OwnerID        int64
+	CurrentUserID  int64
+	Skills         []SkillView
+	Skill          *SkillView
+	VAPIDPublicKey string
+	PageDataJSON   template.JS
+}
+
+func (s *Server) render(w http.ResponseWriter, name string, data PageData) {
+	data.VAPIDPublicKey = s.cfg.VAPID.PublicKey
+	s.templates[name].Execute(w, data)
 }
 
 func (s *Server) loadTemplates() error {
@@ -112,20 +118,20 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	// Check if already authenticated
 	if cookie, err := r.Cookie("session"); err == nil {
 		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
-			s.templates["authenticated"].Execute(w, PageData{Title: "Loading"})
+			s.render(w, "authenticated", PageData{Title: "Loading"})
 			return
 		}
 	}
 
 	// GET request - show login form
 	if r.Method == http.MethodGet {
-		s.templates["login"].Execute(w, PageData{Title: "Login"})
+		s.render(w, "login", PageData{Title: "Login"})
 		return
 	}
 
 	// POST request - handle login
 	if err := r.ParseForm(); err != nil {
-		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Invalid request"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Invalid request"})
 		return
 	}
 
@@ -134,38 +140,40 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 
 	user, err := s.db.GetUserByUsername(username)
 	if err != nil {
-		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Invalid credentials"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Invalid credentials"})
 		return
 	}
 
 	if !auth.CheckPassword(password, user.PasswordHash) {
-		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Invalid credentials"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Invalid credentials"})
 		return
 	}
 
 	if user.Blocked {
-		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Account blocked"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Account blocked"})
 		return
 	}
 
 	token, err := s.session.CreateToken(user.ID, user.Role)
 	if err != nil {
-		s.templates["login"].Execute(w, PageData{Title: "Login", Error: "Internal error"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Internal error"})
 		return
 	}
 
 	s.setSessionCookie(w, token)
-	s.templates["authenticated"].Execute(w, PageData{Title: "Loading"})
+	s.render(w, "authenticated", PageData{Title: "Loading"})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	// Check for "logout everywhere" parameter
-	if r.URL.Query().Get("all") == "true" {
-		// Try to get user from session cookie
-		if cookie, err := r.Cookie("session"); err == nil {
-			if token, err := s.session.DecryptToken(cookie.Value); err == nil {
+	// Try to get user from session cookie for cleanup
+	if cookie, err := r.Cookie("session"); err == nil {
+		if token, err := s.session.DecryptToken(cookie.Value); err == nil {
+			// Check for "logout everywhere" parameter
+			if r.URL.Query().Get("all") == "true" {
 				s.db.CreateSessionRevocation(token.UserID, "logout_all")
 			}
+			// Clean up push subscriptions
+			s.db.DeletePushSubscriptionsByUser(token.UserID)
 		}
 	}
 
@@ -201,7 +209,7 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 		"messages": jsonMessages,
 	})
 
-	s.templates["chat"].Execute(w, PageData{
+	s.render(w, "chat", PageData{
 		Title:        "Chat",
 		PageDataJSON: template.JS(jsonData),
 	})
@@ -226,7 +234,7 @@ func (s *Server) handleTopicsPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	s.templates["topics"].Execute(w, PageData{Title: "Topics", Topics: topicViews})
+	s.render(w, "topics", PageData{Title: "Topics", Topics: topicViews})
 }
 
 func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
@@ -301,7 +309,7 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		"messages":        jsonMessages,
 	})
 
-	s.templates["topic_chat"].Execute(w, PageData{
+	s.render(w, "topic_chat", PageData{
 		Title:         "Topic Chat",
 		TopicID:       topicID,
 		TopicName:     topic.Name,

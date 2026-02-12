@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/config"
 	"github.com/esnunes/bobot/db"
+	"github.com/esnunes/bobot/push"
 	"github.com/esnunes/bobot/tools"
 	"github.com/esnunes/bobot/web"
 )
@@ -22,6 +24,7 @@ type Server struct {
 	engine      *assistant.Engine
 	registry    *tools.Registry
 	connections *ConnectionRegistry
+	pushSender  *push.PushSender
 	router      *http.ServeMux
 	templates   map[string]*template.Template
 }
@@ -47,6 +50,16 @@ func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.E
 		connections: NewConnectionRegistry(),
 		router:      http.NewServeMux(),
 		templates:   make(map[string]*template.Template),
+	}
+
+	// Initialize push sender if VAPID keys are configured
+	if cfg.VAPID.PublicKey != "" && cfg.VAPID.PrivateKey != "" {
+		ps, err := push.NewPushSender(coreDB, cfg.VAPID.PublicKey, cfg.VAPID.PrivateKey, cfg.VAPID.Subject)
+		if err != nil {
+			slog.Error("push: failed to initialize push sender", "error", err)
+		} else {
+			s.pushSender = ps
+		}
 	}
 
 	s.loadTemplates()
@@ -81,6 +94,10 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /skills/{id}", s.sessionMiddleware(s.handleUpdateSkillForm))
 	s.router.HandleFunc("DELETE /skills/{id}", s.sessionMiddleware(s.handleDeleteSkillForm))
 
+	// Push notification routes (require auth)
+	s.router.HandleFunc("POST /api/push/subscribe", s.sessionMiddleware(s.handlePushSubscribe))
+	s.router.HandleFunc("DELETE /api/push/subscribe", s.sessionMiddleware(s.handlePushUnsubscribe))
+
 	// Page routes
 	s.router.HandleFunc("GET /{$}", s.handleLoginPage)
 	s.router.HandleFunc("POST /{$}", s.handleLoginPage)
@@ -90,6 +107,18 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /chat", s.sessionMiddleware(s.handleChatPage))
 	s.router.HandleFunc("GET /topics", s.sessionMiddleware(s.handleTopicsPage))
 	s.router.HandleFunc("GET /topics/{id}", s.sessionMiddleware(s.handleTopicChatPage))
+
+	// Service worker (must be served at root scope)
+	s.router.HandleFunc("GET /sw.js", func(w http.ResponseWriter, r *http.Request) {
+		data, err := fs.ReadFile(web.FS, "static/sw.js")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/javascript")
+		w.Header().Set("Service-Worker-Allowed", "/")
+		w.Write(data)
+	})
 
 	// Static files
 	staticFS, _ := fs.Sub(web.FS, "static")

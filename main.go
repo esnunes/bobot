@@ -73,6 +73,9 @@ func main() {
 		case "update-profiles":
 			runUpdateProfiles(cfg, coreDB)
 			return
+		case "generate-vapid-keys":
+			runGenerateVAPIDKeys()
+			return
 		default:
 			log.Fatalf("Unknown command: %s", os.Args[1])
 		}

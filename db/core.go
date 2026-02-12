@@ -82,6 +82,15 @@ type TopicMember struct {
 	JoinedAt    time.Time
 }
 
+type PushSubscription struct {
+	ID        int64
+	UserID    int64
+	Endpoint  string
+	P256DH    string
+	Auth      string
+	CreatedAt time.Time
+}
+
 type CoreDB struct {
 	db *sql.DB
 }
@@ -372,6 +381,29 @@ func (c *CoreDB) migrate() error {
 	_, err = c.db.Exec(`
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_topic_name
 		ON skills(topic_id, LOWER(name)) WHERE topic_id IS NOT NULL
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create push_subscriptions table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS push_subscriptions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			endpoint TEXT NOT NULL UNIQUE,
+			p256dh TEXT NOT NULL,
+			auth TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id
+		ON push_subscriptions(user_id)
 	`)
 	if err != nil {
 		return err
@@ -1417,4 +1449,47 @@ func (c *CoreDB) DeleteOldSessionRevocations(olderThan time.Time) (int64, error)
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+// SavePushSubscription stores or replaces a push subscription for a user.
+func (c *CoreDB) SavePushSubscription(userID int64, endpoint, p256dh, auth string) error {
+	_, err := c.db.Exec(
+		"INSERT OR REPLACE INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)",
+		userID, endpoint, p256dh, auth,
+	)
+	return err
+}
+
+// DeletePushSubscription removes a push subscription by endpoint.
+func (c *CoreDB) DeletePushSubscription(endpoint string) error {
+	_, err := c.db.Exec("DELETE FROM push_subscriptions WHERE endpoint = ?", endpoint)
+	return err
+}
+
+// DeletePushSubscriptionsByUser removes all push subscriptions for a user.
+func (c *CoreDB) DeletePushSubscriptionsByUser(userID int64) error {
+	_, err := c.db.Exec("DELETE FROM push_subscriptions WHERE user_id = ?", userID)
+	return err
+}
+
+// GetPushSubscriptions returns all push subscriptions for a user.
+func (c *CoreDB) GetPushSubscriptions(userID int64) ([]PushSubscription, error) {
+	rows, err := c.db.Query(
+		"SELECT id, user_id, endpoint, p256dh, auth, created_at FROM push_subscriptions WHERE user_id = ?",
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []PushSubscription
+	for rows.Next() {
+		var s PushSubscription
+		if err := rows.Scan(&s.ID, &s.UserID, &s.Endpoint, &s.P256DH, &s.Auth, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		subs = append(subs, s)
+	}
+	return subs, rows.Err()
 }
