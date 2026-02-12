@@ -32,9 +32,6 @@
     }
   });
 
-  // Check hash for navigation hint (from clients.openWindow)
-  checkHashNavigation();
-
   // Listen for logout event
   document.body.addEventListener("bobot:logout", function () {
     disablePush();
@@ -146,18 +143,11 @@
     // Validate path — only allow /chat and /topics/{id}
     if (url !== "/chat" && !/^\/topics\/\d+$/.test(url)) return;
 
-    if (typeof htmx !== "undefined") {
-      htmx.ajax("GET", url, { target: "body" });
+    if (typeof htmx === "undefined") {
+      console.log("htmx not loaded");
+      return;
     }
-  }
-
-  function checkHashNavigation() {
-    var hash = window.location.hash;
-    if (hash && hash.indexOf("#navigate=") === 0) {
-      var url = hash.substring("#navigate=".length);
-      history.replaceState(null, "", window.location.pathname);
-      navigateTo(url);
-    }
+    htmx.ajax("GET", url, { target: "body" });
   }
 
   function urlBase64ToUint8Array(base64String) {

@@ -41,8 +41,8 @@ self.addEventListener("notificationclick", function (event) {
             return;
           }
         }
-        // No existing window — open a new one with hash hint
-        return self.clients.openWindow("/#navigate=" + url);
+        // No existing window — open a new one with query param
+        return self.clients.openWindow("/?navigate=" + encodeURIComponent(url));
       })
   );
 });

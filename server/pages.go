@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/web"
 )
+
+var navigatePathRe = regexp.MustCompile(`^/topics/\d+$`)
 
 type TopicView struct {
 	ID          int64
@@ -54,6 +57,7 @@ type PageData struct {
 	Skills         []SkillView
 	Skill          *SkillView
 	VAPIDPublicKey string
+	NavigateTo     string
 	PageDataJSON   template.JS
 }
 
@@ -114,54 +118,68 @@ func (s *Server) loadTemplates() error {
 	return nil
 }
 
+// validateNavigatePath returns a safe navigation path.
+// Only /chat and /topics/{id} are allowed; anything else defaults to /chat.
+func validateNavigatePath(path string) string {
+	if path == "/chat" || navigatePathRe.MatchString(path) {
+		return path
+	}
+	return "/chat"
+}
+
 func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
+	nav := validateNavigatePath(r.URL.Query().Get("navigate"))
+
 	// Check if already authenticated
 	if cookie, err := r.Cookie("session"); err == nil {
 		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
-			s.render(w, "authenticated", PageData{Title: "Loading"})
+			s.render(w, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
 			return
 		}
 	}
 
 	// GET request - show login form
 	if r.Method == http.MethodGet {
-		s.render(w, "login", PageData{Title: "Login"})
+		s.render(w, "login", PageData{Title: "Login", NavigateTo: nav})
 		return
 	}
 
 	// POST request - handle login
 	if err := r.ParseForm(); err != nil {
-		s.render(w, "login", PageData{Title: "Login", Error: "Invalid request"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Invalid request", NavigateTo: nav})
 		return
 	}
+
+	// Read navigate from form hidden field (preserved from GET)
+	nav = validateNavigatePath(r.FormValue("navigate"))
 
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
 	user, err := s.db.GetUserByUsername(username)
 	if err != nil {
-		s.render(w, "login", PageData{Title: "Login", Error: "Invalid credentials"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Invalid credentials", NavigateTo: nav})
 		return
 	}
 
 	if !auth.CheckPassword(password, user.PasswordHash) {
-		s.render(w, "login", PageData{Title: "Login", Error: "Invalid credentials"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Invalid credentials", NavigateTo: nav})
 		return
 	}
 
 	if user.Blocked {
-		s.render(w, "login", PageData{Title: "Login", Error: "Account blocked"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Account blocked", NavigateTo: nav})
 		return
 	}
 
 	token, err := s.session.CreateToken(user.ID, user.Role)
 	if err != nil {
-		s.render(w, "login", PageData{Title: "Login", Error: "Internal error"})
+		s.render(w, "login", PageData{Title: "Login", Error: "Internal error", NavigateTo: nav})
 		return
 	}
 
 	s.setSessionCookie(w, token)
-	s.render(w, "authenticated", PageData{Title: "Loading"})
+	s.render(w, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {

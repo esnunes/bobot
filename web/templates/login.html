@@ -3,6 +3,7 @@
     <img src="/static/logo.png" />
     <h1>Welcome to bobot</h1>
     <form id="login-form" hx-post="/" hx-target="body" class="login-form">
+        {{if .NavigateTo}}<input type="hidden" name="navigate" value="{{.NavigateTo}}">{{end}}
         <input type="text" name="username" placeholder="Username" autocapitalize="none" required autofocus>
         <input type="password" name="password" placeholder="Password" required>
         <button type="submit">Login</button>

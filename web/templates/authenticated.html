@@ -1,6 +1,6 @@
 {{define "content"}}
 <div class="authenticated-container"
-     hx-get="/chat"
+     hx-get="{{if .NavigateTo}}{{.NavigateTo}}{{else}}/chat{{end}}"
      hx-trigger="load"
      hx-target="body">
     <img src="/static/logo.png" />
