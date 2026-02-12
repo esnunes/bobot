@@ -14,7 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -85,23 +85,32 @@ func NewPushSender(coreDB *db.CoreDB, publicKeyB64, privateKeyB64, subject strin
 // NotifyUser sends a push notification to all subscriptions for a user.
 // Stale subscriptions (404/410) are cleaned up automatically.
 func (ps *PushSender) NotifyUser(userID int64, payload []byte) {
+	slog.Debug("push: looking up subscriptions", "user_id", userID)
+
 	subs, err := ps.db.GetPushSubscriptions(userID)
 	if err != nil {
-		log.Printf("push: failed to get subscriptions for user %d: %v", userID, err)
+		slog.Error("push: failed to get subscriptions", "user_id", userID, "error", err)
 		return
 	}
 
+	slog.Debug("push: found subscriptions", "user_id", userID, "count", len(subs))
+
 	for _, sub := range subs {
+		slog.Debug("push: sending to endpoint", "user_id", userID, "endpoint", sub.Endpoint)
+
 		status, err := ps.Send(sub.Endpoint, sub.P256DH, sub.Auth, payload)
 		if err != nil {
-			log.Printf("push: send to %s failed: %v", sub.Endpoint, err)
+			slog.Error("push: send failed", "endpoint", sub.Endpoint, "error", err)
 			continue
 		}
+
+		slog.Debug("push: endpoint responded", "endpoint", sub.Endpoint, "status", status)
+
 		if status == http.StatusNotFound || status == http.StatusGone {
-			log.Printf("push: removing stale subscription %s (status %d)", sub.Endpoint, status)
+			slog.Info("push: removing stale subscription", "endpoint", sub.Endpoint, "status", status)
 			ps.db.DeletePushSubscription(sub.Endpoint)
 		} else if status >= 400 {
-			log.Printf("push: endpoint %s returned status %d", sub.Endpoint, status)
+			slog.Warn("push: endpoint returned error", "endpoint", sub.Endpoint, "status", status)
 		}
 	}
 }
@@ -109,15 +118,21 @@ func (ps *PushSender) NotifyUser(userID int64, payload []byte) {
 // Send encrypts the payload and delivers it to a push service endpoint.
 // Returns the HTTP status code and any error.
 func (ps *PushSender) Send(endpoint, p256dhB64, authB64 string, payload []byte) (int, error) {
+	slog.Debug("push: encrypting payload", "endpoint", endpoint, "payload_size", len(payload))
+
 	body, err := encrypt(p256dhB64, authB64, payload)
 	if err != nil {
 		return 0, fmt.Errorf("encrypt: %w", err)
 	}
 
+	slog.Debug("push: generating VAPID auth", "endpoint", endpoint)
+
 	authHeader, err := ps.vapidAuth(endpoint)
 	if err != nil {
 		return 0, fmt.Errorf("vapid auth: %w", err)
 	}
+
+	slog.Debug("push: posting to push service", "endpoint", endpoint, "body_size", len(body))
 
 	req, err := http.NewRequest("POST", endpoint, bytes.NewReader(body))
 	if err != nil {
