@@ -152,7 +152,7 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 	execCtx, cancel := context.WithTimeout(execCtx, s.timeout)
 	defer cancel()
 
-	content := "[Reminder] " + r.Message
+	content := "[Reminder — respond now, do NOT create another reminder] " + r.Message
 
 	var execErr error
 	if r.TopicID != nil {

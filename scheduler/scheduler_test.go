@@ -92,8 +92,9 @@ func TestExecuteReminder(t *testing.T) {
 	if len(pipeline.private) != 1 {
 		t.Fatalf("expected 1 private message, got %d", len(pipeline.private))
 	}
-	if pipeline.private[0].Content != "[Reminder] call dentist" {
-		t.Errorf("got content %q, want %q", pipeline.private[0].Content, "[Reminder] call dentist")
+	wantContent := "[Reminder — respond now, do NOT create another reminder] call dentist"
+	if pipeline.private[0].Content != wantContent {
+		t.Errorf("got content %q, want %q", pipeline.private[0].Content, wantContent)
 	}
 	if pipeline.private[0].UserID != user.ID {
 		t.Errorf("got user_id %d, want %d", pipeline.private[0].UserID, user.ID)
@@ -130,7 +131,7 @@ func TestExecuteReminderInTopic(t *testing.T) {
 	if len(pipeline.topic) != 1 {
 		t.Fatalf("expected 1 topic message, got %d", len(pipeline.topic))
 	}
-	if pipeline.topic[0].Content != "[Reminder] topic reminder" {
+	if pipeline.topic[0].Content != "[Reminder — respond now, do NOT create another reminder] topic reminder" {
 		t.Errorf("got content %q", pipeline.topic[0].Content)
 	}
 	if pipeline.topic[0].TopicID != topic.ID {
