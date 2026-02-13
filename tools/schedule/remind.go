@@ -22,7 +22,7 @@ func (t *RemindTool) Name() string {
 }
 
 func (t *RemindTool) Description() string {
-	return "Create one-shot reminders that fire at a specific time. The reminder message is sent as a chat message when it fires."
+	return "Create one-shot reminders that fire at a specific time. When the reminder fires, the message is sent back to you (the LLM) as a new chat message for you to respond to. Store the user's request verbatim — do NOT answer or resolve it now."
 }
 
 func (t *RemindTool) Schema() any {
@@ -36,7 +36,7 @@ func (t *RemindTool) Schema() any {
 			},
 			"message": map[string]any{
 				"type":        "string",
-				"description": "The reminder message",
+				"description": "The user's original request, stored verbatim. This will be sent back as a prompt when the reminder fires. Do NOT answer or rephrase it — store exactly what the user asked.",
 			},
 			"run_at": map[string]any{
 				"type":        "string",
