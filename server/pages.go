@@ -43,6 +43,16 @@ type SkillView struct {
 	Content     string
 }
 
+type ScheduleView struct {
+	ID            int64
+	Name          string
+	Prompt        string
+	PromptPreview string
+	CronExpr      string
+	Enabled       bool
+	NextRunAt     string
+}
+
 type PageData struct {
 	Title          string
 	Error          string
@@ -56,6 +66,8 @@ type PageData struct {
 	CurrentUserID  int64
 	Skills         []SkillView
 	Skill          *SkillView
+	Schedules      []ScheduleView
+	Schedule       *ScheduleView
 	VAPIDPublicKey string
 	NavigateTo     string
 	PageDataJSON   template.JS
@@ -115,13 +127,25 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["skill_form"] = skillFormTmpl
 
+	schedulesTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/schedules.html")
+	if err != nil {
+		return err
+	}
+	s.templates["schedules"] = schedulesTmpl
+
+	scheduleFormTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/schedule_form.html")
+	if err != nil {
+		return err
+	}
+	s.templates["schedule_form"] = scheduleFormTmpl
+
 	return nil
 }
 
 // validateNavigatePath returns a safe navigation path.
 // Only /chat and /topics/{id} are allowed; anything else defaults to /chat.
 func validateNavigatePath(path string) string {
-	if path == "/chat" || navigatePathRe.MatchString(path) {
+	if path == "/chat" || path == "/schedules" || strings.HasPrefix(path, "/schedules?") || navigatePathRe.MatchString(path) {
 		return path
 	}
 	return "/chat"

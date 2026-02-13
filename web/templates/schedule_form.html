@@ -1,0 +1,58 @@
+{{define "content"}}
+<div class="skill-form-container" data-page="schedule-form">
+    <header>
+        {{if .TopicID}}
+        <button hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{else}}
+        <button hx-get="/schedules" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{end}}
+        <h1>{{if .Schedule}}Edit Schedule{{else}}New Schedule{{end}}</h1>
+        <div></div>
+    </header>
+
+    <main class="skill-form-body">
+        {{if .Error}}<div class="form-error">{{.Error}}</div>{{end}}
+
+        {{if .Schedule}}
+        <form hx-post="/schedules/{{.Schedule.ID}}" hx-target="body" class="skill-form">
+        {{else}}
+        <form hx-post="/schedules" hx-target="body" class="skill-form">
+        {{end}}
+            {{if .TopicID}}<input type="hidden" name="topic_id" value="{{.TopicID}}">{{end}}
+
+            <label for="schedule-name">Name (optional)</label>
+            <input type="text" id="schedule-name" name="name" placeholder="e.g. Daily task summary" maxlength="100" {{if .Schedule}}value="{{.Schedule.Name}}"{{else}}autofocus{{end}}>
+
+            <label for="schedule-prompt">Prompt</label>
+            <textarea id="schedule-prompt" name="prompt" placeholder="The prompt to run on schedule..." rows="6" required>{{if .Schedule}}{{.Schedule.Prompt}}{{end}}</textarea>
+
+            <label for="schedule-cron">Cron Expression (UTC)</label>
+            <input type="text" id="schedule-cron" name="cron_expr" placeholder="e.g. 0 9 * * 1-5 (weekdays at 9am UTC)" required {{if .Schedule}}value="{{.Schedule.CronExpr}}"{{end}}>
+            <small>Format: minute hour day-of-month month day-of-week (minimum interval: 15 minutes)</small>
+
+            {{if .Schedule}}
+            <label class="checkbox-label">
+                <input type="checkbox" name="enabled" {{if .Schedule.Enabled}}checked{{end}}>
+                Enabled
+            </label>
+            {{end}}
+
+            <div class="skill-form-actions">
+                {{if .Schedule}}
+                <button type="button" class="danger-btn" hx-delete="/schedules/{{.Schedule.ID}}" hx-confirm="Delete this schedule?" hx-target="body">Delete</button>
+                <div class="skill-form-actions-right">
+                    <button type="button" hx-get="/schedules{{if .TopicID}}?topic_id={{.TopicID}}{{end}}" hx-target="body">Cancel</button>
+                    <button type="submit" class="primary-btn">Save</button>
+                </div>
+                {{else}}
+                <div></div>
+                <div class="skill-form-actions-right">
+                    <button type="button" hx-get="/schedules{{if .TopicID}}?topic_id={{.TopicID}}{{end}}" hx-target="body">Cancel</button>
+                    <button type="submit" class="primary-btn">Create</button>
+                </div>
+                {{end}}
+            </div>
+        </form>
+    </main>
+</div>
+{{end}}

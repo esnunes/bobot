@@ -1,0 +1,31 @@
+{{define "content"}}
+<div class="skills-container" data-page="schedules">
+    <header>
+        {{if .TopicID}}
+        <button hx-get="/topics/{{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{else}}
+        <button hx-get="/chat" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{end}}
+        <h1>{{if .TopicName}}Schedules - {{.TopicName}}{{else}}Schedules{{end}}</h1>
+        <div></div>
+    </header>
+
+    <main class="skills-list">
+        {{if .Schedules}}
+            {{range .Schedules}}
+            <button hx-get="/schedules/{{.ID}}/edit" hx-target="body" class="skill-item">
+                <span class="skill-name">{{if .Name}}{{.Name}}{{else}}{{.PromptPreview}}{{end}}</span>
+                <span class="skill-description">{{.CronExpr}} {{if .Enabled}}{{else}}(disabled){{end}}</span>
+            </button>
+            {{end}}
+        {{else}}
+            <div class="empty">No scheduled prompts yet.</div>
+        {{end}}
+        {{if .TopicID}}
+        <button hx-get="/schedules/new?topic_id={{.TopicID}}" hx-target="body" class="card-action">+ Create new schedule</button>
+        {{else}}
+        <button hx-get="/schedules/new" hx-target="body" class="card-action">+ Create new schedule</button>
+        {{end}}
+    </main>
+</div>
+{{end}}

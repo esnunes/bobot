@@ -154,7 +154,7 @@ func main() {
 	pipeline := server.NewChatPipeline(coreDB, engine, connections, pushSender, cfg)
 
 	// Initialize HTTP server
-	srv := server.NewWithAssistant(cfg, coreDB, engine, registry, pipeline)
+	srv := server.NewWithAssistant(cfg, coreDB, engine, registry, pipeline, scheduleDB)
 
 	// Create scheduler
 	sched := scheduler.New(scheduleDB, coreDB, pipeline, cfg.Schedule.Timeout)
