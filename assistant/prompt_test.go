@@ -29,6 +29,13 @@ func TestBuildSystemPrompt(t *testing.T) {
 	}
 }
 
+func TestBuildSystemPrompt_IncludesCurrentTime(t *testing.T) {
+	prompt := BuildSystemPrompt(nil, nil)
+	if !strings.Contains(prompt, "Current date and time (UTC):") {
+		t.Error("expected prompt to contain current UTC time")
+	}
+}
+
 func TestBuildSystemPrompt_NoSkills(t *testing.T) {
 	tools := []llm.Tool{
 		{Name: "task", Description: "Manage tasks"},
