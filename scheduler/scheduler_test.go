@@ -92,7 +92,7 @@ func TestExecuteReminder(t *testing.T) {
 	if len(pipeline.private) != 1 {
 		t.Fatalf("expected 1 private message, got %d", len(pipeline.private))
 	}
-	wantContent := "[Reminder — respond now, do NOT create another reminder] call dentist"
+	wantContent := "<bobot-remind>call dentist</bobot-remind>"
 	if pipeline.private[0].Content != wantContent {
 		t.Errorf("got content %q, want %q", pipeline.private[0].Content, wantContent)
 	}
@@ -131,7 +131,7 @@ func TestExecuteReminderInTopic(t *testing.T) {
 	if len(pipeline.topic) != 1 {
 		t.Fatalf("expected 1 topic message, got %d", len(pipeline.topic))
 	}
-	if pipeline.topic[0].Content != "[Reminder — respond now, do NOT create another reminder] topic reminder" {
+	if pipeline.topic[0].Content != "<bobot-remind>topic reminder</bobot-remind>" {
 		t.Errorf("got content %q", pipeline.topic[0].Content)
 	}
 	if pipeline.topic[0].TopicID != topic.ID {
@@ -202,7 +202,7 @@ func TestExecuteCronJob(t *testing.T) {
 	if len(pipeline.private) != 1 {
 		t.Fatalf("expected 1 private message, got %d", len(pipeline.private))
 	}
-	if pipeline.private[0].Content != "[Scheduled] summarize my tasks" {
+	if pipeline.private[0].Content != "<bobot-cron>summarize my tasks</bobot-cron>" {
 		t.Errorf("got content %q", pipeline.private[0].Content)
 	}
 }

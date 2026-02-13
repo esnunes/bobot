@@ -152,7 +152,7 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 	execCtx, cancel := context.WithTimeout(execCtx, s.timeout)
 	defer cancel()
 
-	content := "[Reminder — respond now, do NOT create another reminder] " + r.Message
+	content := "<bobot-remind>" + r.Message + "</bobot-remind>"
 
 	var execErr error
 	if r.TopicID != nil {
@@ -208,7 +208,7 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 	execCtx, cancel := context.WithTimeout(execCtx, s.timeout)
 	defer cancel()
 
-	content := "[Scheduled] " + j.Prompt
+	content := "<bobot-cron>" + j.Prompt + "</bobot-cron>"
 
 	var execErr error
 	if j.TopicID != nil {
