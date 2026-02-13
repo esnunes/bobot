@@ -159,10 +159,12 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 		Content: userContent,
 	})
 
-	// Set ChatData for tool calls in topic chat
+	// Set ChatData for tool calls (always set so tools can access OriginalMessage)
+	chatData := auth.ChatData{OriginalMessage: opts.Message}
 	if opts.TopicID > 0 {
-		ctx = auth.ContextWithChatData(ctx, auth.ChatData{TopicID: &opts.TopicID})
+		chatData.TopicID = &opts.TopicID
 	}
+	ctx = auth.ContextWithChatData(ctx, chatData)
 
 	// Helper to save messages (private or topic)
 	save := func(role, content, rawContent string) {

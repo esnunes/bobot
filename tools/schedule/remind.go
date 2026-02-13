@@ -22,7 +22,7 @@ func (t *RemindTool) Name() string {
 }
 
 func (t *RemindTool) Description() string {
-	return "Create one-shot reminders that fire at a specific time. When the reminder fires, the message is sent back to you (the LLM) as a new chat message for you to respond to. Store the user's request verbatim — do NOT answer or resolve it now."
+	return "Create one-shot reminders that fire at a specific time. When the reminder fires, the user's original message is sent back as a chat prompt for you to respond to. You only need to provide command and run_at — the message is captured automatically."
 }
 
 func (t *RemindTool) Schema() any {
@@ -36,7 +36,7 @@ func (t *RemindTool) Schema() any {
 			},
 			"message": map[string]any{
 				"type":        "string",
-				"description": "The user's original request, stored verbatim. This will be sent back as a prompt when the reminder fires. Do NOT answer or rephrase it — store exactly what the user asked.",
+				"description": "Optional. Only needed for slash commands. When called via LLM, the message is captured automatically from the user's original input.",
 			},
 			"run_at": map[string]any{
 				"type":        "string",
@@ -107,6 +107,10 @@ func (t *RemindTool) Execute(ctx context.Context, input map[string]any) (string,
 
 	switch command {
 	case "create":
+		// Prefer the original user message from context over LLM-provided message
+		if chatData.OriginalMessage != "" {
+			input["message"] = chatData.OriginalMessage
+		}
 		return t.create(userData.UserID, chatData.TopicID, input)
 	case "list":
 		return t.list(userData.UserID, chatData.TopicID)
