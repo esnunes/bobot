@@ -17,6 +17,7 @@ type Config struct {
 	History  HistoryConfig
 	Sync     SyncConfig
 	VAPID    VAPIDConfig
+	Schedule ScheduleConfig
 	DataDir           string
 	BaseURL           string
 	BraveSearchAPIKey string
@@ -63,6 +64,11 @@ type SessionConfig struct {
 	RefreshThreshold time.Duration
 }
 
+type ScheduleConfig struct {
+	Timeout     time.Duration // BOBOT_SCHEDULE_TIMEOUT, default 5m
+	MaxCronJobs int           // BOBOT_MAX_CRON_JOBS, default 10
+}
+
 func Load() (*Config, error) {
 	cfg := &Config{
 		Server: ServerConfig{
@@ -92,6 +98,10 @@ func Load() (*Config, error) {
 		},
 		Sync: SyncConfig{
 			MaxLookback: getEnvDurationOrDefault("BOBOT_SYNC_MAX_LOOKBACK", 24*time.Hour),
+		},
+		Schedule: ScheduleConfig{
+			Timeout:     getEnvDurationOrDefault("BOBOT_SCHEDULE_TIMEOUT", 5*time.Minute),
+			MaxCronJobs: getEnvIntOrDefault("BOBOT_MAX_CRON_JOBS", 10),
 		},
 		VAPID: VAPIDConfig{
 			PublicKey:  os.Getenv("BOBOT_VAPID_PUBLIC_KEY"),
