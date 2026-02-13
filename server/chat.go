@@ -29,24 +29,7 @@ type chatMessage struct {
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
-	// Get session from cookie
-	cookie, err := r.Cookie("session")
-	if err != nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	token, err := s.session.DecryptToken(cookie.Value)
-	if err != nil {
-		http.Error(w, "invalid session", http.StatusUnauthorized)
-		return
-	}
-
-	// Check if past absolute deadline
-	if s.session.IsPastDeadline(token) {
-		http.Error(w, "session expired", http.StatusUnauthorized)
-		return
-	}
+	userData := auth.UserDataFromContext(r.Context())
 
 	// Upgrade to WebSocket
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -57,14 +40,10 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	// Register connection for multi-device support
-	s.connections.Add(token.UserID, conn)
-	defer s.connections.Remove(token.UserID, conn)
+	s.connections.Add(userData.UserID, conn)
+	defer s.connections.Remove(userData.UserID, conn)
 
-	// Create context with user data
-	ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
-		UserID: token.UserID,
-		Role:   token.Role,
-	})
+	ctx := r.Context()
 
 	// Handle messages
 	for {
@@ -77,9 +56,9 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if msg.TopicID != nil {
-			s.handleTopicChatMessage(ctx, token.UserID, *msg.TopicID, msg.Content)
+			s.handleTopicChatMessage(ctx, userData.UserID, *msg.TopicID, msg.Content)
 		} else {
-			s.handlePrivateChatMessage(ctx, token.UserID, msg.Content)
+			s.handlePrivateChatMessage(ctx, userData.UserID, msg.Content)
 		}
 	}
 }
