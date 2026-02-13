@@ -315,29 +315,6 @@ func TestCronJobByTopic(t *testing.T) {
 	}
 }
 
-func TestCountEnabledCronJobs(t *testing.T) {
-	db := newTestDB(t)
-
-	nextRun := time.Date(2026, 2, 13, 9, 0, 0, 0, time.UTC)
-	db.CreateCronJob(1, nil, "job1", "p1", "0 9 * * *", nextRun)
-	id2, _ := db.CreateCronJob(1, nil, "job2", "p2", "0 10 * * *", nextRun)
-	db.CreateCronJob(2, nil, "other user", "p3", "0 11 * * *", nextRun)
-
-	count, err := db.CountEnabledCronJobs(1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != 2 {
-		t.Errorf("got count %d, want 2", count)
-	}
-
-	db.SetCronJobEnabled(id2, 1, false)
-	count, _ = db.CountEnabledCronJobs(1)
-	if count != 1 {
-		t.Errorf("got count %d, want 1", count)
-	}
-}
-
 func TestExecutionCRUD(t *testing.T) {
 	db := newTestDB(t)
 

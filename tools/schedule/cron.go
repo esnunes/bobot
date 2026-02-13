@@ -10,12 +10,11 @@ import (
 )
 
 type CronTool struct {
-	db      *ScheduleDB
-	maxJobs int
+	db *ScheduleDB
 }
 
-func NewCronTool(db *ScheduleDB, maxJobs int) *CronTool {
-	return &CronTool{db: db, maxJobs: maxJobs}
+func NewCronTool(db *ScheduleDB) *CronTool {
+	return &CronTool{db: db}
 }
 
 func (t *CronTool) Name() string {
@@ -141,15 +140,6 @@ func (t *CronTool) create(userID int64, topicID *int64, input map[string]any) (s
 	expr, err := Parse(cronExprStr)
 	if err != nil {
 		return "", fmt.Errorf("invalid cron expression: %w", err)
-	}
-
-	// Check max jobs limit
-	count, err := t.db.CountEnabledCronJobs(userID)
-	if err != nil {
-		return "", fmt.Errorf("failed to count cron jobs: %w", err)
-	}
-	if count >= t.maxJobs {
-		return "", fmt.Errorf("maximum of %d active cron jobs reached", t.maxJobs)
 	}
 
 	// Compute next run time

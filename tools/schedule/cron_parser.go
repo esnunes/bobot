@@ -108,27 +108,6 @@ func (c *CronExpr) Next(from time.Time) time.Time {
 	return limit
 }
 
-// MinInterval computes the shortest possible gap between two consecutive firings.
-func MinInterval(expr *CronExpr) time.Duration {
-	// Find a representative match, then compute the next match after it
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	first := expr.Next(start)
-
-	// Check several consecutive intervals and return the minimum
-	minDuration := time.Duration(1<<63 - 1) // max duration
-	current := first
-	for i := 0; i < 100; i++ {
-		next := expr.Next(current)
-		d := next.Sub(current)
-		if d < minDuration {
-			minDuration = d
-		}
-		current = next
-	}
-
-	return minDuration
-}
-
 // parseField parses a single cron field into a boolean slice.
 // The slice is indexed from 0 to max (inclusive).
 func parseField(field string, min, max int) ([]bool, error) {

@@ -65,8 +65,7 @@ type SessionConfig struct {
 }
 
 type ScheduleConfig struct {
-	Timeout     time.Duration // BOBOT_SCHEDULE_TIMEOUT, default 5m
-	MaxCronJobs int           // BOBOT_MAX_CRON_JOBS, default 10
+	Timeout time.Duration // BOBOT_SCHEDULE_TIMEOUT, default 5m
 }
 
 func Load() (*Config, error) {
@@ -100,8 +99,7 @@ func Load() (*Config, error) {
 			MaxLookback: getEnvDurationOrDefault("BOBOT_SYNC_MAX_LOOKBACK", 24*time.Hour),
 		},
 		Schedule: ScheduleConfig{
-			Timeout:     getEnvDurationOrDefault("BOBOT_SCHEDULE_TIMEOUT", 5*time.Minute),
-			MaxCronJobs: getEnvIntOrDefault("BOBOT_MAX_CRON_JOBS", 10),
+			Timeout: getEnvDurationOrDefault("BOBOT_SCHEDULE_TIMEOUT", 5*time.Minute),
 		},
 		VAPID: VAPIDConfig{
 			PublicKey:  os.Getenv("BOBOT_VAPID_PUBLIC_KEY"),

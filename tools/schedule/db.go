@@ -58,7 +58,7 @@ func NewScheduleDB(dbPath string) (*ScheduleDB, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlite", dbPath+"?_pragma=foreign_keys(1)")
+	db, err := sql.Open("sqlite", dbPath+"?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (s *ScheduleDB) GetDueReminders(now time.Time) ([]Reminder, error) {
 
 func (s *ScheduleDB) MarkReminderExecuted(id int64, executedAt time.Time) error {
 	_, err := s.db.Exec(
-		"UPDATE reminders SET status = 'executed', executed_at = ?, updated_at = ? WHERE id = ?",
+		"UPDATE reminders SET status = 'executed', executed_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'",
 		formatTime(executedAt), formatTime(executedAt), id,
 	)
 	return err
@@ -241,7 +241,7 @@ func (s *ScheduleDB) MarkReminderExecuted(id int64, executedAt time.Time) error 
 func (s *ScheduleDB) MarkReminderFailed(id int64, errMsg string) error {
 	now := formatTime(time.Now())
 	_, err := s.db.Exec(
-		"UPDATE reminders SET status = 'failed', error = ?, updated_at = ? WHERE id = ?",
+		"UPDATE reminders SET status = 'failed', error = ?, updated_at = ? WHERE id = ? AND status = 'pending'",
 		errMsg, now, id,
 	)
 	return err
@@ -386,14 +386,6 @@ func (s *ScheduleDB) DisableCronJob(id int64) error {
 	return err
 }
 
-func (s *ScheduleDB) CountEnabledCronJobs(userID int64) (int, error) {
-	var count int
-	err := s.db.QueryRow(
-		"SELECT COUNT(*) FROM cron_jobs WHERE user_id = ? AND enabled = 1",
-		userID,
-	).Scan(&count)
-	return count, err
-}
 
 // --- Executions ---
 

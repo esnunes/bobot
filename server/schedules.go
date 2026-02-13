@@ -169,16 +169,6 @@ func (s *Server) handleCreateScheduleForm(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Check max jobs
-	count, _ := s.scheduleDB.CountEnabledCronJobs(userData.UserID)
-	if count >= s.cfg.Schedule.MaxCronJobs {
-		s.render(w, "schedule_form", PageData{
-			Title: "New Schedule",
-			Error: fmt.Sprintf("Maximum of %d active schedules reached", s.cfg.Schedule.MaxCronJobs),
-		})
-		return
-	}
-
 	var topicID *int64
 	redirectPath := "/schedules"
 

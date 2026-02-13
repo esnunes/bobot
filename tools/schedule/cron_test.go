@@ -7,7 +7,7 @@ import (
 
 func TestCronTool_Name(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 	if tool.Name() != "cron" {
 		t.Errorf("got %q, want %q", tool.Name(), "cron")
 	}
@@ -15,7 +15,7 @@ func TestCronTool_Name(t *testing.T) {
 
 func TestCronTool_ParseArgs(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	tests := []struct {
 		name    string
@@ -54,7 +54,7 @@ func TestCronTool_ParseArgs(t *testing.T) {
 
 func TestCronTool_ParseArgs_Create(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	result, err := tool.ParseArgs("0 9 * * 1-5 summarize my open tasks")
 	if err != nil {
@@ -70,7 +70,7 @@ func TestCronTool_ParseArgs_Create(t *testing.T) {
 
 func TestCronTool_Create(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	result, err := tool.Execute(ctxWithUser(1), map[string]any{
 		"command":   "create",
@@ -103,7 +103,7 @@ func TestCronTool_Create(t *testing.T) {
 
 func TestCronTool_CreateInvalidExpr(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	_, err := tool.Execute(ctxWithUser(1), map[string]any{
 		"command":   "create",
@@ -115,36 +115,9 @@ func TestCronTool_CreateInvalidExpr(t *testing.T) {
 	}
 }
 
-func TestCronTool_CreateMaxJobs(t *testing.T) {
-	db := newTestDB(t)
-	tool := NewCronTool(db, 2) // max 2 jobs
-
-	// Create 2 jobs
-	for i := 0; i < 2; i++ {
-		_, err := tool.Execute(ctxWithUser(1), map[string]any{
-			"command":   "create",
-			"cron_expr": "0 9 * * *",
-			"prompt":    "test",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Third should fail
-	_, err := tool.Execute(ctxWithUser(1), map[string]any{
-		"command":   "create",
-		"cron_expr": "0 10 * * *",
-		"prompt":    "too many",
-	})
-	if err == nil {
-		t.Error("expected error when exceeding max jobs")
-	}
-}
-
 func TestCronTool_List(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	tool.Execute(ctxWithUser(1), map[string]any{
 		"command":   "create",
@@ -166,7 +139,7 @@ func TestCronTool_List(t *testing.T) {
 
 func TestCronTool_ListEmpty(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	result, err := tool.Execute(ctxWithUser(1), map[string]any{
 		"command": "list",
@@ -181,7 +154,7 @@ func TestCronTool_ListEmpty(t *testing.T) {
 
 func TestCronTool_Delete(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	tool.Execute(ctxWithUser(1), map[string]any{
 		"command":   "create",
@@ -209,7 +182,7 @@ func TestCronTool_Delete(t *testing.T) {
 
 func TestCronTool_DeleteWrongUser(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	tool.Execute(ctxWithUser(1), map[string]any{
 		"command":   "create",
@@ -228,7 +201,7 @@ func TestCronTool_DeleteWrongUser(t *testing.T) {
 
 func TestCronTool_EnableDisable(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	tool.Execute(ctxWithUser(1), map[string]any{
 		"command":   "create",
@@ -265,7 +238,7 @@ func TestCronTool_EnableDisable(t *testing.T) {
 
 func TestCronTool_NoContext(t *testing.T) {
 	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
+	tool := NewCronTool(db)
 
 	_, err := tool.Execute(context.Background(), map[string]any{
 		"command": "list",

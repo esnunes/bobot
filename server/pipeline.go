@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/config"
@@ -52,7 +52,7 @@ func (p *ChatPipeline) SendPrivateMessage(ctx context.Context, userID int64, con
 	// Get assistant response (engine persists assistant messages internally)
 	response, err := p.engine.Chat(ctx, assistant.ChatOptions{Message: content})
 	if err != nil {
-		log.Printf("assistant error: %v", err)
+		slog.Error("pipeline: assistant error", "user_id", userID, "error", err)
 		response = "Sorry, I encountered an error. Please try again."
 	}
 
@@ -100,7 +100,7 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 		DisplayName: displayName,
 	})
 	if err != nil {
-		log.Printf("assistant error: %v", err)
+		slog.Error("pipeline: assistant error", "user_id", userID, "topic_id", topicID, "error", err)
 		response = "Sorry, I encountered an error. Please try again."
 	}
 
@@ -122,7 +122,7 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 func (p *ChatPipeline) broadcastToTopic(topicID int64, data []byte) {
 	members, err := p.db.GetTopicMembers(topicID)
 	if err != nil {
-		log.Printf("failed to get topic members: %v", err)
+		slog.Error("pipeline: failed to get topic members", "topic_id", topicID, "error", err)
 		return
 	}
 
