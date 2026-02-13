@@ -102,6 +102,7 @@ func main() {
 	registry.Register(topic.NewTopicTool(coreDB))
 	registry.Register(skill.NewSkillTool(coreDB))
 	registry.Register(schedule.NewRemindTool(scheduleDB))
+	registry.Register(schedule.NewCronTool(scheduleDB, cfg.Schedule.MaxCronJobs))
 
 	// Initialize ThinQ tool (optional, only if configured)
 	if thinqToken := os.Getenv("THINQ_TOKEN"); thinqToken != "" {

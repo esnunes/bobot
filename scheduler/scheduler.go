@@ -232,12 +232,17 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 }
 
 func (s *Scheduler) updateCronJobNextRun(j *schedule.CronJob) {
-	// Parse cron expression to compute next run
-	// For now, use a simple approach: import will be added when cron_parser is available
-	// This will be wired up in Phase 2 when the cron parser exists
-	// For now, we'll disable the job if we can't compute next run
-	slog.Warn("scheduler: cron parser not yet available, disabling job after execution", "id", j.ID)
-	s.scheduleDB.DisableCronJob(j.ID)
+	expr, err := schedule.Parse(j.CronExpr)
+	if err != nil {
+		slog.Error("scheduler: invalid cron expression, disabling job", "id", j.ID, "expr", j.CronExpr, "error", err)
+		s.scheduleDB.DisableCronJob(j.ID)
+		return
+	}
+
+	// Compute next run from now (not from scheduled time) to skip missed intervals
+	nextRun := expr.Next(time.Now().UTC())
+	s.scheduleDB.UpdateCronJobNextRun(j.ID, nextRun)
+	slog.Debug("scheduler: updated next run", "id", j.ID, "next_run_at", nextRun)
 }
 
 func (s *Scheduler) isTopicValid(userID, topicID int64) bool {
