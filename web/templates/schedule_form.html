@@ -28,7 +28,7 @@
 
             <label for="schedule-cron">Cron Expression (UTC)</label>
             <input type="text" id="schedule-cron" name="cron_expr" placeholder="e.g. 0 9 * * 1-5 (weekdays at 9am UTC)" required {{if .Schedule}}value="{{.Schedule.CronExpr}}"{{end}}>
-            <small>Format: minute hour day-of-month month day-of-week (minimum interval: 15 minutes)</small>
+            <small>Format: minute hour day-of-month month day-of-week</small>
 
             {{if .Schedule}}
             <label class="checkbox-label">

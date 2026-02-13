@@ -169,15 +169,6 @@ func (s *Server) handleCreateScheduleForm(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	interval := schedule.MinInterval(expr)
-	if interval < 15*time.Minute {
-		s.render(w, "schedule_form", PageData{
-			Title: "New Schedule",
-			Error: fmt.Sprintf("Cron interval too frequent (minimum 15 minutes, got %v)", interval),
-		})
-		return
-	}
-
 	// Check max jobs
 	count, _ := s.scheduleDB.CountEnabledCronJobs(userData.UserID)
 	if count >= s.cfg.Schedule.MaxCronJobs {
@@ -272,27 +263,6 @@ func (s *Server) handleUpdateScheduleForm(w http.ResponseWriter, r *http.Request
 			Title:   "Edit Schedule",
 			TopicID: topicID,
 			Error:   fmt.Sprintf("Invalid cron expression: %v", err),
-			Schedule: &ScheduleView{
-				ID:       job.ID,
-				Name:     name,
-				Prompt:   prompt,
-				CronExpr: cronExprStr,
-				Enabled:  enabled,
-			},
-		})
-		return
-	}
-
-	interval := schedule.MinInterval(expr)
-	if interval < 15*time.Minute {
-		var topicID int64
-		if job.TopicID != nil {
-			topicID = *job.TopicID
-		}
-		s.render(w, "schedule_form", PageData{
-			Title:   "Edit Schedule",
-			TopicID: topicID,
-			Error:   fmt.Sprintf("Cron interval too frequent (minimum 15 minutes, got %v)", interval),
 			Schedule: &ScheduleView{
 				ID:       job.ID,
 				Name:     name,

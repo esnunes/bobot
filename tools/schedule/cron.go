@@ -143,12 +143,6 @@ func (t *CronTool) create(userID int64, topicID *int64, input map[string]any) (s
 		return "", fmt.Errorf("invalid cron expression: %w", err)
 	}
 
-	// Check minimum interval (15 minutes)
-	interval := MinInterval(expr)
-	if interval < 15*time.Minute {
-		return "", fmt.Errorf("cron interval too frequent (minimum 15 minutes, got %v)", interval)
-	}
-
 	// Check max jobs limit
 	count, err := t.db.CountEnabledCronJobs(userID)
 	if err != nil {

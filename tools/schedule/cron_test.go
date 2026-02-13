@@ -101,21 +101,6 @@ func TestCronTool_Create(t *testing.T) {
 	}
 }
 
-func TestCronTool_CreateTooFrequent(t *testing.T) {
-	db := newTestDB(t)
-	tool := NewCronTool(db, 10)
-
-	// Every minute is too frequent
-	_, err := tool.Execute(ctxWithUser(1), map[string]any{
-		"command":   "create",
-		"cron_expr": "* * * * *",
-		"prompt":    "too frequent",
-	})
-	if err == nil {
-		t.Error("expected error for too-frequent cron expression")
-	}
-}
-
 func TestCronTool_CreateInvalidExpr(t *testing.T) {
 	db := newTestDB(t)
 	tool := NewCronTool(db, 10)

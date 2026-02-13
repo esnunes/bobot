@@ -159,8 +159,8 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 		Content: userContent,
 	})
 
-	// Set ChatData for tool calls (always set so tools can access OriginalMessage)
-	chatData := auth.ChatData{OriginalMessage: opts.Message}
+	// Set ChatData for tool calls
+	var chatData auth.ChatData
 	if opts.TopicID > 0 {
 		chatData.TopicID = &opts.TopicID
 	}
