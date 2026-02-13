@@ -4,7 +4,6 @@ package assistant
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/esnunes/bobot/llm"
 )
@@ -22,8 +21,6 @@ func BuildSystemPrompt(skills []Skill, tools []llm.Tool) string {
 
 	sb.WriteString(basePrompt)
 	sb.WriteString("\n\n")
-
-	sb.WriteString(fmt.Sprintf("Current date and time (UTC): %s\n\n", time.Now().UTC().Format("2006-01-02 15:04:05")))
 
 	if len(skills) > 0 {
 		sb.WriteString("## Skills\n\n")
