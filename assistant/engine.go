@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/llm"
@@ -152,15 +153,18 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 	if opts.TopicID > 0 && opts.DisplayName != "" {
 		userContent = fmt.Sprintf("[%s]: %s", opts.DisplayName, opts.Message)
 	}
+	userContent = fmt.Sprintf("[Current time (UTC): %s]\n%s", time.Now().UTC().Format("2006-01-02 15:04"), userContent)
 	messages = append(messages, llm.Message{
 		Role:    "user",
 		Content: userContent,
 	})
 
-	// Set ChatData for tool calls in topic chat
+	// Set ChatData for tool calls
+	var chatData auth.ChatData
 	if opts.TopicID > 0 {
-		ctx = auth.ContextWithChatData(ctx, auth.ChatData{TopicID: &opts.TopicID})
+		chatData.TopicID = &opts.TopicID
 	}
+	ctx = auth.ContextWithChatData(ctx, chatData)
 
 	// Helper to save messages (private or topic)
 	save := func(role, content, rawContent string) {

@@ -114,38 +114,8 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 		return
 	}
 
-	// Save user message: sender=user, receiver=bobot
-	s.db.CreatePrivateMessageWithContextThreshold(
-		userID, db.BobotUserID, "user", content, content,
-		s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
-	)
-
-	// Broadcast user message
-	userMsgJSON, _ := json.Marshal(map[string]interface{}{
-		"role":    "user",
-		"content": content,
-	})
-	s.connections.Broadcast(userID, userMsgJSON)
-
-	// Get assistant response (engine persists assistant messages internally)
-	response, err := s.engine.Chat(ctx, assistant.ChatOptions{Message: content})
-	if err != nil {
-		log.Printf("assistant error: %v", err)
-		response = "Sorry, I encountered an error. Please try again."
-	}
-
-	// Broadcast assistant response
-	assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
-		"role":    "assistant",
-		"content": response,
-	})
-	s.connections.Broadcast(userID, assistantMsgJSON)
-
-	// Send push notification if user has no active connections
-	if s.pushSender != nil && s.connections.Count(userID) == 0 {
-		payload := push.BuildPayload("Bobot", push.TruncateMessage(response, 200), "/chat", fmt.Sprintf("msg-private-%d", userID))
-		go s.pushSender.NotifyUser(userID, payload)
-	}
+	// Use pipeline for the full message flow
+	s.pipeline.SendPrivateMessage(ctx, userID, content)
 }
 
 func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int64, content string) {

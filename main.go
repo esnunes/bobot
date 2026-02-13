@@ -2,22 +2,29 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/config"
 	bobotcontext "github.com/esnunes/bobot/context"
 	"github.com/esnunes/bobot/db"
 	"github.com/esnunes/bobot/llm"
+	"github.com/esnunes/bobot/push"
+	"github.com/esnunes/bobot/scheduler"
 	"github.com/esnunes/bobot/server"
 	"github.com/esnunes/bobot/skills"
 	"github.com/esnunes/bobot/tools"
+	"github.com/esnunes/bobot/tools/schedule"
 	"github.com/esnunes/bobot/tools/skill"
 	"github.com/esnunes/bobot/tools/task"
 	"github.com/esnunes/bobot/tools/thinq"
@@ -64,6 +71,13 @@ func main() {
 	}
 	defer taskDB.Close()
 
+	// Initialize schedule database
+	scheduleDB, err := schedule.NewScheduleDB(filepath.Join(cfg.DataDir, "tool_schedule.db"))
+	if err != nil {
+		log.Fatalf("Failed to initialize schedule database: %v", err)
+	}
+	defer scheduleDB.Close()
+
 	// Handle subcommands
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -87,6 +101,8 @@ func main() {
 	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
 	registry.Register(topic.NewTopicTool(coreDB))
 	registry.Register(skill.NewSkillTool(coreDB))
+	registry.Register(schedule.NewRemindTool(scheduleDB))
+	registry.Register(schedule.NewCronTool(scheduleDB))
 
 	// Initialize ThinQ tool (optional, only if configured)
 	if thinqToken := os.Getenv("THINQ_TOKEN"); thinqToken != "" {
@@ -122,13 +138,73 @@ func main() {
 	engine.SetMessageSaver(messageSaver)
 	engine.SetSkillProvider(contextAdapter)
 
-	// Initialize HTTP server
-	srv := server.NewWithAssistant(cfg, coreDB, engine, registry)
-
-	// Start server
-	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-	log.Printf("Starting server on %s", addr)
-	if err := http.ListenAndServe(addr, srv); err != nil {
-		log.Fatalf("Server error: %v", err)
+	// Create shared components for pipeline
+	connections := server.NewConnectionRegistry()
+	var pushSender *push.PushSender
+	if cfg.VAPID.PublicKey != "" && cfg.VAPID.PrivateKey != "" {
+		ps, err := push.NewPushSender(coreDB, cfg.VAPID.PublicKey, cfg.VAPID.PrivateKey, cfg.VAPID.Subject)
+		if err != nil {
+			slog.Error("push: failed to initialize push sender", "error", err)
+		} else {
+			pushSender = ps
+		}
 	}
+
+	// Create ChatPipeline (shared by server and scheduler)
+	pipeline := server.NewChatPipeline(coreDB, engine, connections, pushSender, cfg)
+
+	// Initialize HTTP server
+	srv := server.NewWithAssistant(cfg, coreDB, engine, registry, pipeline, scheduleDB)
+
+	// Create scheduler
+	sched := scheduler.New(scheduleDB, coreDB, pipeline, cfg.Schedule.Timeout)
+
+	// Set up signal handling for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start scheduler in background
+	go sched.Start(ctx)
+
+	// Start HTTP server
+	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	httpServer := &http.Server{
+		Addr:    addr,
+		Handler: srv,
+	}
+
+	go func() {
+		log.Printf("Starting server on %s", addr)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// Wait for shutdown signal
+	sig := <-sigCh
+	slog.Info("received shutdown signal", "signal", sig)
+
+	// 1. Cancel scheduler context (no new executions start)
+	cancel()
+
+	// 2. Shutdown HTTP server with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		slog.Error("HTTP server shutdown error", "error", err)
+	}
+
+	// 3. Wait for scheduler to finish in-flight work
+	select {
+	case <-sched.Done():
+		slog.Info("scheduler stopped")
+	case <-time.After(cfg.Schedule.Timeout + 5*time.Second):
+		slog.Warn("scheduler did not stop in time")
+	}
+
+	slog.Info("shutdown complete")
 }

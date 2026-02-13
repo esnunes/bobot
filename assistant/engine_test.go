@@ -146,9 +146,10 @@ func TestEngine_Chat_WithContextMessages(t *testing.T) {
 		t.Errorf("expected 3 messages, got %d", len(capturedMessages))
 	}
 
-	// Last message should be the new question
-	if capturedMessages[2].Content != "new question" {
-		t.Errorf("expected last message to be 'new question', got %v", capturedMessages[2].Content)
+	// Last message should contain the new question (with time prefix)
+	lastContent, _ := capturedMessages[2].Content.(string)
+	if !strings.Contains(lastContent, "new question") {
+		t.Errorf("expected last message to contain 'new question', got %v", capturedMessages[2].Content)
 	}
 }
 
@@ -270,10 +271,11 @@ func TestEngine_Chat_TopicSimpleResponse(t *testing.T) {
 		t.Errorf("expected first context message to be '[Alice]: hello', got '%v'", capturedMessages[0].Content)
 	}
 
-	// New user message should have DisplayName prepended
+	// New user message should have DisplayName prepended (with time prefix)
 	lastMsg := capturedMessages[len(capturedMessages)-1]
-	if lastMsg.Content != "[Bob]: Hey @bobot, what's up?" {
-		t.Errorf("expected last message to be '[Bob]: Hey @bobot, what's up?', got '%v'", lastMsg.Content)
+	lastContent, _ := lastMsg.Content.(string)
+	if !strings.Contains(lastContent, "[Bob]: Hey @bobot, what's up?") {
+		t.Errorf("expected last message to contain '[Bob]: Hey @bobot, what's up?', got '%v'", lastMsg.Content)
 	}
 
 	// Should have saved via SaveTopicMessage, not SaveMessage
