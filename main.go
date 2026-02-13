@@ -123,7 +123,7 @@ func main() {
 	engine.SetSkillProvider(contextAdapter)
 
 	// Initialize HTTP server
-	srv := server.NewWithAssistant(cfg, coreDB, engine, registry)
+	srv := server.NewWithAssistant(cfg, coreDB, engine, registry, nil)
 
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

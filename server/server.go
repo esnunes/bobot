@@ -25,15 +25,16 @@ type Server struct {
 	registry    *tools.Registry
 	connections *ConnectionRegistry
 	pushSender  *push.PushSender
+	pipeline    *ChatPipeline
 	router      *http.ServeMux
 	templates   map[string]*template.Template
 }
 
 func New(cfg *config.Config, coreDB *db.CoreDB) *Server {
-	return NewWithAssistant(cfg, coreDB, nil, nil)
+	return NewWithAssistant(cfg, coreDB, nil, nil, nil)
 }
 
-func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.Engine, registry *tools.Registry) *Server {
+func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.Engine, registry *tools.Registry, pipeline *ChatPipeline) *Server {
 	session := auth.NewSessionService(
 		cfg.JWT.Secret,
 		cfg.Session.Duration,
@@ -42,23 +43,36 @@ func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.E
 	)
 
 	s := &Server{
-		cfg:         cfg,
-		db:          coreDB,
-		session:     session,
-		engine:      engine,
-		registry:    registry,
-		connections: NewConnectionRegistry(),
-		router:      http.NewServeMux(),
-		templates:   make(map[string]*template.Template),
+		cfg:      cfg,
+		db:       coreDB,
+		session:  session,
+		engine:   engine,
+		registry: registry,
+		pipeline: pipeline,
+		router:   http.NewServeMux(),
+		templates: make(map[string]*template.Template),
 	}
 
-	// Initialize push sender if VAPID keys are configured
-	if cfg.VAPID.PublicKey != "" && cfg.VAPID.PrivateKey != "" {
-		ps, err := push.NewPushSender(coreDB, cfg.VAPID.PublicKey, cfg.VAPID.PrivateKey, cfg.VAPID.Subject)
-		if err != nil {
-			slog.Error("push: failed to initialize push sender", "error", err)
-		} else {
-			s.pushSender = ps
+	// Create ConnectionRegistry (shared with pipeline if provided)
+	if pipeline != nil {
+		s.connections = pipeline.connections
+		s.pushSender = pipeline.pushSender
+	} else {
+		s.connections = NewConnectionRegistry()
+
+		// Initialize push sender if VAPID keys are configured
+		if cfg.VAPID.PublicKey != "" && cfg.VAPID.PrivateKey != "" {
+			ps, err := push.NewPushSender(coreDB, cfg.VAPID.PublicKey, cfg.VAPID.PrivateKey, cfg.VAPID.Subject)
+			if err != nil {
+				slog.Error("push: failed to initialize push sender", "error", err)
+			} else {
+				s.pushSender = ps
+			}
+		}
+
+		// Auto-create pipeline when engine is available (backward compatibility)
+		if engine != nil {
+			s.pipeline = NewChatPipeline(coreDB, engine, s.connections, s.pushSender, cfg)
 		}
 	}
 
