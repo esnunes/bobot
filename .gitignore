@@ -26,3 +26,8 @@ mise.local.toml
 
 # Worktrees
 .worktrees/
+
+# AKB (auto-generated knowledge base)
+docs/akb/*
+!docs/akb/.config.yaml
+!docs/akb/.manifest.json
