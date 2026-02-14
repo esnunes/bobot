@@ -74,6 +74,37 @@ window.MessageRenderer = {
         });
     },
 
+    parseScheduledMessage(content) {
+        if (!content) return null;
+        var match;
+        match = content.match(/^<bobot-remind>([\s\S]*)<\/bobot-remind>$/);
+        if (match) return { type: 'reminder', content: match[1] };
+        match = content.match(/^<bobot-cron>([\s\S]*)<\/bobot-cron>$/);
+        if (match) return { type: 'cron', content: match[1] };
+        return null;
+    },
+
+    renderScheduledMessage(parsed) {
+        var wrapper = document.createElement('div');
+        wrapper.className = 'message-scheduled message-scheduled--' + parsed.type;
+
+        var labelEl = document.createElement('div');
+        labelEl.className = 'message-scheduled-label';
+        if (parsed.type === 'reminder') {
+            labelEl.textContent = '\uD83D\uDD14 Reminder';
+        } else {
+            labelEl.textContent = '\u23F0 Scheduled';
+        }
+        wrapper.appendChild(labelEl);
+
+        var contentEl = document.createElement('div');
+        contentEl.className = 'message-scheduled-content';
+        contentEl.textContent = parsed.content;
+        wrapper.appendChild(contentEl);
+
+        return wrapper;
+    },
+
     resetConfirmingButtons() {
         document.querySelectorAll('.bobot-action-btn--confirming').forEach(function(btn) {
             btn.classList.remove('bobot-action-btn--confirming');

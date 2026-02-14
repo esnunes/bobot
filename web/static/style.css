@@ -961,3 +961,39 @@ header {
   opacity: var(--opacities-disabled);
   cursor: default;
 }
+
+/* Scheduled message components (reminders & cron) */
+.message-scheduled {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.message-scheduled-label {
+  font-size: var(--font-sizes-0);
+  font-weight: var(--font-weights-bold);
+  letter-spacing: var(--letter-spacings-wide);
+  text-transform: uppercase;
+}
+
+.message-scheduled-content {
+  line-height: var(--line-heights-normal);
+}
+
+.message-scheduled--reminder .message-scheduled-label {
+  color: #fe640b;
+}
+
+.message:has(.message-scheduled--reminder) {
+  background: #fef0e4;
+  border-left: 3px solid #fe640b;
+}
+
+.message-scheduled--cron .message-scheduled-label {
+  color: #179299;
+}
+
+.message:has(.message-scheduled--cron) {
+  background: #e0f5f5;
+  border-left: 3px solid #179299;
+}
