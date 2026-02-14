@@ -169,7 +169,12 @@ window.TopicChatClient = class TopicChatClient {
                 this.wsContainer.send({ content: msg, topic_id: this.topicId });
             }, !!id);
         } else {
-            contentEl.textContent = content;
+            var scheduled = MessageRenderer.parseScheduledMessage(content);
+            if (scheduled) {
+                contentEl.appendChild(MessageRenderer.renderScheduledMessage(scheduled));
+            } else {
+                contentEl.textContent = content;
+            }
             msgEl.appendChild(contentEl);
         }
 
@@ -261,7 +266,12 @@ window.TopicChatClient = class TopicChatClient {
                 this.wsContainer.send({ content: msg, topic_id: this.topicId });
             }, true);
         } else {
-            contentEl.textContent = content;
+            var scheduled = MessageRenderer.parseScheduledMessage(content);
+            if (scheduled) {
+                contentEl.appendChild(MessageRenderer.renderScheduledMessage(scheduled));
+            } else {
+                contentEl.textContent = content;
+            }
             msgEl.appendChild(contentEl);
         }
 
