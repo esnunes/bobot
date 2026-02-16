@@ -6,17 +6,18 @@
         <div></div>
     </header>
 
-    <main class="admin-list">
+    <div class="context-toolbar">
         <div class="context-summary">
             <span>{{len .Context.Messages}} messages</span>
             <span>{{.Context.TotalTokens}} / {{.Context.MaxTokens}} tokens</span>
         </div>
-
         <div class="context-toggle">
             <button class="context-toggle-btn active" data-view="structured">Structured</button>
             <button class="context-toggle-btn" data-view="raw">Raw JSON</button>
         </div>
+    </div>
 
+    <main class="admin-list">
         <div id="structured-view">
             <details class="context-section">
                 <summary class="context-section-title">System Prompt</summary>
