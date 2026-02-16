@@ -244,6 +244,157 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 	return "", fmt.Errorf("max iterations reached")
 }
 
+// ContextInspection holds the full LLM context for inspection.
+type ContextInspection struct {
+	SystemPrompt string
+	Messages     []ContextMessage
+	Tools        []llm.Tool
+	TotalTokens  int
+	MaxTokens    int
+}
+
+// InspectPrivateContext builds the full LLM context for a user's private chat without calling the LLM.
+func (e *Engine) InspectPrivateContext(userID int64, role string) (*ContextInspection, error) {
+	llmTools := e.registry.ToLLMToolsForRole(role)
+
+	allSkills := append([]Skill{}, e.skills...)
+	if e.skillProvider != nil {
+		userSkills, err := e.skillProvider.GetPrivateChatSkills(userID)
+		if err == nil {
+			allSkills = append(allSkills, userSkills...)
+		}
+	}
+	systemPrompt := BuildSystemPrompt(allSkills, llmTools)
+
+	if e.profileProvider != nil {
+		profileContent, _, err := e.profileProvider.GetUserProfile(userID)
+		if err == nil && profileContent != "" {
+			systemPrompt += "\n\n## User Profile\nThe following is known about the user you are chatting with:\n<user-profile>\n" + profileContent + "\n</user-profile>"
+		}
+	}
+
+	contextMsgs, err := e.contextProvider.GetContextMessages(userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get context messages: %w", err)
+	}
+
+	totalTokens := 0
+	for _, cm := range contextMsgs {
+		raw := cm.RawContent
+		if raw == "" {
+			raw = cm.Content
+		}
+		totalTokens += len(raw) / 4
+	}
+
+	return &ContextInspection{
+		SystemPrompt: systemPrompt,
+		Messages:     contextMsgs,
+		Tools:        llmTools,
+		TotalTokens:  totalTokens,
+	}, nil
+}
+
+// InspectTopicContext builds the full LLM context for a topic chat without calling the LLM.
+func (e *Engine) InspectTopicContext(topicID int64) (*ContextInspection, error) {
+	llmTools := e.registry.ToLLMToolsForRole("user")
+
+	allSkills := append([]Skill{}, e.skills...)
+	if e.skillProvider != nil {
+		topicSkills, err := e.skillProvider.GetTopicSkills(topicID)
+		if err == nil {
+			allSkills = append(allSkills, topicSkills...)
+		}
+	}
+	systemPrompt := BuildSystemPrompt(allSkills, llmTools)
+
+	if e.profileProvider != nil {
+		profiles, err := e.profileProvider.GetTopicMemberProfiles(topicID)
+		if err == nil && profiles != "" {
+			systemPrompt += "\n\n" + profiles
+		}
+	}
+
+	contextMsgs, err := e.contextProvider.GetTopicContextMessages(topicID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get topic context messages: %w", err)
+	}
+
+	totalTokens := 0
+	for _, cm := range contextMsgs {
+		raw := cm.RawContent
+		if raw == "" {
+			raw = cm.Content
+		}
+		totalTokens += len(raw) / 4
+	}
+
+	return &ContextInspection{
+		SystemPrompt: systemPrompt,
+		Messages:     contextMsgs,
+		Tools:        llmTools,
+		TotalTokens:  totalTokens,
+	}, nil
+}
+
+// BuildRawJSON constructs the full Anthropic API request payload as JSON for inspection.
+func (ci *ContextInspection) BuildRawJSON(model string, maxTokens int) (string, error) {
+	type rawMsg struct {
+		Role    string `json:"role"`
+		Content any    `json:"content"`
+	}
+
+	type rawTool struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		InputSchema any    `json:"input_schema"`
+	}
+
+	type rawRequest struct {
+		Model     string    `json:"model"`
+		MaxTokens int       `json:"max_tokens"`
+		System    string    `json:"system"`
+		Messages  []rawMsg  `json:"messages"`
+		Tools     []rawTool `json:"tools,omitempty"`
+	}
+
+	msgs := make([]rawMsg, 0, len(ci.Messages))
+	for _, cm := range ci.Messages {
+		msg := rawMsg{Role: cm.Role}
+		if cm.RawContent != "" {
+			msg.Content = parseRawContent(cm.RawContent)
+		} else {
+			msg.Content = cm.Content
+		}
+		msgs = append(msgs, msg)
+	}
+
+	tools := make([]rawTool, 0, len(ci.Tools))
+	for _, t := range ci.Tools {
+		tools = append(tools, rawTool{
+			Name:        t.Name,
+			Description: t.Description,
+			InputSchema: t.InputSchema,
+		})
+	}
+
+	req := rawRequest{
+		Model:     model,
+		MaxTokens: maxTokens,
+		System:    ci.SystemPrompt,
+		Messages:  msgs,
+	}
+	if len(tools) > 0 {
+		req.Tools = tools
+	}
+
+	data, err := json.MarshalIndent(req, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 // parseRawContent converts stored raw_content back to the appropriate type
 // for the LLM Message.Content field (string or []map[string]any).
 func parseRawContent(raw string) interface{} {
