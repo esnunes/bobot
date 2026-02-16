@@ -25,15 +25,11 @@ A self-hosted personal AI assistant with multi-user support, topic-based convers
 ## Getting started
 
 ```bash
-# Clone
-git clone https://github.com/esnunes/bobot-web.git
-cd bobot-web
-
-# Build
-go build -o bin/bobot .
+# Install
+go install github.com/esnunes/bobot@latest
 
 # Create the first admin user
-./bin/bobot create-admin <username>
+bobot create-admin <username>
 
 # Configure (see Configuration below)
 export BOBOT_LLM_BASE_URL=https://api.anthropic.com
@@ -42,7 +38,7 @@ export BOBOT_LLM_MODEL=claude-sonnet-4-5-20250929
 export BOBOT_JWT_SECRET=$(openssl rand -hex 32)
 
 # Run
-./bin/bobot
+bobot
 ```
 
 The server starts on `http://localhost:8080` by default.
@@ -81,7 +77,7 @@ All configuration is done through environment variables.
 
 ### Push notifications (optional)
 
-Generate keys with `./bin/bobot generate-vapid-keys`.
+Generate keys with `bobot generate-vapid-keys`.
 
 | Variable | Description |
 |---|---|
@@ -102,16 +98,16 @@ Generate keys with `./bin/bobot generate-vapid-keys`.
 
 ```bash
 # Start the server
-./bin/bobot
+bobot
 
 # Create an admin user
-./bin/bobot create-admin <username>
+bobot create-admin <username>
 
 # Generate VAPID keys for push notifications
-./bin/bobot generate-vapid-keys
+bobot generate-vapid-keys
 
 # Update user profiles from conversation history
-./bin/bobot update-profiles
+bobot update-profiles
 ```
 
 ### Makefile targets
