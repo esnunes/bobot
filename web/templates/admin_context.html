@@ -1,0 +1,94 @@
+{{define "content"}}
+<div class="admin-container" data-page="admin-context">
+    <header>
+        <button hx-get="/admin" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <h1>{{.Context.Label}}</h1>
+        <div></div>
+    </header>
+
+    <main class="admin-list">
+        <div class="context-summary">
+            <span>{{len .Context.Messages}} messages</span>
+            <span>{{.Context.TotalTokens}} / {{.Context.MaxTokens}} tokens</span>
+        </div>
+
+        <div class="context-toggle">
+            <button class="context-toggle-btn active" data-view="structured">Structured</button>
+            <button class="context-toggle-btn" data-view="raw">Raw JSON</button>
+        </div>
+
+        <div id="structured-view">
+            <details class="context-section">
+                <summary class="context-section-title">System Prompt</summary>
+                <pre class="context-pre"><code>{{.Context.SystemPrompt}}</code></pre>
+            </details>
+
+            <details class="context-section" open>
+                <summary class="context-section-title">Messages ({{len .Context.Messages}})</summary>
+                {{if .Context.Messages}}
+                    {{range .Context.Messages}}
+                    <div class="context-message">
+                        <div class="context-message-header">
+                            <span class="admin-badge {{.Role}}">{{.Role}}</span>
+                            <span class="context-message-tokens">{{.Tokens}} tokens</span>
+                        </div>
+                        {{if .Content}}
+                        <div class="context-message-content">{{.Content}}</div>
+                        {{end}}
+                        {{if and .RawContent (ne .RawContent .Content)}}
+                        <details class="context-raw-detail">
+                            <summary>raw_content</summary>
+                            <pre class="context-pre"><code>{{.RawContent}}</code></pre>
+                        </details>
+                        {{end}}
+                    </div>
+                    {{end}}
+                {{else}}
+                    <div class="empty">No messages in context window.</div>
+                {{end}}
+            </details>
+
+            <details class="context-section">
+                <summary class="context-section-title">Tools ({{len .Context.Tools}})</summary>
+                {{if .Context.Tools}}
+                    {{range .Context.Tools}}
+                    <div class="context-tool">
+                        <span class="context-tool-name">{{.Name}}</span>
+                        <span class="context-tool-desc">{{.Description}}</span>
+                    </div>
+                    {{end}}
+                {{else}}
+                    <div class="empty">No tools.</div>
+                {{end}}
+            </details>
+        </div>
+
+        <div id="raw-view" class="hidden">
+            <pre class="context-pre context-raw-json"><code>{{.Context.RawJSON}}</code></pre>
+        </div>
+    </main>
+</div>
+
+<script>
+(function() {
+    const btns = document.querySelectorAll('.context-toggle-btn');
+    const structured = document.getElementById('structured-view');
+    const raw = document.getElementById('raw-view');
+
+    btns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            btns.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+
+            if (btn.dataset.view === 'raw') {
+                structured.classList.add('hidden');
+                raw.classList.remove('hidden');
+            } else {
+                raw.classList.add('hidden');
+                structured.classList.remove('hidden');
+            }
+        });
+    });
+})();
+</script>
+{{end}}

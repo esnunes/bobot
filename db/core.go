@@ -1199,6 +1199,32 @@ func (c *CoreDB) GetTopicByName(name string) (*Topic, error) {
 }
 
 // GetUserTopics retrieves all topics a user is a member of.
+func (c *CoreDB) ListAllTopics() ([]Topic, error) {
+	rows, err := c.db.Query(`
+		SELECT id, name, owner_id, deleted_at, created_at
+		FROM topics WHERE deleted_at IS NULL
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var topics []Topic
+	for rows.Next() {
+		var t Topic
+		var deletedAt sql.NullTime
+		if err := rows.Scan(&t.ID, &t.Name, &t.OwnerID, &deletedAt, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		if deletedAt.Valid {
+			t.DeletedAt = &deletedAt.Time
+		}
+		topics = append(topics, t)
+	}
+	return topics, rows.Err()
+}
+
 func (c *CoreDB) GetUserTopics(userID int64) ([]Topic, error) {
 	rows, err := c.db.Query(`
 		SELECT t.id, t.name, t.owner_id, t.deleted_at, t.created_at

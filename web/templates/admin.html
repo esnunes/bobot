@@ -1,0 +1,42 @@
+{{define "content"}}
+<div class="admin-container" data-page="admin">
+    <header>
+        <button hx-get="/chat" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <h1>Admin</h1>
+        <div></div>
+    </header>
+
+    <main class="admin-list">
+        <h2 class="admin-section-title">Users</h2>
+        {{if .AdminUsers}}
+            {{range .AdminUsers}}
+            <button hx-get="/admin/users/{{.ID}}/context" hx-target="body" class="admin-item">
+                <div class="admin-item-header">
+                    <span class="admin-item-name">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}</span>
+                    <span class="admin-badge {{.Role}}">{{.Role}}</span>
+                    {{if .Blocked}}<span class="admin-badge blocked">blocked</span>{{end}}
+                </div>
+                <span class="admin-item-meta">Joined {{.CreatedAt}}</span>
+            </button>
+            {{end}}
+        {{else}}
+            <div class="empty">No users found.</div>
+        {{end}}
+
+        <h2 class="admin-section-title">Topics</h2>
+        {{if .AdminTopics}}
+            {{range .AdminTopics}}
+            <button hx-get="/admin/topics/{{.ID}}/context" hx-target="body" class="admin-item">
+                <div class="admin-item-header">
+                    <span class="admin-item-name">{{.Name}}</span>
+                    <span class="admin-item-meta">{{.MemberCount}} members</span>
+                </div>
+                <span class="admin-item-meta">Owner: {{.OwnerName}} &middot; Created {{.CreatedAt}}</span>
+            </button>
+            {{end}}
+        {{else}}
+            <div class="empty">No topics found.</div>
+        {{end}}
+    </main>
+</div>
+{{end}}

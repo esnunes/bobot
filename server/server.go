@@ -119,6 +119,11 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /schedules/{id}", s.sessionMiddleware(s.handleUpdateScheduleForm))
 	s.router.HandleFunc("DELETE /schedules/{id}", s.sessionMiddleware(s.handleDeleteScheduleForm))
 
+	// Admin routes (require auth + admin role)
+	s.router.HandleFunc("GET /admin", s.sessionMiddleware(s.adminMiddleware(s.handleAdminPage)))
+	s.router.HandleFunc("GET /admin/users/{id}/context", s.sessionMiddleware(s.adminMiddleware(s.handleAdminUserContextPage)))
+	s.router.HandleFunc("GET /admin/topics/{id}/context", s.sessionMiddleware(s.adminMiddleware(s.handleAdminTopicContextPage)))
+
 	// Push notification routes (require auth)
 	s.router.HandleFunc("POST /api/push/subscribe", s.sessionMiddleware(s.handlePushSubscribe))
 	s.router.HandleFunc("DELETE /api/push/subscribe", s.sessionMiddleware(s.handlePushUnsubscribe))
@@ -213,6 +218,17 @@ func (s *Server) sessionMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			Role:   token.Role,
 		})
 		next(w, r.WithContext(ctx))
+	}
+}
+
+func (s *Server) adminMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userData := auth.UserDataFromContext(r.Context())
+		if userData.Role != "admin" {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next(w, r)
 	}
 }
 

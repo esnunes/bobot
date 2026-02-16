@@ -53,6 +53,45 @@ type ScheduleView struct {
 	NextRunAt     string
 }
 
+type AdminUserView struct {
+	ID          int64
+	DisplayName string
+	Username    string
+	Role        string
+	Blocked     bool
+	CreatedAt   string
+}
+
+type AdminTopicView struct {
+	ID          int64
+	Name        string
+	OwnerName   string
+	MemberCount int
+	CreatedAt   string
+}
+
+type ContextMessageView struct {
+	Role       string
+	Content    string
+	RawContent string
+	Tokens     int
+}
+
+type ContextInspectionView struct {
+	Label        string
+	SystemPrompt string
+	Messages     []ContextMessageView
+	Tools        []ToolView
+	TotalTokens  int
+	MaxTokens    int
+	RawJSON      string
+}
+
+type ToolView struct {
+	Name        string
+	Description string
+}
+
 type PageData struct {
 	Title          string
 	Error          string
@@ -71,6 +110,10 @@ type PageData struct {
 	VAPIDPublicKey string
 	NavigateTo     string
 	PageDataJSON   template.JS
+	IsAdmin        bool
+	AdminUsers     []AdminUserView
+	AdminTopics    []AdminTopicView
+	Context        *ContextInspectionView
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data PageData) {
@@ -139,13 +182,25 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["schedule_form"] = scheduleFormTmpl
 
+	adminTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/admin.html")
+	if err != nil {
+		return err
+	}
+	s.templates["admin"] = adminTmpl
+
+	adminContextTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/admin_context.html")
+	if err != nil {
+		return err
+	}
+	s.templates["admin_context"] = adminContextTmpl
+
 	return nil
 }
 
 // validateNavigatePath returns a safe navigation path.
 // Only /chat and /topics/{id} are allowed; anything else defaults to /chat.
 func validateNavigatePath(path string) string {
-	if path == "/chat" || path == "/schedules" || strings.HasPrefix(path, "/schedules?") || navigatePathRe.MatchString(path) {
+	if path == "/chat" || path == "/schedules" || strings.HasPrefix(path, "/schedules?") || path == "/admin" || strings.HasPrefix(path, "/admin/") || navigatePathRe.MatchString(path) {
 		return path
 	}
 	return "/chat"
@@ -254,6 +309,7 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "chat", PageData{
 		Title:        "Chat",
 		PageDataJSON: template.JS(jsonData),
+		IsAdmin:      userData.Role == "admin",
 	})
 }
 
@@ -359,5 +415,6 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		CurrentUserID: userData.UserID,
 		Members:       members,
 		PageDataJSON:  template.JS(jsonData),
+		IsAdmin:       userData.Role == "admin",
 	})
 }
