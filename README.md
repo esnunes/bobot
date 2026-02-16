@@ -13,6 +13,7 @@ A self-hosted personal AI assistant with multi-user support, topic-based convers
 - **Smart home** — optional LG ThinQ device control
 - **Web search** — optional Brave Search integration
 - **User profiles** — auto-generated user profiles from conversation history
+- **Admin dashboard** — inspect full LLM context for any user or topic chat
 - **PWA** — installable progressive web app with WebSocket live updates
 - **Minimal dependencies** — only 6 direct dependencies to reduce supply chain attack surface
 
