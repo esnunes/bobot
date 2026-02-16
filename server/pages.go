@@ -70,11 +70,20 @@ type AdminTopicView struct {
 	CreatedAt   string
 }
 
+type ToolBlockView struct {
+	Type      string // "tool_use" or "tool_result"
+	ToolName  string // for tool_use
+	ToolID    string
+	Input     string // JSON string of input, for tool_use
+	ResultStr string // for tool_result
+}
+
 type ContextMessageView struct {
 	Role       string
 	Content    string
 	RawContent string
 	Tokens     int
+	ToolBlocks []ToolBlockView
 }
 
 type ContextInspectionView struct {

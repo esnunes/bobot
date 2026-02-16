@@ -2,6 +2,7 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -126,12 +127,48 @@ func buildContextPageData(label string, inspection *assistant.ContextInspection,
 			rawContent = content
 		}
 		tokens := len(rawContent) / 4
-		msgs = append(msgs, ContextMessageView{
+		mv := ContextMessageView{
 			Role:       m.Role,
 			Content:    content,
 			RawContent: rawContent,
 			Tokens:     tokens,
-		})
+		}
+
+		// Parse tool blocks from raw_content when it's a JSON array
+		if len(rawContent) > 0 && rawContent[0] == '[' {
+			var blocks []map[string]any
+			if err := json.Unmarshal([]byte(rawContent), &blocks); err == nil {
+				for _, b := range blocks {
+					tb := ToolBlockView{}
+					if t, ok := b["type"].(string); ok {
+						tb.Type = t
+					}
+					switch tb.Type {
+					case "tool_use":
+						if name, ok := b["name"].(string); ok {
+							tb.ToolName = name
+						}
+						if id, ok := b["id"].(string); ok {
+							tb.ToolID = id
+						}
+						if input, ok := b["input"]; ok {
+							inputJSON, _ := json.MarshalIndent(input, "", "  ")
+							tb.Input = string(inputJSON)
+						}
+					case "tool_result":
+						if id, ok := b["tool_use_id"].(string); ok {
+							tb.ToolID = id
+						}
+						if c, ok := b["content"].(string); ok {
+							tb.ResultStr = c
+						}
+					}
+					mv.ToolBlocks = append(mv.ToolBlocks, tb)
+				}
+			}
+		}
+
+		msgs = append(msgs, mv)
 	}
 
 	tools := make([]ToolView, 0, len(inspection.Tools))
