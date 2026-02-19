@@ -9,6 +9,11 @@ window.MessageRenderer = {
         }
 
         var html = marked.parse(content, { breaks: true });
+        // HTML5 ignores self-closing syntax on custom elements, causing
+        // multiple <bobot .../> tags to nest instead of being siblings.
+        // Convert to explicit close tags so the DOM parser treats them
+        // as independent elements.
+        html = html.replace(/<bobot\b([^>]*?)\/>/g, '<bobot$1></bobot>');
         return DOMPurify.sanitize(html, {
             ADD_TAGS: ['bobot'],
             ADD_ATTR: ['label', 'action', 'message', 'confirm']
