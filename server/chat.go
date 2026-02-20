@@ -228,7 +228,7 @@ func (s *Server) pushToTopicMembers(topicID, senderID int64, senderName, content
 				continue
 			}
 			title := fmt.Sprintf("%s in #%s", senderName, topic.Name)
-			payload := push.BuildPayload(title, push.TruncateMessage(content, 200), fmt.Sprintf("/topics/%d", topicID), fmt.Sprintf("msg-topic-%d", topicID))
+			payload := push.BuildPayload(title, push.TruncateMessage(content, 200), fmt.Sprintf("/chats/%d", topicID), fmt.Sprintf("msg-topic-%d", topicID))
 			go s.pushSender.NotifyUser(member.UserID, payload)
 		}
 	}

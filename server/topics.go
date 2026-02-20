@@ -37,7 +37,7 @@ func (s *Server) handleCreateTopic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "/topics/`+strconv.FormatInt(topic.ID, 10)+`"}}`)
+	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "/chats/`+strconv.FormatInt(topic.ID, 10)+`"}}`)
 	w.WriteHeader(http.StatusNoContent)
 }
 
