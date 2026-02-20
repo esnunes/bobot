@@ -518,6 +518,7 @@ header {
 .chats-container {
   display: flex;
   flex-direction: column;
+  height: 100dvh;
 }
 
 .chats-list {
