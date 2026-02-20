@@ -13,7 +13,7 @@ import (
 	"github.com/esnunes/bobot/web"
 )
 
-var navigatePathRe = regexp.MustCompile(`^/topics/\d+$`)
+var navigatePathRe = regexp.MustCompile(`^/chats/\d+$`)
 
 type TopicView struct {
 	ID          int64
@@ -149,11 +149,11 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["chat"] = chatTmpl
 
-	topicsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/topics.html")
+	chatsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/chats.html")
 	if err != nil {
 		return err
 	}
-	s.templates["topics"] = topicsTmpl
+	s.templates["chats"] = chatsTmpl
 
 	topicChatTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/topic_chat.html")
 	if err != nil {
@@ -207,7 +207,7 @@ func (s *Server) loadTemplates() error {
 }
 
 // validateNavigatePath returns a safe navigation path.
-// Only /chat and /topics/{id} are allowed; anything else defaults to /chat.
+// Only /chat and /chats/{id} are allowed; anything else defaults to /chat.
 func validateNavigatePath(path string) string {
 	if path == "/chat" || path == "/schedules" || strings.HasPrefix(path, "/schedules?") || path == "/admin" || strings.HasPrefix(path, "/admin/") || navigatePathRe.MatchString(path) {
 		return path
@@ -322,7 +322,7 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleTopicsPage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleChatsPage(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 
 	topics, err := s.db.GetUserTopics(userData.UserID)
@@ -341,7 +341,7 @@ func (s *Server) handleTopicsPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	s.render(w, "topics", PageData{Title: "Topics", Topics: topicViews})
+	s.render(w, "chats", PageData{Title: "Chats", Topics: topicViews})
 }
 
 func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {

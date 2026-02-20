@@ -140,8 +140,8 @@
   }
 
   function navigateTo(url) {
-    // Validate path — only allow /chat and /topics/{id}
-    if (url !== "/chat" && !/^\/topics\/\d+$/.test(url)) return;
+    // Validate path — only allow /chat and /chats/{id}
+    if (url !== "/chat" && !/^\/chats\/\d+$/.test(url)) return;
 
     if (typeof htmx === "undefined") {
       console.log("htmx not loaded");

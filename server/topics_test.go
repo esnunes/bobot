@@ -51,7 +51,7 @@ func TestCreateTopic(t *testing.T) {
 
 	// HTMX pattern: trigger client-side redirect
 	trigger := w.Header().Get("HX-Trigger")
-	expectedTrigger := `{"bobot:redirect": {"path": "/topics/1"}}`
+	expectedTrigger := `{"bobot:redirect": {"path": "/chats/1"}}`
 	if trigger != expectedTrigger {
 		t.Errorf("expected HX-Trigger %q, got %q", expectedTrigger, trigger)
 	}

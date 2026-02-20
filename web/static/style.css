@@ -513,14 +513,14 @@ header {
 }
 
 /* ============================================
-   TOPICS PAGE
+   CHATS PAGE
    ============================================ */
-.topics-container {
+.chats-container {
   display: flex;
   flex-direction: column;
 }
 
-.topics-list {
+.chats-list {
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
@@ -528,6 +528,39 @@ header {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+.bobot-chat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--colors-surface);
+  border-radius: var(--radii-lg);
+  box-shadow: var(--shadows-low);
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow var(--transitions-fast);
+  border: 0;
+}
+
+.bobot-chat-item:hover {
+  box-shadow: var(--shadows-medium);
+}
+
+.bobot-icon {
+  width: var(--sizes-icon);
+  height: var(--sizes-icon);
+  color: var(--colors-text-secondary);
+  flex-shrink: 0;
+}
+
+.section-label {
+  font-size: var(--font-sizes-0);
+  color: var(--colors-text-secondary);
+  font-weight: var(--font-weights-medium);
+  padding-left: var(--space-1);
+  margin-top: var(--space-1);
 }
 
 .topic-item {

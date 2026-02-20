@@ -293,7 +293,7 @@ window.TopicChatClient = class TopicChatClient {
 
             if (!resp.ok) throw new Error('Failed to leave topic');
 
-            htmx.ajax('GET', '/topics', {target: 'body', swap: 'innerHTML'});
+            htmx.ajax('GET', '/chats', {target: 'body', swap: 'innerHTML'});
         } catch (err) {
             console.error('Failed to leave topic:', err);
             alert('Failed to leave topic');
@@ -311,7 +311,7 @@ window.TopicChatClient = class TopicChatClient {
 
             if (!resp.ok) throw new Error('Failed to delete topic');
 
-            htmx.ajax('GET', '/topics', {target: 'body', swap: 'innerHTML'});
+            htmx.ajax('GET', '/chats', {target: 'body', swap: 'innerHTML'});
         } catch (err) {
             console.error('Failed to delete topic:', err);
             alert('Failed to delete topic');
