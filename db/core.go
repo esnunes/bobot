@@ -1638,3 +1638,52 @@ func (c *CoreDB) GetLatestTopicMessageID(topicID int64) (int64, error) {
 	`, topicID).Scan(&id)
 	return id, err
 }
+
+// ReadPosition holds a user's read position with display info.
+type ReadPosition struct {
+	UserID      int64
+	DisplayName string
+	LastReadID  int64
+}
+
+// GetPrivateChatReadPosition returns the last_read_message_id for a user's private chat with Bobot.
+// Returns 0 if no row exists (user has never opened the chat).
+func (c *CoreDB) GetPrivateChatReadPosition(userID int64) (int64, error) {
+	var id int64
+	err := c.db.QueryRow(`
+		SELECT COALESCE(last_read_message_id, 0)
+		FROM chat_read_status
+		WHERE user_id = ? AND topic_id IS NULL
+	`, userID).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return id, err
+}
+
+// GetTopicReadPositions returns read positions for all members of a topic,
+// excluding Bobot (user_id=0). Only returns users who have a chat_read_status row.
+func (c *CoreDB) GetTopicReadPositions(topicID int64) ([]ReadPosition, error) {
+	rows, err := c.db.Query(`
+		SELECT crs.user_id,
+		       CASE WHEN u.display_name != '' THEN u.display_name ELSE u.username END,
+		       crs.last_read_message_id
+		FROM chat_read_status crs
+		JOIN users u ON crs.user_id = u.id
+		WHERE crs.topic_id = ? AND crs.user_id != ?
+	`, topicID, BobotUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var positions []ReadPosition
+	for rows.Next() {
+		var p ReadPosition
+		if err := rows.Scan(&p.UserID, &p.DisplayName, &p.LastReadID); err != nil {
+			return nil, err
+		}
+		positions = append(positions, p)
+	}
+	return positions, rows.Err()
+}

@@ -86,6 +86,8 @@ type ContextMessageView struct {
 	RawContent string
 	Tokens     int
 	ToolBlocks []ToolBlockView
+	Timestamp  string
+	ReadBadge  string
 }
 
 type ContextInspectionView struct {

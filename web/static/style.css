@@ -1279,22 +1279,53 @@ header {
 
 .context-message-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: var(--space-2);
   margin-bottom: var(--space-1);
 }
 
 .context-message-tokens {
   font-size: var(--font-sizes-0);
   color: var(--colors-text-secondary);
+  margin-left: auto;
+}
+
+.context-message-timestamp {
+  font-size: var(--font-sizes-0);
+  color: var(--colors-text-secondary);
+}
+
+.context-read-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+}
+
+.context-read-divider::before,
+.context-read-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--colors-border);
+}
+
+.context-read-divider span {
+  font-size: var(--font-sizes-0);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-text-secondary);
+  white-space: nowrap;
 }
 
 .context-message-content {
+  padding: var(--space-2);
+  border: var(--borders-none);
+  border-radius: var(--radii-md);
+  background-color: var(--colors-overlay);
   font-size: var(--font-sizes-1);
   color: var(--colors-text);
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 200px;
   overflow-y: auto;
 }
 

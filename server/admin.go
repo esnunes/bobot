@@ -3,8 +3,10 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/esnunes/bobot/assistant"
 	"github.com/esnunes/bobot/db"
@@ -91,7 +93,17 @@ func (s *Server) handleAdminUserContextPage(w http.ResponseWriter, r *http.Reque
 		label = user.Username
 	}
 
-	s.render(w, "admin_context", buildContextPageData(label, inspection, s.cfg.LLM.Model))
+	// Build read positions for this user's private chat
+	readPositions := make(map[int64][]string)
+	lastReadID, _ := s.db.GetPrivateChatReadPosition(userID)
+	if lastReadID > 0 {
+		resolvedID := resolveReadPosition(lastReadID, inspection.Messages)
+		if resolvedID > 0 {
+			readPositions[resolvedID] = []string{"Read"}
+		}
+	}
+
+	s.render(w, "admin_context", buildContextPageData(label, inspection, s.cfg.LLM.Model, readPositions))
 }
 
 func (s *Server) handleAdminTopicContextPage(w http.ResponseWriter, r *http.Request) {
@@ -115,10 +127,43 @@ func (s *Server) handleAdminTopicContextPage(w http.ResponseWriter, r *http.Requ
 	}
 	inspection.MaxTokens = s.cfg.Context.TokensMax
 
-	s.render(w, "admin_context", buildContextPageData(topic.Name, inspection, s.cfg.LLM.Model))
+	// Build read positions for all topic members
+	readPositions := make(map[int64][]string)
+	positions, _ := s.db.GetTopicReadPositions(topicID)
+	for _, p := range positions {
+		if p.LastReadID <= 0 {
+			continue
+		}
+		resolvedID := resolveReadPosition(p.LastReadID, inspection.Messages)
+		if resolvedID > 0 {
+			readPositions[resolvedID] = append(readPositions[resolvedID], p.DisplayName)
+		}
+	}
+
+	s.render(w, "admin_context", buildContextPageData(topic.Name, inspection, s.cfg.LLM.Model, readPositions))
 }
 
-func buildContextPageData(label string, inspection *assistant.ContextInspection, model string) PageData {
+// resolveReadPosition finds the highest context message ID where msg.ID <= lastReadID.
+// Returns 0 if no message qualifies (read position is before the context window).
+func resolveReadPosition(lastReadID int64, messages []assistant.ContextMessage) int64 {
+	var resolved int64
+	for _, m := range messages {
+		if m.ID > 0 && m.ID <= lastReadID {
+			resolved = m.ID
+		}
+	}
+	return resolved
+}
+
+// formatReadBadge formats read-by users with truncation for >3 names.
+func formatReadBadge(users []string) string {
+	if len(users) <= 3 {
+		return strings.Join(users, ", ")
+	}
+	return strings.Join(users[:3], ", ") + fmt.Sprintf(" +%d more", len(users)-3)
+}
+
+func buildContextPageData(label string, inspection *assistant.ContextInspection, model string, readPositions map[int64][]string) PageData {
 	msgs := make([]ContextMessageView, 0, len(inspection.Messages))
 	for _, m := range inspection.Messages {
 		content := m.Content
@@ -132,6 +177,10 @@ func buildContextPageData(label string, inspection *assistant.ContextInspection,
 			Content:    content,
 			RawContent: rawContent,
 			Tokens:     tokens,
+			Timestamp:  m.CreatedAt.UTC().Format("2006-01-02 15:04"),
+		}
+		if users, ok := readPositions[m.ID]; ok {
+			mv.ReadBadge = formatReadBadge(users)
 		}
 
 		// Parse tool blocks from raw_content when it's a JSON array
