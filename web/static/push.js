@@ -149,15 +149,22 @@
           var topicId = btn.getAttribute("data-topic-id");
           var isMuted = btn.getAttribute("data-muted") === "true";
           var method = isMuted ? "DELETE" : "POST";
+          btn.disabled = true;
           fetch("/api/topics/" + topicId + "/mute", {
             method: method,
-            credentials: "include",
-          }).then(function (resp) {
-            if (resp.ok) {
-              btn.setAttribute("data-muted", isMuted ? "false" : "true");
-              btn.textContent = isMuted ? "Mute topic" : "Unmute topic";
-            }
-          });
+          })
+            .then(function (resp) {
+              if (resp.ok) {
+                btn.setAttribute("data-muted", isMuted ? "false" : "true");
+                btn.textContent = isMuted ? "Mute topic" : "Unmute topic";
+              }
+            })
+            .catch(function (err) {
+              console.error("Mute toggle failed:", err);
+            })
+            .finally(function () {
+              btn.disabled = false;
+            });
         };
         btn.style.display = "";
       });
