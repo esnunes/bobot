@@ -21,9 +21,11 @@
     <script src="/static/bobot.js" defer></script>
     <script src="/static/push.js" defer></script>
     <script src="/static/ws-manager.js" defer></script>
+    <script src="/static/unread-state.js" defer></script>
 </head>
 <body hx-push-url="false">
     <div id="ws-connection" hx-preserve="true"></div>
+    {{if .UnreadJSON}}<script type="application/json" data-unread-state>{{.UnreadJSON}}</script>{{end}}
     {{template "content" .}}
 </body>
 </html>

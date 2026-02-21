@@ -156,6 +156,7 @@ header {
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
     background: none;
     border: none;
     color: var(--colors-accent);
@@ -165,6 +166,12 @@ header {
 
     &:hover {
       opacity: var(--opacities-muted);
+    }
+
+    > .unread-dot {
+      position: absolute;
+      top: 2px;
+      right: -2px;
     }
   }
 }
@@ -591,6 +598,20 @@ header {
 .topic-members {
   font-size: var(--font-sizes-0);
   color: var(--colors-text-secondary);
+}
+
+.topic-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--colors-danger);
+  flex-shrink: 0;
 }
 
 .card-action {

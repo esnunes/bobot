@@ -21,6 +21,7 @@ window.TopicChatClient = class TopicChatClient {
         this.currentUserId = null;
         this.wsContainer = document.getElementById('ws-connection');
         this.handleTopicMessage = null;
+        this.handleUnreadChanged = null;
 
         this.init();
     }
@@ -93,6 +94,23 @@ window.TopicChatClient = class TopicChatClient {
             this.mentionBotBtn.addEventListener('click', () => this.mentionBot());
         }
 
+        // Unread indicator on back button
+        this.handleUnreadChanged = (e) => {
+            var btn = document.querySelector('button[aria-label="Chats"]');
+            if (!btn) return;
+            var dot = btn.querySelector('.unread-dot');
+            if (e.detail.chatIds.size > 0) {
+                if (!dot) {
+                    dot = document.createElement('span');
+                    dot.className = 'unread-dot';
+                    btn.appendChild(dot);
+                }
+            } else {
+                if (dot) dot.remove();
+            }
+        };
+        document.addEventListener('bobot:unread-changed', this.handleUnreadChanged);
+
         // Reset bobot confirm buttons when clicking elsewhere
         document.addEventListener('click', () => {
             MessageRenderer.resetConfirmingButtons();
@@ -109,6 +127,10 @@ window.TopicChatClient = class TopicChatClient {
         if (this.handleTopicMessage) {
             document.removeEventListener('bobot:topic-message', this.handleTopicMessage);
             this.handleTopicMessage = null;
+        }
+        if (this.handleUnreadChanged) {
+            document.removeEventListener('bobot:unread-changed', this.handleUnreadChanged);
+            this.handleUnreadChanged = null;
         }
     }
 
