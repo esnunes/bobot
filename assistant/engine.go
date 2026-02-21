@@ -21,9 +21,11 @@ type ContextProvider interface {
 
 // ContextMessage represents a message for context (simplified from db.Message).
 type ContextMessage struct {
+	ID         int64
 	Role       string
 	Content    string
 	RawContent string
+	CreatedAt  time.Time
 }
 
 // ProfileProvider retrieves user or topic profile data.

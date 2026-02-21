@@ -34,9 +34,11 @@ func (a *CoreDBAdapter) GetContextMessages(userID int64) ([]assistant.ContextMes
 	result := make([]assistant.ContextMessage, len(messages))
 	for i, m := range messages {
 		result[i] = assistant.ContextMessage{
+			ID:         m.ID,
 			Role:       m.Role,
 			Content:    m.Content,
 			RawContent: m.RawContent,
+			CreatedAt:  m.CreatedAt,
 		}
 	}
 	return result, nil
@@ -52,9 +54,11 @@ func (a *CoreDBAdapter) GetTopicContextMessages(topicID int64) ([]assistant.Cont
 	result := make([]assistant.ContextMessage, len(messages))
 	for i, m := range messages {
 		result[i] = assistant.ContextMessage{
+			ID:         m.ID,
 			Role:       m.Role,
 			Content:    m.Content,
 			RawContent: m.RawContent,
+			CreatedAt:  m.CreatedAt,
 		}
 	}
 	return result, nil

@@ -31,6 +31,7 @@
                     <div class="context-message">
                         <div class="context-message-header">
                             <span class="admin-badge {{.Role}}">{{.Role}}</span>
+                            <span class="context-message-timestamp">{{.Timestamp}}</span>
                             <span class="context-message-tokens">{{.Tokens}} tokens</span>
                         </div>
                         {{if .Content}}
@@ -67,6 +68,9 @@
                         </details>
                         {{end}}
                     </div>
+                    {{if .ReadBadge}}
+                    <div class="context-read-divider"><span>{{.ReadBadge}}</span></div>
+                    {{end}}
                     {{end}}
                 {{else}}
                     <div class="empty">No messages in context window.</div>
