@@ -7,16 +7,20 @@
     </header>
 
     <main class="chats-list">
-        <button hx-get="/chat" hx-target="body" class="bobot-chat-item">
+        <button hx-get="/chat" hx-target="body" class="bobot-chat-item" data-chat-id="0">
             <svg class="bobot-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
             <span class="topic-name">bobot</span>
+            {{if .BobotHasUnread}}<span class="unread-dot"></span>{{end}}
         </button>
         <div class="section-label">Topics</div>
         {{if .Topics}}
             {{range .Topics}}
-            <button hx-get="/chats/{{.ID}}" hx-target="body" class="topic-item">
+            <button hx-get="/chats/{{.ID}}" hx-target="body" class="topic-item" data-chat-id="{{.ID}}">
                 <span class="topic-name">{{.Name}}</span>
-                <span class="topic-members">{{.MemberCount}} member{{if ne .MemberCount 1}}s{{end}}</span>
+                <span class="topic-right">
+                    {{if .HasUnread}}<span class="unread-dot"></span>{{end}}
+                    <span class="topic-members">{{.MemberCount}} member{{if ne .MemberCount 1}}s{{end}}</span>
+                </span>
             </button>
             {{end}}
         {{end}}
@@ -78,6 +82,30 @@
             modal.classList.add('hidden');
             nameInput.value = '';
         }
+    });
+
+    // Unread dot management — subscribe to state changes
+    document.addEventListener('bobot:unread-changed', function(e) {
+        if (!document.querySelector('[data-page="chats"]')) return;
+        var chatIds = e.detail.chatIds;
+        document.querySelectorAll('[data-chat-id]').forEach(function(item) {
+            var id = parseInt(item.dataset.chatId, 10);
+            var dot = item.querySelector('.unread-dot');
+            if (chatIds.has(id)) {
+                if (!dot) {
+                    dot = document.createElement('span');
+                    dot.className = 'unread-dot';
+                    var topicRight = item.querySelector('.topic-right');
+                    if (topicRight) {
+                        topicRight.insertBefore(dot, topicRight.firstChild);
+                    } else {
+                        item.appendChild(dot);
+                    }
+                }
+            } else {
+                if (dot) dot.remove();
+            }
+        });
     });
 })();
 </script>

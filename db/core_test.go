@@ -1116,3 +1116,204 @@ func TestDeleteOldSessionRevocations(t *testing.T) {
 		t.Error("Expected no revocation after deletion")
 	}
 }
+
+func TestCoreDB_MarkChatRead_PrivateChat(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("reader", "hash")
+
+	// Create a private message
+	msg, _ := db.CreateMessage(user.ID, BobotUserID, "user", "hello", "hello")
+
+	// Before marking read, should show unread
+	bobotUnread, _, err := db.GetUnreadChats(user.ID)
+	if err != nil {
+		t.Fatalf("GetUnreadChats failed: %v", err)
+	}
+	if !bobotUnread {
+		t.Error("expected bobot chat to be unread")
+	}
+
+	// Mark as read
+	err = db.MarkChatRead(user.ID, PrivateChatTopicID, msg.ID)
+	if err != nil {
+		t.Fatalf("MarkChatRead failed: %v", err)
+	}
+
+	// After marking read, should not show unread
+	bobotUnread, _, err = db.GetUnreadChats(user.ID)
+	if err != nil {
+		t.Fatalf("GetUnreadChats failed: %v", err)
+	}
+	if bobotUnread {
+		t.Error("expected bobot chat to be read after MarkChatRead")
+	}
+}
+
+func TestCoreDB_MarkChatRead_TopicChat(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("reader", "hash")
+	topic, _ := db.CreateTopic("Test Topic", user.ID)
+	db.AddTopicMember(topic.ID, user.ID)
+
+	// Create a topic message
+	msg, _ := db.CreateTopicMessage(topic.ID, user.ID, "user", "hello topic", "hello topic")
+
+	// Before marking read, should show unread
+	_, topicUnreads, err := db.GetUnreadChats(user.ID)
+	if err != nil {
+		t.Fatalf("GetUnreadChats failed: %v", err)
+	}
+	if !topicUnreads[topic.ID] {
+		t.Error("expected topic chat to be unread")
+	}
+
+	// Mark as read
+	err = db.MarkChatRead(user.ID, topic.ID, msg.ID)
+	if err != nil {
+		t.Fatalf("MarkChatRead failed: %v", err)
+	}
+
+	// After marking read, should not show unread
+	_, topicUnreads, err = db.GetUnreadChats(user.ID)
+	if err != nil {
+		t.Fatalf("GetUnreadChats failed: %v", err)
+	}
+	if topicUnreads[topic.ID] {
+		t.Error("expected topic chat to be read after MarkChatRead")
+	}
+}
+
+func TestCoreDB_MarkChatRead_Upsert(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("reader", "hash")
+
+	// Mark read with message ID 1
+	err := db.MarkChatRead(user.ID, PrivateChatTopicID, 1)
+	if err != nil {
+		t.Fatalf("MarkChatRead failed: %v", err)
+	}
+
+	// Mark read again with message ID 5 (upsert)
+	err = db.MarkChatRead(user.ID, PrivateChatTopicID, 5)
+	if err != nil {
+		t.Fatalf("MarkChatRead upsert failed: %v", err)
+	}
+
+	// Verify it was updated, not duplicated
+	var count int
+	db.db.QueryRow("SELECT COUNT(*) FROM chat_read_status WHERE user_id = ?", user.ID).Scan(&count)
+	if count != 1 {
+		t.Errorf("expected 1 row, got %d", count)
+	}
+
+	var lastRead int64
+	db.db.QueryRow("SELECT last_read_message_id FROM chat_read_status WHERE user_id = ? AND topic_id IS NULL", user.ID).Scan(&lastRead)
+	if lastRead != 5 {
+		t.Errorf("expected last_read_message_id=5, got %d", lastRead)
+	}
+}
+
+func TestCoreDB_GetUnreadChats_NoRowsMeansRead(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("newuser", "hash")
+
+	// No messages, no read status — should not show unread
+	bobotUnread, topicUnreads, err := db.GetUnreadChats(user.ID)
+	if err != nil {
+		t.Fatalf("GetUnreadChats failed: %v", err)
+	}
+	if bobotUnread {
+		t.Error("expected no unread for bobot with no messages")
+	}
+	if len(topicUnreads) != 0 {
+		t.Errorf("expected no unread topics, got %d", len(topicUnreads))
+	}
+}
+
+func TestCoreDB_GetUnreadChats_NewMessageAfterRead(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("reader", "hash")
+
+	// Create and read a message
+	msg1, _ := db.CreateMessage(user.ID, BobotUserID, "user", "hello", "hello")
+	db.MarkChatRead(user.ID, PrivateChatTopicID, msg1.ID)
+
+	// New message arrives from bobot
+	db.CreateMessage(BobotUserID, user.ID, "assistant", "hi there", "hi there")
+
+	// Should show unread again
+	bobotUnread, _, err := db.GetUnreadChats(user.ID)
+	if err != nil {
+		t.Fatalf("GetUnreadChats failed: %v", err)
+	}
+	if !bobotUnread {
+		t.Error("expected bobot chat to be unread after new message")
+	}
+}
+
+func TestCoreDB_GetLatestPrivateMessageID(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("reader", "hash")
+
+	// No messages
+	id, err := db.GetLatestPrivateMessageID(user.ID)
+	if err != nil {
+		t.Fatalf("GetLatestPrivateMessageID failed: %v", err)
+	}
+	if id != 0 {
+		t.Errorf("expected 0 for no messages, got %d", id)
+	}
+
+	// Create messages
+	db.CreateMessage(user.ID, BobotUserID, "user", "first", "first")
+	msg2, _ := db.CreateMessage(BobotUserID, user.ID, "assistant", "second", "second")
+
+	id, err = db.GetLatestPrivateMessageID(user.ID)
+	if err != nil {
+		t.Fatalf("GetLatestPrivateMessageID failed: %v", err)
+	}
+	if id != msg2.ID {
+		t.Errorf("expected %d, got %d", msg2.ID, id)
+	}
+}
+
+func TestCoreDB_GetLatestTopicMessageID(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user, _ := db.CreateUser("reader", "hash")
+	topic, _ := db.CreateTopic("Test", user.ID)
+
+	// No messages
+	id, err := db.GetLatestTopicMessageID(topic.ID)
+	if err != nil {
+		t.Fatalf("GetLatestTopicMessageID failed: %v", err)
+	}
+	if id != 0 {
+		t.Errorf("expected 0 for no messages, got %d", id)
+	}
+
+	// Create messages
+	db.CreateTopicMessage(topic.ID, user.ID, "user", "first", "first")
+	msg2, _ := db.CreateTopicMessage(topic.ID, user.ID, "user", "second", "second")
+
+	id, err = db.GetLatestTopicMessageID(topic.ID)
+	if err != nil {
+		t.Fatalf("GetLatestTopicMessageID failed: %v", err)
+	}
+	if id != msg2.ID {
+		t.Errorf("expected %d, got %d", msg2.ID, id)
+	}
+}

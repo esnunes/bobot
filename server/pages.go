@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/esnunes/bobot/auth"
+	"github.com/esnunes/bobot/db"
 	"github.com/esnunes/bobot/web"
 )
 
@@ -19,6 +20,7 @@ type TopicView struct {
 	ID          int64
 	Name        string
 	MemberCount int
+	HasUnread   bool
 }
 
 type MessageView struct {
@@ -123,11 +125,31 @@ type PageData struct {
 	AdminUsers     []AdminUserView
 	AdminTopics    []AdminTopicView
 	Context        *ContextInspectionView
+	BobotHasUnread  bool
+	HasOtherUnreads bool
+	UnreadJSON      template.JS
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data PageData) {
 	data.VAPIDPublicKey = s.cfg.VAPID.PublicKey
 	s.templates[name].Execute(w, data)
+}
+
+// buildUnreadJSON returns a JSON array of chat IDs with unread messages.
+// Private bobot chat is represented as 0.
+func buildUnreadJSON(bobotUnread bool, topicUnreads map[int64]bool) template.JS {
+	var ids []int64
+	if bobotUnread {
+		ids = append(ids, 0)
+	}
+	for topicID := range topicUnreads {
+		ids = append(ids, topicID)
+	}
+	if len(ids) == 0 {
+		return "[]"
+	}
+	data, _ := json.Marshal(ids)
+	return template.JS(data)
 }
 
 func (s *Server) loadTemplates() error {
@@ -315,10 +337,16 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 		"messages": jsonMessages,
 	})
 
+	s.markChatReadImplicit(userData.UserID, db.PrivateChatTopicID)
+
+	bobotUnread, topicUnreads, _ := s.db.GetUnreadChats(userData.UserID)
+
 	s.render(w, "chat", PageData{
-		Title:        "Chat",
-		PageDataJSON: template.JS(jsonData),
-		IsAdmin:      userData.Role == "admin",
+		Title:           "Chat",
+		PageDataJSON:    template.JS(jsonData),
+		IsAdmin:         userData.Role == "admin",
+		HasOtherUnreads: len(topicUnreads) > 0,
+		UnreadJSON:      buildUnreadJSON(bobotUnread, topicUnreads),
 	})
 }
 
@@ -331,6 +359,8 @@ func (s *Server) handleChatsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	bobotUnread, topicUnreads, _ := s.db.GetUnreadChats(userData.UserID)
+
 	topicViews := make([]TopicView, 0, len(topics))
 	for _, t := range topics {
 		members, _ := s.db.GetTopicMembers(t.ID)
@@ -338,10 +368,16 @@ func (s *Server) handleChatsPage(w http.ResponseWriter, r *http.Request) {
 			ID:          t.ID,
 			Name:        t.Name,
 			MemberCount: len(members),
+			HasUnread:   topicUnreads[t.ID],
 		})
 	}
 
-	s.render(w, "chats", PageData{Title: "Chats", Topics: topicViews})
+	s.render(w, "chats", PageData{
+		Title:          "Chats",
+		Topics:         topicViews,
+		BobotHasUnread: bobotUnread,
+		UnreadJSON:     buildUnreadJSON(bobotUnread, topicUnreads),
+	})
 }
 
 func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
@@ -416,14 +452,24 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		"messages":        jsonMessages,
 	})
 
+	s.markChatReadImplicit(userData.UserID, topicID)
+
+	bobotUnread, topicUnreads, _ := s.db.GetUnreadChats(userData.UserID)
+	otherTopicUnreads := len(topicUnreads)
+	if topicUnreads[topicID] {
+		otherTopicUnreads--
+	}
+
 	s.render(w, "topic_chat", PageData{
-		Title:         "Topic Chat",
-		TopicID:       topicID,
-		TopicName:     topic.Name,
-		OwnerID:       topic.OwnerID,
-		CurrentUserID: userData.UserID,
-		Members:       members,
-		PageDataJSON:  template.JS(jsonData),
-		IsAdmin:       userData.Role == "admin",
+		Title:           "Topic Chat",
+		TopicID:         topicID,
+		TopicName:       topic.Name,
+		OwnerID:         topic.OwnerID,
+		CurrentUserID:   userData.UserID,
+		Members:         members,
+		PageDataJSON:    template.JS(jsonData),
+		IsAdmin:         userData.Role == "admin",
+		HasOtherUnreads: bobotUnread || otherTopicUnreads > 0,
+		UnreadJSON:      buildUnreadJSON(bobotUnread, topicUnreads),
 	})
 }

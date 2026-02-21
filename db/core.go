@@ -17,6 +17,10 @@ var ErrNotFound = errors.New("not found")
 // This user is created during migration with ID 0.
 const BobotUserID = int64(0)
 
+// PrivateChatTopicID is the sentinel value for the private Bobot chat.
+// In the chat_read_status table, this maps to topic_id IS NULL.
+const PrivateChatTopicID = int64(0)
+
 const WelcomeMessage = `
 👋 Olá! Seja muito bem-vindo(a)!
 
@@ -404,6 +408,35 @@ func (c *CoreDB) migrate() error {
 	_, err = c.db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id
 		ON push_subscriptions(user_id)
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create chat_read_status table for unread message tracking
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS chat_read_status (
+			user_id INTEGER NOT NULL REFERENCES users(id),
+			topic_id INTEGER REFERENCES topics(id),
+			last_read_message_id INTEGER NOT NULL DEFAULT 0
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Two partial indexes to enforce uniqueness (SQLite treats NULLs as distinct in UNIQUE)
+	_, err = c.db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_read_status_private
+		ON chat_read_status(user_id) WHERE topic_id IS NULL
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_read_status_topic
+		ON chat_read_status(user_id, topic_id) WHERE topic_id IS NOT NULL
 	`)
 	if err != nil {
 		return err
@@ -1518,4 +1551,90 @@ func (c *CoreDB) GetPushSubscriptions(userID int64) ([]PushSubscription, error) 
 		subs = append(subs, s)
 	}
 	return subs, rows.Err()
+}
+
+// MarkChatRead updates the last read message ID for a user in a chat.
+// Pass PrivateChatTopicID (0) for the private Bobot chat; it maps to topic_id IS NULL internally.
+func (c *CoreDB) MarkChatRead(userID int64, topicID int64, messageID int64) error {
+	if topicID == PrivateChatTopicID {
+		_, err := c.db.Exec(`
+			INSERT INTO chat_read_status (user_id, topic_id, last_read_message_id)
+			VALUES (?, NULL, ?)
+			ON CONFLICT(user_id) WHERE topic_id IS NULL
+			DO UPDATE SET last_read_message_id = excluded.last_read_message_id
+		`, userID, messageID)
+		return err
+	}
+	_, err := c.db.Exec(`
+		INSERT INTO chat_read_status (user_id, topic_id, last_read_message_id)
+		VALUES (?, ?, ?)
+		ON CONFLICT(user_id, topic_id) WHERE topic_id IS NOT NULL
+		DO UPDATE SET last_read_message_id = excluded.last_read_message_id
+	`, userID, topicID, messageID)
+	return err
+}
+
+// GetUnreadChats returns the unread status for the private Bobot chat and all topic chats the user is a member of.
+// Missing chat_read_status rows are treated as "all read" (no unread indicator).
+func (c *CoreDB) GetUnreadChats(userID int64) (bobotUnread bool, topicUnreads map[int64]bool, err error) {
+	// Check private Bobot chat
+	err = c.db.QueryRow(`
+		SELECT COALESCE(MAX(m.id), 0) > COALESCE(crs.last_read_message_id, 0)
+		FROM messages m
+		LEFT JOIN chat_read_status crs ON crs.user_id = ? AND crs.topic_id IS NULL
+		WHERE m.topic_id IS NULL
+		  AND ((m.sender_id = 0 AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = 0))
+	`, userID, userID, userID).Scan(&bobotUnread)
+	if err != nil {
+		return false, nil, err
+	}
+
+	// Check topic chats
+	rows, err := c.db.Query(`
+		SELECT t.id,
+		       COALESCE(MAX(m.id), 0) > COALESCE(crs.last_read_message_id, 0) AS has_unread
+		FROM topics t
+		JOIN topic_members tm ON tm.topic_id = t.id AND tm.user_id = ?
+		LEFT JOIN messages m ON m.topic_id = t.id
+		LEFT JOIN chat_read_status crs ON crs.user_id = ? AND crs.topic_id = t.id
+		WHERE t.deleted_at IS NULL
+		GROUP BY t.id
+	`, userID, userID)
+	if err != nil {
+		return false, nil, err
+	}
+	defer rows.Close()
+
+	topicUnreads = make(map[int64]bool)
+	for rows.Next() {
+		var topicID int64
+		var hasUnread bool
+		if err := rows.Scan(&topicID, &hasUnread); err != nil {
+			return false, nil, err
+		}
+		if hasUnread {
+			topicUnreads[topicID] = true
+		}
+	}
+	return bobotUnread, topicUnreads, rows.Err()
+}
+
+// GetLatestPrivateMessageID returns the ID of the most recent private chat message for a user.
+func (c *CoreDB) GetLatestPrivateMessageID(userID int64) (int64, error) {
+	var id int64
+	err := c.db.QueryRow(`
+		SELECT COALESCE(MAX(id), 0) FROM messages
+		WHERE topic_id IS NULL
+		  AND ((sender_id = 0 AND receiver_id = ?) OR (sender_id = ? AND receiver_id = 0))
+	`, userID, userID).Scan(&id)
+	return id, err
+}
+
+// GetLatestTopicMessageID returns the ID of the most recent message in a topic.
+func (c *CoreDB) GetLatestTopicMessageID(topicID int64) (int64, error) {
+	var id int64
+	err := c.db.QueryRow(`
+		SELECT COALESCE(MAX(id), 0) FROM messages WHERE topic_id = ?
+	`, topicID).Scan(&id)
+	return id, err
 }

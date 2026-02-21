@@ -90,11 +90,14 @@ func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, con
 			"content": response,
 		})
 		s.connections.Broadcast(userID, respJSON)
+
+		s.markChatReadImplicit(userID, db.PrivateChatTopicID)
 		return
 	}
 
 	// Use pipeline for the full message flow
 	s.pipeline.SendPrivateMessage(ctx, userID, content)
+	s.markChatReadImplicit(userID, db.PrivateChatTopicID)
 }
 
 func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int64, content string) {
@@ -144,6 +147,8 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 			"display_name": "bobot",
 		})
 		s.broadcastToTopic(topicID, respJSON)
+
+		s.markChatReadImplicit(userID, topicID)
 		return
 	}
 
@@ -171,6 +176,8 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 	if shouldTriggerAssistant(content) {
 		s.handleTopicAssistantResponse(ctx, userID, topicID, content, user.DisplayName)
 	}
+
+	s.markChatReadImplicit(userID, topicID)
 }
 
 func shouldTriggerAssistant(content string) bool {

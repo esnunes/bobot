@@ -16,6 +16,7 @@ window.ChatClient ||= class ChatClient {
         this.hasMoreHistory = true;
         this.wsContainer = document.getElementById('ws-connection');
         this.handleChatMessage = null;
+        this.handleUnreadChanged = null;
 
         this.init();
     }
@@ -155,6 +156,23 @@ window.ChatClient ||= class ChatClient {
             MessageRenderer.resetConfirmingButtons();
         });
 
+        // Unread indicator on back button
+        this.handleUnreadChanged = (e) => {
+            var btn = document.querySelector('button[aria-label="Chats"]');
+            if (!btn) return;
+            var dot = btn.querySelector('.unread-dot');
+            if (e.detail.chatIds.size > 0) {
+                if (!dot) {
+                    dot = document.createElement('span');
+                    dot.className = 'unread-dot';
+                    btn.appendChild(dot);
+                }
+            } else {
+                if (dot) dot.remove();
+            }
+        };
+        document.addEventListener('bobot:unread-changed', this.handleUnreadChanged);
+
         // Logout cleanup - clear chat-specific localStorage
         document.addEventListener('bobot:logout', () => {
             localStorage.removeItem('lastMessageTimestamp');
@@ -165,6 +183,10 @@ window.ChatClient ||= class ChatClient {
         if (this.handleChatMessage) {
             document.removeEventListener('bobot:chat-message', this.handleChatMessage);
             this.handleChatMessage = null;
+        }
+        if (this.handleUnreadChanged) {
+            document.removeEventListener('bobot:unread-changed', this.handleUnreadChanged);
+            this.handleUnreadChanged = null;
         }
     }
 
