@@ -228,6 +228,30 @@ func (s *Server) handleRemoveTopicMember(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) handleToggleTopicMute(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	topicID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid topic id", http.StatusBadRequest)
+		return
+	}
+
+	isMember, err := s.db.IsTopicMember(topicID, userData.UserID)
+	if err != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	muted := r.Method == http.MethodPost
+	if err := s.db.SetTopicMemberMuted(topicID, userData.UserID, muted); err != nil {
+		http.Error(w, "failed to update topic mute", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleTopicMessageHistory(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 
