@@ -228,6 +228,9 @@ func (s *Server) pushToTopicMembers(topicID, senderID int64, senderName, content
 		if member.UserID == senderID || member.UserID == db.BobotUserID {
 			continue
 		}
+		if member.Muted {
+			continue
+		}
 		if s.connections.Count(member.UserID) == 0 {
 			// Check if user is blocked
 			user, err := s.db.GetUserByID(member.UserID)

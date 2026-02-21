@@ -136,6 +136,31 @@
         };
         btn.style.display = "";
       });
+
+      var muteButtons = document.querySelectorAll("[data-mute-toggle]");
+      muteButtons.forEach(function (btn) {
+        if (!enabled) {
+          btn.style.display = "none";
+          return;
+        }
+        var muted = btn.getAttribute("data-muted") === "true";
+        btn.textContent = muted ? "Unmute topic" : "Mute topic";
+        btn.onclick = function () {
+          var topicId = btn.getAttribute("data-topic-id");
+          var isMuted = btn.getAttribute("data-muted") === "true";
+          var method = isMuted ? "DELETE" : "POST";
+          fetch("/api/topics/" + topicId + "/mute", {
+            method: method,
+            credentials: "include",
+          }).then(function (resp) {
+            if (resp.ok) {
+              btn.setAttribute("data-muted", isMuted ? "false" : "true");
+              btn.textContent = isMuted ? "Mute topic" : "Unmute topic";
+            }
+          });
+        };
+        btn.style.display = "";
+      });
     });
   }
 

@@ -84,6 +84,7 @@ type TopicMember struct {
 	Username    string
 	DisplayName string
 	JoinedAt    time.Time
+	Muted       bool
 }
 
 type PushSubscription struct {
@@ -439,6 +440,11 @@ func (c *CoreDB) migrate() error {
 		ON chat_read_status(user_id, topic_id) WHERE topic_id IS NOT NULL
 	`)
 	if err != nil {
+		return err
+	}
+
+	// Migrate: add muted column to topic_members
+	if err := c.addColumnIfMissing("topic_members", "muted", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
 
@@ -1298,7 +1304,7 @@ func (c *CoreDB) SoftDeleteTopic(topicID int64) error {
 // GetTopicMembers retrieves all members of a topic.
 func (c *CoreDB) GetTopicMembers(topicID int64) ([]TopicMember, error) {
 	rows, err := c.db.Query(`
-		SELECT u.id, u.username, u.display_name, tm.joined_at
+		SELECT u.id, u.username, u.display_name, tm.joined_at, tm.muted
 		FROM topic_members tm
 		JOIN users u ON tm.user_id = u.id
 		WHERE tm.topic_id = ?
@@ -1312,12 +1318,21 @@ func (c *CoreDB) GetTopicMembers(topicID int64) ([]TopicMember, error) {
 	var members []TopicMember
 	for rows.Next() {
 		var m TopicMember
-		if err := rows.Scan(&m.UserID, &m.Username, &m.DisplayName, &m.JoinedAt); err != nil {
+		if err := rows.Scan(&m.UserID, &m.Username, &m.DisplayName, &m.JoinedAt, &m.Muted); err != nil {
 			return nil, err
 		}
 		members = append(members, m)
 	}
 	return members, rows.Err()
+}
+
+// SetTopicMemberMuted sets the muted state for a user in a topic.
+func (c *CoreDB) SetTopicMemberMuted(topicID, userID int64, muted bool) error {
+	_, err := c.db.Exec(
+		"UPDATE topic_members SET muted = ? WHERE topic_id = ? AND user_id = ?",
+		muted, topicID, userID,
+	)
+	return err
 }
 
 // GetTopicRecentMessages returns the most recent messages for a topic.

@@ -150,6 +150,9 @@ func (p *ChatPipeline) pushToTopicMembers(topicID, senderID int64, senderName, c
 		if member.UserID == senderID || member.UserID == db.BobotUserID {
 			continue
 		}
+		if member.Muted {
+			continue
+		}
 		if p.connections.Count(member.UserID) == 0 {
 			user, err := p.db.GetUserByID(member.UserID)
 			if err != nil || user.Blocked {

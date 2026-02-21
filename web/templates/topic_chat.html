@@ -28,6 +28,7 @@
         </div>
         <hr>
         <button class="menu-item" data-push-toggle style="display:none">Enable notifications</button>
+        <button class="menu-item" data-mute-toggle data-topic-id="{{.TopicID}}" data-muted="{{.PushMuted}}" style="display:none">{{if .PushMuted}}Unmute topic{{else}}Mute topic{{end}}</button>
         {{if .IsAdmin}}<button class="menu-item" hx-get="/admin" hx-target="body">Admin</button>{{end}}
         <button class="menu-item" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">Skills</button>
         <button class="menu-item" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">Schedules</button>

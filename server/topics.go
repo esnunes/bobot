@@ -228,6 +228,62 @@ func (s *Server) handleRemoveTopicMember(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) handleMuteTopic(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	topicID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid topic id", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := s.db.GetTopicByID(topicID); err != nil {
+		http.Error(w, "topic not found", http.StatusNotFound)
+		return
+	}
+
+	isMember, err := s.db.IsTopicMember(topicID, userData.UserID)
+	if err != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := s.db.SetTopicMemberMuted(topicID, userData.UserID, true); err != nil {
+		http.Error(w, "failed to mute topic", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleUnmuteTopic(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	topicID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid topic id", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := s.db.GetTopicByID(topicID); err != nil {
+		http.Error(w, "topic not found", http.StatusNotFound)
+		return
+	}
+
+	isMember, err := s.db.IsTopicMember(topicID, userData.UserID)
+	if err != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := s.db.SetTopicMemberMuted(topicID, userData.UserID, false); err != nil {
+		http.Error(w, "failed to unmute topic", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleTopicMessageHistory(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 
