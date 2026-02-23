@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sort"
 	"time"
@@ -135,13 +134,18 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 		return
 	}
 
-	// Lifecycle guard: check topic still valid
-	if r.TopicID != nil {
-		if !s.isTopicValid(r.UserID, *r.TopicID) {
-			slog.Warn("scheduler: skipping reminder for invalid topic", "id", r.ID, "topic_id", *r.TopicID)
-			s.scheduleDB.MarkReminderFailed(r.ID, "topic deleted or user removed")
-			return
-		}
+	// Lifecycle guard: require topic ID
+	if r.TopicID == nil {
+		slog.Warn("scheduler: skipping reminder with no topic", "id", r.ID)
+		s.scheduleDB.MarkReminderFailed(r.ID, "no topic ID")
+		return
+	}
+	topicID := *r.TopicID
+
+	if !s.isTopicValid(r.UserID, topicID) {
+		slog.Warn("scheduler: skipping reminder for invalid topic", "id", r.ID, "topic_id", topicID)
+		s.scheduleDB.MarkReminderFailed(r.ID, "topic deleted or user removed")
+		return
 	}
 
 	// Build execution context
@@ -153,14 +157,6 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 	defer cancel()
 
 	content := "<bobot-remind>" + r.Message + "</bobot-remind>"
-
-	// Resolve topic ID (use bobot topic for private reminders)
-	topicID, err := s.resolveTopicID(r.UserID, r.TopicID)
-	if err != nil {
-		slog.Error("scheduler: failed to resolve topic for reminder", "id", r.ID, "error", err)
-		s.scheduleDB.MarkReminderFailed(r.ID, err.Error())
-		return
-	}
 
 	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: &topicID})
 	_, execErr := s.pipeline.SendMessage(execCtx, r.UserID, topicID, content, user.DisplayName)
@@ -186,13 +182,18 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 		return
 	}
 
-	// Lifecycle guard: check topic still valid
-	if j.TopicID != nil {
-		if !s.isTopicValid(j.UserID, *j.TopicID) {
-			slog.Warn("scheduler: disabling cron job for invalid topic", "id", j.ID, "topic_id", *j.TopicID)
-			s.scheduleDB.DisableCronJob(j.ID)
-			return
-		}
+	// Lifecycle guard: require topic ID
+	if j.TopicID == nil {
+		slog.Warn("scheduler: disabling cron job with no topic", "id", j.ID)
+		s.scheduleDB.DisableCronJob(j.ID)
+		return
+	}
+	topicID := *j.TopicID
+
+	if !s.isTopicValid(j.UserID, topicID) {
+		slog.Warn("scheduler: disabling cron job for invalid topic", "id", j.ID, "topic_id", topicID)
+		s.scheduleDB.DisableCronJob(j.ID)
+		return
 	}
 
 	// Create execution record
@@ -212,14 +213,6 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 	defer cancel()
 
 	content := "<bobot-cron>" + j.Prompt + "</bobot-cron>"
-
-	// Resolve topic ID (use bobot topic for private crons)
-	topicID, err := s.resolveTopicID(j.UserID, j.TopicID)
-	if err != nil {
-		slog.Error("scheduler: failed to resolve topic for cron job", "id", j.ID, "error", err)
-		s.scheduleDB.FailExecution(execID, time.Now().UTC(), err.Error())
-		return
-	}
 
 	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: &topicID})
 	_, execErr := s.pipeline.SendMessage(execCtx, j.UserID, topicID, content, user.DisplayName)
@@ -268,18 +261,3 @@ func (s *Scheduler) isTopicValid(userID, topicID int64) bool {
 	return true
 }
 
-// resolveTopicID returns the topic ID to use. If topicID is nil (private chat),
-// looks up the user's bobot topic.
-func (s *Scheduler) resolveTopicID(userID int64, topicID *int64) (int64, error) {
-	if topicID != nil {
-		return *topicID, nil
-	}
-	topic, err := s.coreDB.GetUserBobotTopic(userID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get bobot topic: %w", err)
-	}
-	if topic == nil {
-		return 0, fmt.Errorf("no bobot topic found for user %d", userID)
-	}
-	return topic.ID, nil
-}

@@ -4,7 +4,6 @@ package db
 import (
 	"database/sql"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -177,100 +176,6 @@ func TestCoreDB_MessageTokenColumns(t *testing.T) {
 	// Should get no rows error, not column missing error
 	if err != nil && err.Error() != "sql: no rows in result set" {
 		t.Errorf("expected no rows error or success, got: %v", err)
-	}
-}
-
-func TestCoreDB_ChunkReset(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("chunkuser", "hash")
-
-	// Use thresholds: start=10, max=30
-	// Formula: contextTokens = prevContextTokens + prevTokens + tokens
-	// Each 4 chars = 1 token (integer division)
-
-	// msg1: "aaaa" = 4 chars = 1 token, ctx=0 (first message)
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "aaaa", "aaaa", 10, 30)
-
-	// msg2: "bbbbbbbb" = 8 chars = 2 tokens, ctx = 0 + 1 + 2 = 3
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "bbbbbbbb", "bbbbbbbb", 10, 30)
-
-	// msg3: "cccccccccccc" = 12 chars = 3 tokens, ctx = 3 + 2 + 3 = 8
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "cccccccccccc", "cccccccccccc", 10, 30)
-
-	// msg4: "dddddddddddddddd" = 16 chars = 4 tokens, ctx = 8 + 3 + 4 = 15
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "dddddddddddddddd", "dddddddddddddddd", 10, 30)
-
-	// msg5: "eeeeeeeeeeeeeeeeeeee" = 20 chars = 5 tokens, ctx = 15 + 4 + 5 = 24
-	// 24 < 30, no reset yet
-	msg5, _ := db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "eeeeeeeeeeeeeeeeeeee", "eeeeeeeeeeeeeeeeeeee", 10, 30)
-
-	if msg5.ContextTokens != 24 {
-		t.Errorf("expected context_tokens=24, got %d", msg5.ContextTokens)
-	}
-
-	// msg6: "ffffffffffffffffffffffff" = 24 chars = 6 tokens
-	// Would be ctx = 24 + 5 + 6 = 35 > 30, triggers reset
-	// targetThreshold = 30 - 10 = 20
-	// Find most recent msg with ctx < 20: msg4 has ctx=15 < 20
-	// Subtract 15 from msg4 onwards:
-	//   msg4: 15 - 15 = 0
-	//   msg5: 24 - 15 = 9
-	// Then add msg6: ctx = 9 + 5 + 6 = 20
-	msg6, _ := db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "ffffffffffffffffffffffff", "ffffffffffffffffffffffff", 10, 30)
-
-	if msg6.ContextTokens != 20 {
-		t.Errorf("expected context_tokens=20 after reset, got %d", msg6.ContextTokens)
-	}
-
-	// Verify msg4 is now chunk start (ctx=0)
-	// msg4 is the 4th message overall (OFFSET 3 from the start)
-	var msg4Ctx int
-	db.db.QueryRow("SELECT context_tokens FROM messages WHERE topic_id IS NULL ORDER BY id ASC LIMIT 1 OFFSET 3").Scan(&msg4Ctx)
-	if msg4Ctx != 0 {
-		t.Errorf("expected msg4 context_tokens=0 (chunk start), got %d", msg4Ctx)
-	}
-
-	// Verify msg5 was updated (ctx=9)
-	// msg5 is the 5th message overall (OFFSET 4 from the start)
-	var msg5Ctx int
-	db.db.QueryRow("SELECT context_tokens FROM messages WHERE topic_id IS NULL ORDER BY id ASC LIMIT 1 OFFSET 4").Scan(&msg5Ctx)
-	if msg5Ctx != 9 {
-		t.Errorf("expected msg5 context_tokens=9 after reset, got %d", msg5Ctx)
-	}
-}
-
-func TestCoreDB_GetContextMessages(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("ctxuser", "hash")
-
-	// Create some messages - small thresholds for testing
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "aaaa", "aaaa", 10, 20)         // msg1: ctx=0
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "bbbb", "bbbb", 10, 20)    // msg2: ctx=2
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "cccc", "cccc", 10, 20)         // msg3: ctx=3
-
-	// Force a reset by adding messages that exceed threshold
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", strings.Repeat("d", 40), strings.Repeat("d", 40), 10, 20) // tokens=10, exceeds
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "eeee", "eeee", 10, 20)          // msg5
-
-	// Get context messages (should only return from most recent chunk start)
-	messages, err := db.GetPrivateChatContextMessages(user.ID)
-	if err != nil {
-		t.Fatalf("failed to get context messages: %v", err)
-	}
-
-	// Should not include msg1 and msg2 (before chunk reset)
-	// First message in result should have context_tokens = 0
-	if len(messages) == 0 {
-		t.Fatal("expected at least one message")
-	}
-	if messages[0].ContextTokens != 0 {
-		t.Errorf("first context message should have context_tokens=0, got %d", messages[0].ContextTokens)
 	}
 }
 

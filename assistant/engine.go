@@ -13,9 +13,8 @@ import (
 	"github.com/esnunes/bobot/tools"
 )
 
-// ContextProvider retrieves context messages for a user or topic.
+// ContextProvider retrieves context messages for a topic.
 type ContextProvider interface {
-	GetContextMessages(userID int64) ([]ContextMessage, error)
 	GetTopicContextMessages(topicID int64) ([]ContextMessage, error)
 }
 
@@ -28,28 +27,25 @@ type ContextMessage struct {
 	CreatedAt  time.Time
 }
 
-// ProfileProvider retrieves user or topic profile data.
+// ProfileProvider retrieves topic profile data.
 type ProfileProvider interface {
-	GetUserProfile(userID int64) (string, int64, error)
 	GetTopicMemberProfiles(topicID int64) (string, error)
 }
 
 // SkillProvider retrieves user-defined skills for the current chat scope.
 type SkillProvider interface {
-	GetPrivateChatSkills(userID int64) ([]Skill, error)
 	GetTopicSkills(topicID int64) ([]Skill, error)
 }
 
 // MessageSaver persists messages during the chat loop.
 type MessageSaver interface {
-	SaveMessage(userID int64, role, content, rawContent string) error
 	SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error
 }
 
 // ChatOptions configures a Chat call.
 type ChatOptions struct {
 	Message     string
-	TopicID     int64  // if > 0, topic chat; 0 means private chat
+	TopicID     int64
 	DisplayName string // sender's display name (for topic message attribution)
 }
 
@@ -83,9 +79,6 @@ func (e *Engine) SetSkillProvider(provider SkillProvider) {
 
 // Chat processes a user message and returns the assistant's response.
 // The context must contain the user ID (set by auth middleware).
-// For topic chats (TopicID > 0), it fetches topic context, injects member profiles,
-// prepends [DisplayName] to user messages, and saves via SaveTopicMessage.
-// For private chats (TopicID == 0), it behaves as before.
 func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 	userData := auth.UserDataFromContext(ctx)
 
@@ -95,47 +88,24 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 	// Merge built-in skills with user-defined skills
 	allSkills := append([]Skill{}, e.skills...)
 	if e.skillProvider != nil {
-		var userSkills []Skill
-		var skillErr error
-		if opts.TopicID > 0 {
-			userSkills, skillErr = e.skillProvider.GetTopicSkills(opts.TopicID)
-		} else {
-			userSkills, skillErr = e.skillProvider.GetPrivateChatSkills(userData.UserID)
-		}
-		if skillErr == nil {
+		userSkills, err := e.skillProvider.GetTopicSkills(opts.TopicID)
+		if err == nil {
 			allSkills = append(allSkills, userSkills...)
 		}
 	}
 	systemPrompt := BuildSystemPrompt(allSkills, llmTools)
 
-	// Inject profiles
-	if opts.TopicID > 0 {
-		// Topic chat: inject all member profiles
-		if e.profileProvider != nil {
-			profiles, err := e.profileProvider.GetTopicMemberProfiles(opts.TopicID)
-			if err == nil && profiles != "" {
-				systemPrompt += "\n\n" + profiles
-			}
-		}
-	} else {
-		// Private chat: inject single user profile
-		if e.profileProvider != nil {
-			profileContent, _, err := e.profileProvider.GetUserProfile(userData.UserID)
-			if err == nil && profileContent != "" {
-				systemPrompt += "\n\n## User Profile\nThe following is known about the user you are chatting with:\n<user-profile>\n" + profileContent + "\n</user-profile>"
-			}
+	// Inject member profiles
+	if e.profileProvider != nil {
+		profiles, err := e.profileProvider.GetTopicMemberProfiles(opts.TopicID)
+		if err == nil && profiles != "" {
+			systemPrompt += "\n\n" + profiles
 		}
 	}
 	slog.Debug("chat system prompt", "content", systemPrompt, "topicID", opts.TopicID)
 
 	// Get context messages
-	var contextMsgs []ContextMessage
-	var err error
-	if opts.TopicID > 0 {
-		contextMsgs, err = e.contextProvider.GetTopicContextMessages(opts.TopicID)
-	} else {
-		contextMsgs, err = e.contextProvider.GetContextMessages(userData.UserID)
-	}
+	contextMsgs, err := e.contextProvider.GetTopicContextMessages(opts.TopicID)
 
 	var messages []llm.Message
 	if err == nil {
@@ -150,9 +120,9 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 		}
 	}
 
-	// Add the new user message (with attribution for topic chat)
+	// Add the new user message with attribution
 	userContent := opts.Message
-	if opts.TopicID > 0 && opts.DisplayName != "" {
+	if opts.DisplayName != "" {
 		userContent = fmt.Sprintf("[%s]: %s", opts.DisplayName, opts.Message)
 	}
 	userContent = fmt.Sprintf("[Current time (UTC): %s]\n%s", time.Now().UTC().Format("2006-01-02 15:04"), userContent)
@@ -162,22 +132,14 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 	})
 
 	// Set ChatData for tool calls
-	var chatData auth.ChatData
-	if opts.TopicID > 0 {
-		chatData.TopicID = &opts.TopicID
-	}
-	ctx = auth.ContextWithChatData(ctx, chatData)
+	ctx = auth.ContextWithChatData(ctx, auth.ChatData{TopicID: &opts.TopicID})
 
-	// Helper to save messages (private or topic)
+	// Helper to save messages
 	save := func(role, content, rawContent string) {
 		if e.messageSaver == nil {
 			return
 		}
-		if opts.TopicID > 0 {
-			e.messageSaver.SaveTopicMessage(opts.TopicID, userData.UserID, role, content, rawContent)
-		} else {
-			e.messageSaver.SaveMessage(userData.UserID, role, content, rawContent)
-		}
+		e.messageSaver.SaveTopicMessage(opts.TopicID, userData.UserID, role, content, rawContent)
 	}
 
 	// Loop for tool use

@@ -122,28 +122,6 @@ func TestGetSkillByIDNotFound(t *testing.T) {
 	}
 }
 
-func TestGetPrivateChatSkills(t *testing.T) {
-	db := setupSkillTestDB(t)
-	defer db.Close()
-
-	alice, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
-	bob, _ := db.CreateUserFull("bob", "hash", "Bob", "user")
-	topic, _ := db.CreateTopic("General", alice.ID)
-
-	db.CreateSkill(alice.ID, nil, "groceries", "desc1", "content1")
-	db.CreateSkill(alice.ID, nil, "recipes", "desc2", "content2")
-	db.CreateSkill(alice.ID, &topic.ID, "topic-skill", "desc3", "content3")
-	db.CreateSkill(bob.ID, nil, "bob-skill", "desc4", "content4")
-
-	skills, err := db.GetPrivateChatSkills(alice.ID)
-	if err != nil {
-		t.Fatalf("get private skills failed: %v", err)
-	}
-	if len(skills) != 2 {
-		t.Errorf("expected 2 private skills, got %d", len(skills))
-	}
-}
-
 func TestGetTopicSkills(t *testing.T) {
 	db := setupSkillTestDB(t)
 	defer db.Close()
@@ -201,23 +179,6 @@ func TestDeleteSkill(t *testing.T) {
 	_, err = db.GetSkillByID(created.ID)
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
-	}
-}
-
-func TestGetPrivateChatSkillByName(t *testing.T) {
-	db := setupSkillTestDB(t)
-	defer db.Close()
-
-	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
-	db.CreateSkill(user.ID, nil, "Groceries", "desc", "content")
-
-	// Case-insensitive lookup
-	skill, err := db.GetPrivateChatSkillByName(user.ID, "groceries")
-	if err != nil {
-		t.Fatalf("get by name failed: %v", err)
-	}
-	if skill.Name != "Groceries" {
-		t.Errorf("expected name 'Groceries', got %q", skill.Name)
 	}
 }
 

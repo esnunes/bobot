@@ -116,19 +116,16 @@ func (s *SkillTool) create(userData auth.UserData, chatData auth.ChatData, name,
 		return "", fmt.Errorf("missing skill name. Usage: /skill create <name>")
 	}
 
-	var topicID *int64
-	if chatData.TopicID != nil {
-		if err := s.canManageTopicSkills(userData.UserID, userData.Role, *chatData.TopicID); err != nil {
-			return "", err
-		}
-		topicID = chatData.TopicID
+	topicID := *chatData.TopicID
+	if err := s.canManageTopicSkills(userData.UserID, userData.Role, topicID); err != nil {
+		return "", err
 	}
 
 	if len(content) > 4096 {
 		slog.Warn("skill content exceeds 4KB", "name", name, "size", len(content))
 	}
 
-	skill, err := s.db.CreateSkill(userData.UserID, topicID, name, description, content)
+	skill, err := s.db.CreateSkill(userData.UserID, chatData.TopicID, name, description, content)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
 			return "", fmt.Errorf("a skill named %q already exists in this scope", name)
@@ -136,7 +133,7 @@ func (s *SkillTool) create(userData auth.UserData, chatData auth.ChatData, name,
 		return "", fmt.Errorf("failed to create skill: %w", err)
 	}
 
-	s.warnIfTooManySkills(userData.UserID, topicID)
+	s.warnIfTooManySkills(topicID)
 
 	return fmt.Sprintf("Skill %q created.", skill.Name), nil
 }
@@ -147,15 +144,14 @@ func (s *SkillTool) update(userData auth.UserData, chatData auth.ChatData, name,
 		return "", fmt.Errorf("missing skill name. Usage: /skill update <name>")
 	}
 
-	skill, err := s.resolveSkill(userData, chatData, name)
+	topicID := *chatData.TopicID
+	skill, err := s.resolveSkill(topicID, name)
 	if err != nil {
 		return "", err
 	}
 
-	if chatData.TopicID != nil {
-		if err := s.canManageTopicSkills(userData.UserID, userData.Role, *chatData.TopicID); err != nil {
-			return "", err
-		}
+	if err := s.canManageTopicSkills(userData.UserID, userData.Role, topicID); err != nil {
+		return "", err
 	}
 
 	if len(content) > 4096 {
@@ -183,15 +179,14 @@ func (s *SkillTool) deleteSk(userData auth.UserData, chatData auth.ChatData, nam
 		return "", fmt.Errorf("missing skill name. Usage: /skill delete <name>")
 	}
 
-	skill, err := s.resolveSkill(userData, chatData, name)
+	topicID := *chatData.TopicID
+	skill, err := s.resolveSkill(topicID, name)
 	if err != nil {
 		return "", err
 	}
 
-	if chatData.TopicID != nil {
-		if err := s.canManageTopicSkills(userData.UserID, userData.Role, *chatData.TopicID); err != nil {
-			return "", err
-		}
+	if err := s.canManageTopicSkills(userData.UserID, userData.Role, topicID); err != nil {
+		return "", err
 	}
 
 	if err := s.db.DeleteSkill(skill.ID); err != nil {
@@ -205,11 +200,7 @@ func (s *SkillTool) list(userData auth.UserData, chatData auth.ChatData) (string
 	var skills []db.SkillRow
 	var err error
 
-	if chatData.TopicID != nil {
-		skills, err = s.db.GetTopicSkills(*chatData.TopicID)
-	} else {
-		skills, err = s.db.GetPrivateChatSkills(userData.UserID)
-	}
+	skills, err = s.db.GetTopicSkills(*chatData.TopicID)
 	if err != nil {
 		return "", fmt.Errorf("failed to list skills: %w", err)
 	}
@@ -230,30 +221,17 @@ func (s *SkillTool) list(userData auth.UserData, chatData auth.ChatData) (string
 	return sb.String(), nil
 }
 
-func (s *SkillTool) resolveSkill(userData auth.UserData, chatData auth.ChatData, name string) (*db.SkillRow, error) {
-	if chatData.TopicID != nil {
-		skill, err := s.db.GetTopicSkillByName(*chatData.TopicID, name)
-		if err == db.ErrNotFound {
-			return nil, fmt.Errorf("skill not found: %s", name)
-		}
-		return skill, err
-	}
-	skill, err := s.db.GetPrivateChatSkillByName(userData.UserID, name)
+func (s *SkillTool) resolveSkill(topicID int64, name string) (*db.SkillRow, error) {
+	skill, err := s.db.GetTopicSkillByName(topicID, name)
 	if err == db.ErrNotFound {
 		return nil, fmt.Errorf("skill not found: %s", name)
 	}
 	return skill, err
 }
 
-func (s *SkillTool) warnIfTooManySkills(userID int64, topicID *int64) {
-	var skills []db.SkillRow
-	var err error
-	if topicID != nil {
-		skills, err = s.db.GetTopicSkills(*topicID)
-	} else {
-		skills, err = s.db.GetPrivateChatSkills(userID)
-	}
+func (s *SkillTool) warnIfTooManySkills(topicID int64) {
+	skills, err := s.db.GetTopicSkills(topicID)
 	if err == nil && len(skills) > 10 {
-		slog.Warn("scope exceeds 10 skills", "userID", userID, "topicID", topicID, "count", len(skills))
+		slog.Warn("scope exceeds 10 skills", "topicID", topicID, "count", len(skills))
 	}
 }

@@ -69,9 +69,10 @@ func TestExecuteReminder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a due reminder (no topic — resolves to bobot topic)
+	// Create a due reminder with bobot topic
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateReminder(user.ID, nil, "call dentist", past)
+	tid := bobotTopic.ID
+	schedDB.CreateReminder(user.ID, &tid, "call dentist", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -188,7 +189,8 @@ func TestExecuteCronJob(t *testing.T) {
 	}
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateCronJob(user.ID, nil, "daily tasks", "summarize my tasks", "0 9 * * 1-5", past)
+	tid := bobotTopic.ID
+	schedDB.CreateCronJob(user.ID, &tid, "daily tasks", "summarize my tasks", "0 9 * * 1-5", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -268,11 +270,12 @@ func TestCoalescingMultipleMissedRuns(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
-	coreDB.CreateBobotTopic(user.ID)
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
 	// Create a cron job that missed many runs (next_run_at far in the past)
 	longPast := time.Now().UTC().Add(-24 * time.Hour)
-	schedDB.CreateCronJob(user.ID, nil, "missed job", "prompt", "0 * * * *", longPast)
+	tid := bobotTopic.ID
+	schedDB.CreateCronJob(user.ID, &tid, "missed job", "prompt", "0 * * * *", longPast)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())

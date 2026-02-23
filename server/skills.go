@@ -13,36 +13,24 @@ import (
 func (s *Server) handleSkillsPage(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 
-	topicIDStr := r.URL.Query().Get("topic_id")
-
-	var skills []db.SkillRow
-	var err error
-	var topicID int64
-	var topicName string
-
-	if topicIDStr != "" {
-		topicID, err = strconv.ParseInt(topicIDStr, 10, 64)
-		if err != nil {
-			http.Error(w, "invalid topic_id", http.StatusBadRequest)
-			return
-		}
-		isMember, memberErr := s.db.IsTopicMember(topicID, userData.UserID)
-		if memberErr != nil || !isMember {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-		topic, topicErr := s.db.GetTopicByID(topicID)
-		if topicErr != nil {
-			http.Error(w, "topic not found", http.StatusNotFound)
-			return
-		}
-		topicName = topic.Name
-		skills, err = s.db.GetTopicSkills(topicID)
-	} else {
-		skills, err = s.db.GetPrivateChatSkills(userData.UserID)
+	topicID, err := strconv.ParseInt(r.URL.Query().Get("topic_id"), 10, 64)
+	if err != nil {
+		http.Error(w, "topic_id required", http.StatusBadRequest)
+		return
+	}
+	isMember, memberErr := s.db.IsTopicMember(topicID, userData.UserID)
+	if memberErr != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	topic, topicErr := s.db.GetTopicByID(topicID)
+	if topicErr != nil {
+		http.Error(w, "topic not found", http.StatusNotFound)
+		return
 	}
 
-	if err != nil {
+	skills, skillErr := s.db.GetTopicSkills(topicID)
+	if skillErr != nil {
 		http.Error(w, "failed to load skills", http.StatusInternalServerError)
 		return
 	}
@@ -59,7 +47,7 @@ func (s *Server) handleSkillsPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "skills", PageData{
 		Title:     "Skills",
 		TopicID:   topicID,
-		TopicName: topicName,
+		TopicName: topic.Name,
 		Skills:    skillViews,
 	})
 }
