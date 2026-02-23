@@ -135,16 +135,10 @@ window.TopicChatClient = class TopicChatClient {
     }
 
     mentionBot() {
-        const currentValue = this.input.value;
         const mention = '@bobot ';
 
-        // Add mention at cursor position or append if no selection
-        if (this.input.selectionStart !== undefined) {
-            const start = this.input.selectionStart;
-            this.input.value = currentValue.slice(0, start) + mention + currentValue.slice(start);
-            this.input.selectionStart = this.input.selectionEnd = start + mention.length;
-        } else {
-            this.input.value = currentValue + mention;
+        if (!this.input.value.toLowerCase().startsWith(mention.trimEnd().toLowerCase())) {
+            this.input.value = mention + this.input.value;
         }
 
         this.input.focus();
