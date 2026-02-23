@@ -116,6 +116,9 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 	// Send push to offline topic members
 	p.pushToTopicMembers(topicID, db.BobotUserID, "Bobot", response)
 
+	// Auto-mark as read for members with auto-read enabled
+	p.autoMarkReadForTopic(topicID)
+
 	return response, nil
 }
 
@@ -128,6 +131,28 @@ func (p *ChatPipeline) broadcastToTopic(topicID int64, data []byte) {
 
 	for _, member := range members {
 		p.connections.Broadcast(member.UserID, data)
+	}
+}
+
+// autoMarkReadForTopic marks the topic as read for all members with auto-read enabled.
+func (p *ChatPipeline) autoMarkReadForTopic(topicID int64) {
+	members, err := p.db.GetTopicMembers(topicID)
+	if err != nil {
+		return
+	}
+	latestID, err := p.db.GetLatestTopicMessageID(topicID)
+	if err != nil || latestID == 0 {
+		return
+	}
+	readEvent, _ := json.Marshal(map[string]any{
+		"type":     "read",
+		"topic_id": topicID,
+	})
+	for _, member := range members {
+		if member.AutoRead {
+			p.db.MarkChatRead(member.UserID, topicID, latestID)
+			p.connections.Broadcast(member.UserID, readEvent)
+		}
 	}
 }
 

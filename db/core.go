@@ -85,6 +85,7 @@ type TopicMember struct {
 	DisplayName string
 	JoinedAt    time.Time
 	Muted       bool
+	AutoRead    bool
 }
 
 type PushSubscription struct {
@@ -445,6 +446,11 @@ func (c *CoreDB) migrate() error {
 
 	// Migrate: add muted column to topic_members
 	if err := c.addColumnIfMissing("topic_members", "muted", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Migrate: add auto_read column to topic_members
+	if err := c.addColumnIfMissing("topic_members", "auto_read", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
 
@@ -1304,7 +1310,7 @@ func (c *CoreDB) SoftDeleteTopic(topicID int64) error {
 // GetTopicMembers retrieves all members of a topic.
 func (c *CoreDB) GetTopicMembers(topicID int64) ([]TopicMember, error) {
 	rows, err := c.db.Query(`
-		SELECT u.id, u.username, u.display_name, tm.joined_at, tm.muted
+		SELECT u.id, u.username, u.display_name, tm.joined_at, tm.muted, tm.auto_read
 		FROM topic_members tm
 		JOIN users u ON tm.user_id = u.id
 		WHERE tm.topic_id = ?
@@ -1318,7 +1324,7 @@ func (c *CoreDB) GetTopicMembers(topicID int64) ([]TopicMember, error) {
 	var members []TopicMember
 	for rows.Next() {
 		var m TopicMember
-		if err := rows.Scan(&m.UserID, &m.Username, &m.DisplayName, &m.JoinedAt, &m.Muted); err != nil {
+		if err := rows.Scan(&m.UserID, &m.Username, &m.DisplayName, &m.JoinedAt, &m.Muted, &m.AutoRead); err != nil {
 			return nil, err
 		}
 		members = append(members, m)
@@ -1331,6 +1337,15 @@ func (c *CoreDB) SetTopicMemberMuted(topicID, userID int64, muted bool) error {
 	_, err := c.db.Exec(
 		"UPDATE topic_members SET muted = ? WHERE topic_id = ? AND user_id = ?",
 		muted, topicID, userID,
+	)
+	return err
+}
+
+// SetTopicMemberAutoRead sets the auto-read state for a user in a topic.
+func (c *CoreDB) SetTopicMemberAutoRead(topicID, userID int64, autoRead bool) error {
+	_, err := c.db.Exec(
+		"UPDATE topic_members SET auto_read = ? WHERE topic_id = ? AND user_id = ?",
+		autoRead, topicID, userID,
 	)
 	return err
 }
@@ -1609,7 +1624,7 @@ func (c *CoreDB) GetUnreadChats(userID int64) (bobotUnread bool, topicUnreads ma
 		SELECT t.id,
 		       COALESCE(MAX(m.id), 0) > COALESCE(crs.last_read_message_id, 0) AS has_unread
 		FROM topics t
-		JOIN topic_members tm ON tm.topic_id = t.id AND tm.user_id = ?
+		JOIN topic_members tm ON tm.topic_id = t.id AND tm.user_id = ? AND tm.auto_read = 0
 		LEFT JOIN messages m ON m.topic_id = t.id
 		LEFT JOIN chat_read_status crs ON crs.user_id = ? AND crs.topic_id = t.id
 		WHERE t.deleted_at IS NULL

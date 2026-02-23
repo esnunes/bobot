@@ -94,6 +94,26 @@ window.TopicChatClient = class TopicChatClient {
             this.mentionBotBtn.addEventListener('click', () => this.mentionBot());
         }
 
+        // Auto-read toggle
+        var autoReadBtn = document.querySelector('[data-auto-read-toggle]');
+        if (autoReadBtn) {
+            autoReadBtn.addEventListener('click', function() {
+                var topicId = autoReadBtn.getAttribute('data-topic-id');
+                var isAutoRead = autoReadBtn.getAttribute('data-auto-read') === 'true';
+                var method = isAutoRead ? 'DELETE' : 'POST';
+                autoReadBtn.disabled = true;
+                fetch('/api/topics/' + topicId + '/auto-read', { method: method })
+                    .then(function(resp) {
+                        if (resp.ok) {
+                            autoReadBtn.setAttribute('data-auto-read', isAutoRead ? 'false' : 'true');
+                            autoReadBtn.textContent = isAutoRead ? 'Enable auto-read' : 'Disable auto-read';
+                        }
+                    })
+                    .catch(function(err) { console.error('Auto-read toggle failed:', err); })
+                    .finally(function() { autoReadBtn.disabled = false; });
+            });
+        }
+
         // Unread indicator on back button
         this.handleUnreadChanged = (e) => {
             var btn = document.querySelector('button[aria-label="Chats"]');

@@ -31,3 +31,16 @@ func (s *Server) broadcastReadEvent(userID int64, topicID int64) {
 	})
 	s.connections.Broadcast(userID, readEvent)
 }
+
+// autoMarkReadForTopic marks the topic as read for all members with auto-read enabled.
+func (s *Server) autoMarkReadForTopic(topicID int64) {
+	members, err := s.db.GetTopicMembers(topicID)
+	if err != nil {
+		return
+	}
+	for _, member := range members {
+		if member.AutoRead {
+			s.markChatReadImplicit(member.UserID, topicID)
+		}
+	}
+}

@@ -149,6 +149,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 		s.broadcastToTopic(topicID, respJSON)
 
 		s.markChatReadImplicit(userID, topicID)
+		s.autoMarkReadForTopic(topicID)
 		return
 	}
 
@@ -178,6 +179,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 	}
 
 	s.markChatReadImplicit(userID, topicID)
+	s.autoMarkReadForTopic(topicID)
 }
 
 func shouldTriggerAssistant(content string) bool {
