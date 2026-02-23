@@ -11,7 +11,7 @@
 
     <footer class="chat-input">
         <form id="chat-form">
-            <button type="button" id="mention-bot-btn" class="input-action" aria-label="Mention bobot"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg></button>
+            {{if not .AutoRespond}}<button type="button" id="mention-bot-btn" class="input-action" aria-label="Mention bobot"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg></button>{{end}}
             <input type="text" id="message-input" placeholder="Message..." autocomplete="off">
             <button type="submit" class="input-action" aria-label="Send"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
         </form>
@@ -20,6 +20,7 @@
 
 <div id="menu-overlay" class="menu-overlay hidden">
     <div class="menu">
+        {{if not .AutoRespond}}
         <div id="members-list" class="members-list">
             <strong>Members:</strong>
             {{range .Members}}
@@ -27,17 +28,20 @@
             {{end}}
         </div>
         <hr>
+        {{end}}
         <button class="menu-item" data-push-toggle style="display:none">Enable notifications</button>
-        <button class="menu-item" data-mute-toggle data-topic-id="{{.TopicID}}" data-muted="{{.PushMuted}}" style="display:none">{{if .PushMuted}}Unmute topic{{else}}Mute topic{{end}}</button>
+        {{if not .AutoRespond}}<button class="menu-item" data-mute-toggle data-topic-id="{{.TopicID}}" data-muted="{{.PushMuted}}" style="display:none">{{if .PushMuted}}Unmute topic{{else}}Mute topic{{end}}</button>{{end}}
         <button class="menu-item" data-auto-read-toggle data-topic-id="{{.TopicID}}" data-auto-read="{{.AutoRead}}">{{if .AutoRead}}Disable auto-read{{else}}Enable auto-read{{end}}</button>
         {{if .IsAdmin}}<button class="menu-item" hx-get="/admin" hx-target="body">Admin</button>{{end}}
         <button class="menu-item" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">Skills</button>
         <button class="menu-item" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">Schedules</button>
+        {{if not .AutoRespond}}
         <hr>
         {{if eq .OwnerID .CurrentUserID}}
         <button id="delete-btn" class="danger-btn">Delete Topic</button>
         {{else}}
         <button id="leave-btn" class="danger-btn">Leave Topic</button>
+        {{end}}
         {{end}}
     </div>
 </div>

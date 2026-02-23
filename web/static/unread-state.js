@@ -5,8 +5,6 @@
     var unreadChatIds = new Set();
 
     function getCurrentChatId() {
-        var chatPage = document.querySelector('[data-page="chat"]');
-        if (chatPage) return 0;
         var topicPage = document.querySelector('[data-page="topic-chat"]');
         if (topicPage) return parseInt(topicPage.dataset.topicId, 10);
         return null;
@@ -32,13 +30,6 @@
     }
 
     // WebSocket event handlers — only these trigger dispatches
-    document.addEventListener('bobot:chat-message', function() {
-        if (getCurrentChatId() !== 0) {
-            unreadChatIds.add(0);
-            dispatchChanged();
-        }
-    });
-
     document.addEventListener('bobot:topic-message', function(e) {
         var topicId = e.detail.topic_id;
         if (getCurrentChatId() !== topicId) {

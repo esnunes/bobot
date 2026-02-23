@@ -131,6 +131,7 @@ type PageData struct {
 	UnreadJSON      template.JS
 	PushMuted       bool
 	AutoRead        bool
+	AutoRespond     bool
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data PageData) {
@@ -433,6 +434,7 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 	jsonData, _ := json.Marshal(map[string]any{
 		"current_user_id": userData.UserID,
 		"messages":        jsonMessages,
+		"auto_respond":    topic.AutoRespond,
 	})
 
 	s.markChatReadImplicit(userData.UserID, topicID)
@@ -456,5 +458,6 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		UnreadJSON:      buildUnreadJSON(unreads),
 		PushMuted:       pushMuted,
 		AutoRead:        autoRead,
+		AutoRespond:     topic.AutoRespond,
 	})
 }

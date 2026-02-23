@@ -65,15 +65,9 @@
             }));
             return;
         }
-        if (data.topic_id) {
-            document.dispatchEvent(new CustomEvent('bobot:topic-message', {
-                detail: data
-            }));
-        } else {
-            document.dispatchEvent(new CustomEvent('bobot:chat-message', {
-                detail: data
-            }));
-        }
+        document.dispatchEvent(new CustomEvent('bobot:topic-message', {
+            detail: data
+        }));
     }
 
     function scheduleReconnect() {
