@@ -92,6 +92,7 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 		"display_name": displayName,
 	})
 	p.broadcastToTopic(topicID, userMsgJSON)
+	p.autoMarkReadForTopic(topicID)
 
 	// Get assistant response
 	response, err := p.engine.Chat(ctx, assistant.ChatOptions{
@@ -112,12 +113,10 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 		"display_name": "bobot",
 	})
 	p.broadcastToTopic(topicID, assistantMsgJSON)
+	p.autoMarkReadForTopic(topicID)
 
 	// Send push to offline topic members
 	p.pushToTopicMembers(topicID, db.BobotUserID, "Bobot", response)
-
-	// Auto-mark as read for members with auto-read enabled
-	p.autoMarkReadForTopic(topicID)
 
 	return response, nil
 }

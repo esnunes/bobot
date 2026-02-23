@@ -132,6 +132,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 			"display_name": user.DisplayName,
 		})
 		s.broadcastToTopic(topicID, cmdMsgJSON)
+		s.autoMarkReadForTopic(topicID)
 
 		// Save system response
 		s.db.CreateTopicMessageWithContext(
@@ -169,6 +170,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 		"display_name": user.DisplayName,
 	})
 	s.broadcastToTopic(topicID, userMsgJSON)
+	s.autoMarkReadForTopic(topicID)
 
 	// Send push to offline topic members (exclude sender)
 	s.pushToTopicMembers(topicID, userID, user.DisplayName, content)
@@ -205,6 +207,7 @@ func (s *Server) handleTopicAssistantResponse(ctx context.Context, userID, topic
 		"display_name": "bobot",
 	})
 	s.broadcastToTopic(topicID, assistantMsgJSON)
+	s.autoMarkReadForTopic(topicID)
 
 	// Send push to offline topic members (exclude nobody — all members get notified for bot responses)
 	s.pushToTopicMembers(topicID, db.BobotUserID, "Bobot", response)
