@@ -530,6 +530,24 @@ func (c *CoreDB) migratePrivateChatsToTopics() error {
 		}
 	}
 
+	// Migrate orphaned private skills (topic_id IS NULL) into each user's bobot topic.
+	// This covers users who already had a bobot topic from a previous migration run.
+	_, err = c.db.Exec(`
+		UPDATE skills SET topic_id = (
+			SELECT t.id FROM topics t
+			WHERE t.name = 'bobot' AND t.owner_id = skills.user_id AND t.deleted_at IS NULL
+			LIMIT 1
+		)
+		WHERE topic_id IS NULL
+		AND EXISTS (
+			SELECT 1 FROM topics t
+			WHERE t.name = 'bobot' AND t.owner_id = skills.user_id AND t.deleted_at IS NULL
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

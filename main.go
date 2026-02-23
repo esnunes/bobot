@@ -78,6 +78,17 @@ func main() {
 	}
 	defer scheduleDB.Close()
 
+	// Migrate orphaned schedules (reminders/cron jobs with no topic) to bobot topics
+	if err := scheduleDB.MigrateOrphanedToTopics(func(userID int64) int64 {
+		topic, err := coreDB.GetUserBobotTopic(userID)
+		if err != nil || topic == nil {
+			return 0
+		}
+		return topic.ID
+	}); err != nil {
+		log.Fatalf("Failed to migrate orphaned schedules: %v", err)
+	}
+
 	// Handle subcommands
 	if len(os.Args) > 1 {
 		switch os.Args[1] {

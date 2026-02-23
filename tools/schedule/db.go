@@ -144,6 +144,68 @@ func parseNullableTime(s *string) *time.Time {
 	return &t
 }
 
+// MigrateOrphanedToTopics assigns a topic_id to any reminders or cron jobs
+// that have topic_id IS NULL by looking up each user's bobot topic.
+// The lookup function should return the bobot topic ID for a given user ID,
+// or 0 if the user has no bobot topic.
+func (s *ScheduleDB) MigrateOrphanedToTopics(getBobotTopicID func(userID int64) int64) error {
+	// Migrate pending reminders with no topic
+	rows, err := s.db.Query(`SELECT DISTINCT user_id FROM reminders WHERE topic_id IS NULL AND status = 'pending'`)
+	if err != nil {
+		return err
+	}
+	var userIDs []int64
+	for rows.Next() {
+		var uid int64
+		if err := rows.Scan(&uid); err != nil {
+			rows.Close()
+			return err
+		}
+		userIDs = append(userIDs, uid)
+	}
+	rows.Close()
+
+	for _, uid := range userIDs {
+		topicID := getBobotTopicID(uid)
+		if topicID == 0 {
+			continue
+		}
+		_, err := s.db.Exec(`UPDATE reminders SET topic_id = ? WHERE user_id = ? AND topic_id IS NULL AND status = 'pending'`, topicID, uid)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Migrate enabled cron jobs with no topic
+	rows, err = s.db.Query(`SELECT DISTINCT user_id FROM cron_jobs WHERE topic_id IS NULL AND enabled = 1`)
+	if err != nil {
+		return err
+	}
+	userIDs = userIDs[:0]
+	for rows.Next() {
+		var uid int64
+		if err := rows.Scan(&uid); err != nil {
+			rows.Close()
+			return err
+		}
+		userIDs = append(userIDs, uid)
+	}
+	rows.Close()
+
+	for _, uid := range userIDs {
+		topicID := getBobotTopicID(uid)
+		if topicID == 0 {
+			continue
+		}
+		_, err := s.db.Exec(`UPDATE cron_jobs SET topic_id = ? WHERE user_id = ? AND topic_id IS NULL AND enabled = 1`, topicID, uid)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // --- Reminders ---
 
 func (s *ScheduleDB) CreateReminder(userID int64, topicID *int64, message string, runAt time.Time) (int64, error) {
