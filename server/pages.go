@@ -3,7 +3,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"net/http"
 	"regexp"
@@ -314,13 +313,9 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	target := fmt.Sprintf("/chats/%d", topic.ID)
-	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("HX-Redirect", target)
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	http.Redirect(w, r, target, http.StatusFound)
+	target := "/chats/" + strconv.FormatInt(topic.ID, 10)
+	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+target+`"}}`)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleChatsPage(w http.ResponseWriter, r *http.Request) {
