@@ -28,7 +28,14 @@ func (s *Server) handleMessageHistory(w http.ResponseWriter, r *http.Request) {
 		limit = s.cfg.History.DefaultLimit
 	}
 
-	messages, err := s.db.GetPrivateChatMessagesBefore(userData.UserID, beforeID, limit)
+	// Resolve to user's bobot topic
+	topic, err := s.db.GetUserBobotTopic(userData.UserID)
+	if err != nil || topic == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	messages, err := s.db.GetTopicMessagesBefore(topic.ID, beforeID, limit)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -63,7 +70,14 @@ func (s *Server) handleMessageSync(w http.ResponseWriter, r *http.Request) {
 		since = minTime
 	}
 
-	messages, err := s.db.GetPrivateChatMessagesSince(userData.UserID, since)
+	// Resolve to user's bobot topic
+	topic, err := s.db.GetUserBobotTopic(userData.UserID)
+	if err != nil || topic == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	messages, err := s.db.GetTopicMessagesSince(topic.ID, since)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

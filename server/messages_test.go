@@ -29,10 +29,11 @@ func TestHandleMessageHistory(t *testing.T) {
 	}
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
-	// Create 5 messages
+	// Create 5 messages in the bobot topic
 	for i := 0; i < 5; i++ {
-		coreDB.CreateMessage(user.ID, db.BobotUserID, "user", "msg", "msg")
+		coreDB.CreateTopicMessage(bobotTopic.ID, user.ID, "user", "msg", "msg")
 	}
 
 	srv := New(cfg, coreDB)
@@ -62,12 +63,13 @@ func TestHandleMessageSync(t *testing.T) {
 	}
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
 	// Use a time in the past as the "since" point
 	since := time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
 
 	// Create a message after the "since" time
-	coreDB.CreateMessage(db.BobotUserID, user.ID, "assistant", "new message", "new message")
+	coreDB.CreateTopicMessage(bobotTopic.ID, db.BobotUserID, "assistant", "new message", "new message")
 
 	srv := New(cfg, coreDB)
 

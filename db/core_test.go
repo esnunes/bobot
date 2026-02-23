@@ -1108,37 +1108,38 @@ func TestDeleteOldSessionRevocations(t *testing.T) {
 	}
 }
 
-func TestCoreDB_MarkChatRead_PrivateChat(t *testing.T) {
+func TestCoreDB_MarkChatRead_BobotTopic(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
 	user, _ := db.CreateUser("reader", "hash")
+	bobotTopic, _ := db.CreateBobotTopic(user.ID)
 
-	// Create a private message
-	msg, _ := db.CreateMessage(user.ID, BobotUserID, "user", "hello", "hello")
+	// Create a message in the bobot topic
+	msg, _ := db.CreateTopicMessage(bobotTopic.ID, user.ID, "user", "hello", "hello")
 
 	// Before marking read, should show unread
-	bobotUnread, _, err := db.GetUnreadChats(user.ID)
+	unreads, err := db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if !bobotUnread {
-		t.Error("expected bobot chat to be unread")
+	if !unreads[bobotTopic.ID] {
+		t.Error("expected bobot topic to be unread")
 	}
 
 	// Mark as read
-	err = db.MarkChatRead(user.ID, PrivateChatTopicID, msg.ID)
+	err = db.MarkChatRead(user.ID, bobotTopic.ID, msg.ID)
 	if err != nil {
 		t.Fatalf("MarkChatRead failed: %v", err)
 	}
 
 	// After marking read, should not show unread
-	bobotUnread, _, err = db.GetUnreadChats(user.ID)
+	unreads, err = db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if bobotUnread {
-		t.Error("expected bobot chat to be read after MarkChatRead")
+	if unreads[bobotTopic.ID] {
+		t.Error("expected bobot topic to be read after MarkChatRead")
 	}
 }
 
@@ -1154,11 +1155,11 @@ func TestCoreDB_MarkChatRead_TopicChat(t *testing.T) {
 	msg, _ := db.CreateTopicMessage(topic.ID, user.ID, "user", "hello topic", "hello topic")
 
 	// Before marking read, should show unread
-	_, topicUnreads, err := db.GetUnreadChats(user.ID)
+	unreads, err := db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if !topicUnreads[topic.ID] {
+	if !unreads[topic.ID] {
 		t.Error("expected topic chat to be unread")
 	}
 
@@ -1169,11 +1170,11 @@ func TestCoreDB_MarkChatRead_TopicChat(t *testing.T) {
 	}
 
 	// After marking read, should not show unread
-	_, topicUnreads, err = db.GetUnreadChats(user.ID)
+	unreads, err = db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if topicUnreads[topic.ID] {
+	if unreads[topic.ID] {
 		t.Error("expected topic chat to be read after MarkChatRead")
 	}
 }
@@ -1183,28 +1184,29 @@ func TestCoreDB_MarkChatRead_Upsert(t *testing.T) {
 	defer db.Close()
 
 	user, _ := db.CreateUser("reader", "hash")
+	bobotTopic, _ := db.CreateBobotTopic(user.ID)
 
 	// Mark read with message ID 1
-	err := db.MarkChatRead(user.ID, PrivateChatTopicID, 1)
+	err := db.MarkChatRead(user.ID, bobotTopic.ID, 1)
 	if err != nil {
 		t.Fatalf("MarkChatRead failed: %v", err)
 	}
 
 	// Mark read again with message ID 5 (upsert)
-	err = db.MarkChatRead(user.ID, PrivateChatTopicID, 5)
+	err = db.MarkChatRead(user.ID, bobotTopic.ID, 5)
 	if err != nil {
 		t.Fatalf("MarkChatRead upsert failed: %v", err)
 	}
 
 	// Verify it was updated, not duplicated
 	var count int
-	db.db.QueryRow("SELECT COUNT(*) FROM chat_read_status WHERE user_id = ?", user.ID).Scan(&count)
+	db.db.QueryRow("SELECT COUNT(*) FROM chat_read_status WHERE user_id = ? AND topic_id = ?", user.ID, bobotTopic.ID).Scan(&count)
 	if count != 1 {
 		t.Errorf("expected 1 row, got %d", count)
 	}
 
 	var lastRead int64
-	db.db.QueryRow("SELECT last_read_message_id FROM chat_read_status WHERE user_id = ? AND topic_id IS NULL", user.ID).Scan(&lastRead)
+	db.db.QueryRow("SELECT last_read_message_id FROM chat_read_status WHERE user_id = ? AND topic_id = ?", user.ID, bobotTopic.ID).Scan(&lastRead)
 	if lastRead != 5 {
 		t.Errorf("expected last_read_message_id=5, got %d", lastRead)
 	}
@@ -1217,15 +1219,12 @@ func TestCoreDB_GetUnreadChats_NoRowsMeansRead(t *testing.T) {
 	user, _ := db.CreateUser("newuser", "hash")
 
 	// No messages, no read status — should not show unread
-	bobotUnread, topicUnreads, err := db.GetUnreadChats(user.ID)
+	unreads, err := db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if bobotUnread {
-		t.Error("expected no unread for bobot with no messages")
-	}
-	if len(topicUnreads) != 0 {
-		t.Errorf("expected no unread topics, got %d", len(topicUnreads))
+	if len(unreads) != 0 {
+		t.Errorf("expected no unreads, got %d", len(unreads))
 	}
 }
 
@@ -1234,21 +1233,22 @@ func TestCoreDB_GetUnreadChats_NewMessageAfterRead(t *testing.T) {
 	defer db.Close()
 
 	user, _ := db.CreateUser("reader", "hash")
+	bobotTopic, _ := db.CreateBobotTopic(user.ID)
 
-	// Create and read a message
-	msg1, _ := db.CreateMessage(user.ID, BobotUserID, "user", "hello", "hello")
-	db.MarkChatRead(user.ID, PrivateChatTopicID, msg1.ID)
+	// Create and read a message in the bobot topic
+	msg1, _ := db.CreateTopicMessage(bobotTopic.ID, user.ID, "user", "hello", "hello")
+	db.MarkChatRead(user.ID, bobotTopic.ID, msg1.ID)
 
 	// New message arrives from bobot
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "hi there", "hi there")
+	db.CreateTopicMessage(bobotTopic.ID, BobotUserID, "assistant", "hi there", "hi there")
 
 	// Should show unread again
-	bobotUnread, _, err := db.GetUnreadChats(user.ID)
+	unreads, err := db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if !bobotUnread {
-		t.Error("expected bobot chat to be unread after new message")
+	if !unreads[bobotTopic.ID] {
+		t.Error("expected bobot topic to be unread after new message")
 	}
 }
 

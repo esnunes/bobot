@@ -1720,18 +1720,8 @@ func (c *CoreDB) GetPushSubscriptions(userID int64) ([]PushSubscription, error) 
 	return subs, rows.Err()
 }
 
-// MarkChatRead updates the last read message ID for a user in a chat.
-// Pass PrivateChatTopicID (0) for the private Bobot chat; it maps to topic_id IS NULL internally.
+// MarkChatRead updates the last read message ID for a user in a topic.
 func (c *CoreDB) MarkChatRead(userID int64, topicID int64, messageID int64) error {
-	if topicID == PrivateChatTopicID {
-		_, err := c.db.Exec(`
-			INSERT INTO chat_read_status (user_id, topic_id, last_read_message_id)
-			VALUES (?, NULL, ?)
-			ON CONFLICT(user_id) WHERE topic_id IS NULL
-			DO UPDATE SET last_read_message_id = excluded.last_read_message_id
-		`, userID, messageID)
-		return err
-	}
 	_, err := c.db.Exec(`
 		INSERT INTO chat_read_status (user_id, topic_id, last_read_message_id)
 		VALUES (?, ?, ?)
@@ -1741,22 +1731,10 @@ func (c *CoreDB) MarkChatRead(userID int64, topicID int64, messageID int64) erro
 	return err
 }
 
-// GetUnreadChats returns the unread status for the private Bobot chat and all topic chats the user is a member of.
+// GetUnreadChats returns a map of topic IDs with unread messages for the user.
+// All chats (including the bobot topic) are tracked via topics.
 // Missing chat_read_status rows are treated as "all read" (no unread indicator).
-func (c *CoreDB) GetUnreadChats(userID int64) (bobotUnread bool, topicUnreads map[int64]bool, err error) {
-	// Check private Bobot chat
-	err = c.db.QueryRow(`
-		SELECT COALESCE(MAX(m.id), 0) > COALESCE(crs.last_read_message_id, 0)
-		FROM messages m
-		LEFT JOIN chat_read_status crs ON crs.user_id = ? AND crs.topic_id IS NULL
-		WHERE m.topic_id IS NULL
-		  AND ((m.sender_id = 0 AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = 0))
-	`, userID, userID, userID).Scan(&bobotUnread)
-	if err != nil {
-		return false, nil, err
-	}
-
-	// Check topic chats
+func (c *CoreDB) GetUnreadChats(userID int64) (map[int64]bool, error) {
 	rows, err := c.db.Query(`
 		SELECT t.id,
 		       COALESCE(MAX(m.id), 0) > COALESCE(crs.last_read_message_id, 0) AS has_unread
@@ -1768,22 +1746,22 @@ func (c *CoreDB) GetUnreadChats(userID int64) (bobotUnread bool, topicUnreads ma
 		GROUP BY t.id
 	`, userID, userID)
 	if err != nil {
-		return false, nil, err
+		return nil, err
 	}
 	defer rows.Close()
 
-	topicUnreads = make(map[int64]bool)
+	unreads := make(map[int64]bool)
 	for rows.Next() {
 		var topicID int64
 		var hasUnread bool
 		if err := rows.Scan(&topicID, &hasUnread); err != nil {
-			return false, nil, err
+			return nil, err
 		}
 		if hasUnread {
-			topicUnreads[topicID] = true
+			unreads[topicID] = true
 		}
 	}
-	return bobotUnread, topicUnreads, rows.Err()
+	return unreads, rows.Err()
 }
 
 // GetLatestPrivateMessageID returns the ID of the most recent private chat message for a user.
