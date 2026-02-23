@@ -271,8 +271,20 @@ func TestSignup_ValidInvite(t *testing.T) {
 		t.Error("invite should be marked as used")
 	}
 
-	// Verify welcome message was sent
-	messages, err := srv.db.GetPrivateChatMessages(user.ID, 10)
+	// Verify bobot topic was created
+	bobotTopic, err := srv.db.GetUserBobotTopic(user.ID)
+	if err != nil {
+		t.Fatalf("failed to get bobot topic: %v", err)
+	}
+	if bobotTopic == nil {
+		t.Fatal("expected bobot topic to be created")
+	}
+	if !bobotTopic.AutoRespond {
+		t.Error("expected bobot topic to have auto_respond enabled")
+	}
+
+	// Verify welcome message was sent in bobot topic
+	messages, err := srv.db.GetTopicRecentMessages(bobotTopic.ID, 10)
 	if err != nil {
 		t.Fatalf("failed to get messages: %v", err)
 	}
