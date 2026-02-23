@@ -333,13 +333,9 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
-	// Migrate: add case-insensitive unique index for active topic names
-	_, err = c.db.Exec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS idx_topics_name_active ON topics(LOWER(name)) WHERE deleted_at IS NULL
-	`)
-	if err != nil {
-		return err
-	}
+	// Note: idx_topics_name_active was previously created here but is now dropped below
+	// (topic names are no longer globally unique — each user has a "bobot" topic).
+	// Kept as no-op for migration ordering.
 
 	// Create user_profiles table
 	_, err = c.db.Exec(`
