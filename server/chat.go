@@ -132,7 +132,6 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 			"display_name": user.DisplayName,
 		})
 		s.broadcastToTopic(topicID, cmdMsgJSON)
-		s.autoMarkReadForTopic(topicID)
 
 		// Save system response
 		s.db.CreateTopicMessageWithContext(
@@ -150,7 +149,6 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 		s.broadcastToTopic(topicID, respJSON)
 
 		s.markChatReadImplicit(userID, topicID)
-		s.autoMarkReadForTopic(topicID)
 		return
 	}
 
@@ -170,7 +168,6 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 		"display_name": user.DisplayName,
 	})
 	s.broadcastToTopic(topicID, userMsgJSON)
-	s.autoMarkReadForTopic(topicID)
 
 	// Send push to offline topic members (exclude sender)
 	s.pushToTopicMembers(topicID, userID, user.DisplayName, content)
@@ -181,7 +178,6 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 	}
 
 	s.markChatReadImplicit(userID, topicID)
-	s.autoMarkReadForTopic(topicID)
 }
 
 func shouldTriggerAssistant(content string) bool {
@@ -207,7 +203,6 @@ func (s *Server) handleTopicAssistantResponse(ctx context.Context, userID, topic
 		"display_name": "bobot",
 	})
 	s.broadcastToTopic(topicID, assistantMsgJSON)
-	s.autoMarkReadForTopic(topicID)
 
 	// Send push to offline topic members (exclude nobody — all members get notified for bot responses)
 	s.pushToTopicMembers(topicID, db.BobotUserID, "Bobot", response)
@@ -258,6 +253,22 @@ func (s *Server) broadcastToTopic(topicID int64, data []byte) {
 
 	for _, member := range members {
 		s.connections.Broadcast(member.UserID, data)
+	}
+
+	// Auto-mark as read for members with auto-read enabled
+	var latestID int64
+	for _, member := range members {
+		if !member.AutoRead {
+			continue
+		}
+		if latestID == 0 {
+			latestID, err = s.db.GetLatestTopicMessageID(topicID)
+			if err != nil || latestID == 0 {
+				break
+			}
+		}
+		s.db.MarkChatRead(member.UserID, topicID, latestID)
+		s.broadcastReadEvent(member.UserID, topicID)
 	}
 }
 

@@ -92,7 +92,6 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 		"display_name": displayName,
 	})
 	p.broadcastToTopic(topicID, userMsgJSON)
-	p.autoMarkReadForTopic(topicID)
 
 	// Get assistant response
 	response, err := p.engine.Chat(ctx, assistant.ChatOptions{
@@ -113,7 +112,6 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 		"display_name": "bobot",
 	})
 	p.broadcastToTopic(topicID, assistantMsgJSON)
-	p.autoMarkReadForTopic(topicID)
 
 	// Send push to offline topic members
 	p.pushToTopicMembers(topicID, db.BobotUserID, "Bobot", response)
@@ -131,27 +129,25 @@ func (p *ChatPipeline) broadcastToTopic(topicID int64, data []byte) {
 	for _, member := range members {
 		p.connections.Broadcast(member.UserID, data)
 	}
-}
 
-// autoMarkReadForTopic marks the topic as read for all members with auto-read enabled.
-func (p *ChatPipeline) autoMarkReadForTopic(topicID int64) {
-	members, err := p.db.GetTopicMembers(topicID)
-	if err != nil {
-		return
-	}
-	latestID, err := p.db.GetLatestTopicMessageID(topicID)
-	if err != nil || latestID == 0 {
-		return
-	}
-	readEvent, _ := json.Marshal(map[string]any{
-		"type":     "read",
-		"topic_id": topicID,
-	})
+	// Auto-mark as read for members with auto-read enabled
+	var latestID int64
 	for _, member := range members {
-		if member.AutoRead {
-			p.db.MarkChatRead(member.UserID, topicID, latestID)
-			p.connections.Broadcast(member.UserID, readEvent)
+		if !member.AutoRead {
+			continue
 		}
+		if latestID == 0 {
+			latestID, err = p.db.GetLatestTopicMessageID(topicID)
+			if err != nil || latestID == 0 {
+				break
+			}
+		}
+		p.db.MarkChatRead(member.UserID, topicID, latestID)
+		readEvent, _ := json.Marshal(map[string]any{
+			"type":     "read",
+			"topic_id": topicID,
+		})
+		p.connections.Broadcast(member.UserID, readEvent)
 	}
 }
 
