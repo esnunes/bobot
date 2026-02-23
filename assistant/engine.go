@@ -255,48 +255,6 @@ type ContextInspection struct {
 	MaxTokens    int
 }
 
-// InspectPrivateContext builds the full LLM context for a user's private chat without calling the LLM.
-func (e *Engine) InspectPrivateContext(userID int64, role string) (*ContextInspection, error) {
-	llmTools := e.registry.ToLLMToolsForRole(role)
-
-	allSkills := append([]Skill{}, e.skills...)
-	if e.skillProvider != nil {
-		userSkills, err := e.skillProvider.GetPrivateChatSkills(userID)
-		if err == nil {
-			allSkills = append(allSkills, userSkills...)
-		}
-	}
-	systemPrompt := BuildSystemPrompt(allSkills, llmTools)
-
-	if e.profileProvider != nil {
-		profileContent, _, err := e.profileProvider.GetUserProfile(userID)
-		if err == nil && profileContent != "" {
-			systemPrompt += "\n\n## User Profile\nThe following is known about the user you are chatting with:\n<user-profile>\n" + profileContent + "\n</user-profile>"
-		}
-	}
-
-	contextMsgs, err := e.contextProvider.GetContextMessages(userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get context messages: %w", err)
-	}
-
-	totalTokens := 0
-	for _, cm := range contextMsgs {
-		raw := cm.RawContent
-		if raw == "" {
-			raw = cm.Content
-		}
-		totalTokens += len(raw) / 4
-	}
-
-	return &ContextInspection{
-		SystemPrompt: systemPrompt,
-		Messages:     contextMsgs,
-		Tools:        llmTools,
-		TotalTokens:  totalTokens,
-	}, nil
-}
-
 // InspectTopicContext builds the full LLM context for a topic chat without calling the LLM.
 func (e *Engine) InspectTopicContext(topicID int64) (*ContextInspection, error) {
 	llmTools := e.registry.ToLLMToolsForRole("user")

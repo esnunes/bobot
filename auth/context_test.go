@@ -47,19 +47,14 @@ func TestEmptyContext(t *testing.T) {
 }
 
 func TestContextWithChatData(t *testing.T) {
-	receiverID := int64(42)
 	topicID := int64(99)
 
 	ctx := context.Background()
 	ctx = ContextWithChatData(ctx, ChatData{
-		ReceiverID: &receiverID,
-		TopicID:    &topicID,
+		TopicID: &topicID,
 	})
 
 	data := ChatDataFromContext(ctx)
-	if data.ReceiverID == nil || *data.ReceiverID != 42 {
-		t.Errorf("expected receiver_id 42, got %v", data.ReceiverID)
-	}
 	if data.TopicID == nil || *data.TopicID != 99 {
 		t.Errorf("expected topic_id 99, got %v", data.TopicID)
 	}
@@ -69,7 +64,7 @@ func TestChatDataFromContext_Empty(t *testing.T) {
 	ctx := context.Background()
 
 	data := ChatDataFromContext(ctx)
-	if data.ReceiverID != nil || data.TopicID != nil {
+	if data.TopicID != nil {
 		t.Error("expected nil values from empty context")
 	}
 }
@@ -79,7 +74,7 @@ func TestChatDataWithNilFields(t *testing.T) {
 	ctx = ContextWithChatData(ctx, ChatData{})
 
 	data := ChatDataFromContext(ctx)
-	if data.ReceiverID != nil || data.TopicID != nil {
+	if data.TopicID != nil {
 		t.Error("expected nil values")
 	}
 }

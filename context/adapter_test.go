@@ -21,8 +21,8 @@ func TestCoreDBAdapter_GetContextMessages(t *testing.T) {
 	defer coreDB.Close()
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
-	coreDB.CreateMessageWithContext(user.ID, db.BobotUserID, "user", "Hello", "Hello")
-	coreDB.CreateMessageWithContext(db.BobotUserID, user.ID, "assistant", "Hi there", "Hi there")
+	coreDB.CreatePrivateMessageWithContextThreshold(user.ID, db.BobotUserID, "user", "Hello", "Hello", 1000, 4000)
+	coreDB.CreatePrivateMessageWithContextThreshold(db.BobotUserID, user.ID, "assistant", "Hi there", "Hi there", 1000, 4000)
 
 	adapter := NewCoreDBAdapter(coreDB)
 

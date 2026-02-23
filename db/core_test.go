@@ -3,7 +3,6 @@ package db
 
 import (
 	"database/sql"
-	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -164,60 +163,6 @@ func TestCoreDB_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestCoreDB_Messages(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("msguser", "hash")
-
-	// Create messages: user sends to bobot
-	msg1, err := db.CreateMessage(user.ID, BobotUserID, "user", "Hello", "Hello")
-	if err != nil {
-		t.Fatalf("failed to create message: %v", err)
-	}
-	if msg1.Content != "Hello" {
-		t.Errorf("expected content Hello, got %s", msg1.Content)
-	}
-
-	// Bobot responds to user
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi there!", "Hi there!")
-
-	// Get messages
-	messages, err := db.GetPrivateChatMessages(user.ID, 10)
-	if err != nil {
-		t.Fatalf("failed to get messages: %v", err)
-	}
-	if len(messages) != 2 {
-		t.Errorf("expected 2 messages, got %d", len(messages))
-	}
-
-	// Messages should be in chronological order
-	if messages[0].Role != "user" {
-		t.Error("first message should be from user")
-	}
-	if messages[1].Role != "assistant" {
-		t.Error("second message should be from assistant")
-	}
-}
-
-func TestCoreDB_GetMessagesLimit(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("limituser", "hash")
-
-	for i := 0; i < 5; i++ {
-		db.CreateMessage(user.ID, BobotUserID, "user", "msg", "msg")
-	}
-
-	messages, _ := db.GetPrivateChatMessages(user.ID, 3)
-	if len(messages) != 3 {
-		t.Errorf("expected 3 messages, got %d", len(messages))
-	}
-}
-
 func TestCoreDB_MessageTokenColumns(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
@@ -232,39 +177,6 @@ func TestCoreDB_MessageTokenColumns(t *testing.T) {
 	// Should get no rows error, not column missing error
 	if err != nil && err.Error() != "sql: no rows in result set" {
 		t.Errorf("expected no rows error or success, got: %v", err)
-	}
-}
-
-func TestCoreDB_CreateMessageWithTokens(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("tokenuser", "hash")
-
-	// First message starts a chunk (context_tokens = 0)
-	msg1, err := db.CreateMessageWithContext(user.ID, BobotUserID, "user", "Hello world", "Hello world")
-	if err != nil {
-		t.Fatalf("failed to create message: %v", err)
-	}
-
-	// "Hello world" = 11 chars / 4 = 2 tokens (integer division)
-	if msg1.Tokens != 2 {
-		t.Errorf("expected 2 tokens, got %d", msg1.Tokens)
-	}
-	if msg1.ContextTokens != 0 {
-		t.Errorf("first message should have context_tokens=0, got %d", msg1.ContextTokens)
-	}
-
-	// Second message continues the chunk (bobot responds to user)
-	msg2, _ := db.CreateMessageWithContext(BobotUserID, user.ID, "assistant", "Hi there, how can I help?", "Hi there, how can I help?")
-	// "Hi there, how can I help?" = 25 chars / 4 = 6 tokens
-	if msg2.Tokens != 6 {
-		t.Errorf("expected 6 tokens, got %d", msg2.Tokens)
-	}
-	// context_tokens = previous (0 + 2) + current (6) = 8
-	if msg2.ContextTokens != 8 {
-		t.Errorf("expected context_tokens=8, got %d", msg2.ContextTokens)
 	}
 }
 
@@ -359,92 +271,6 @@ func TestCoreDB_GetContextMessages(t *testing.T) {
 	}
 	if messages[0].ContextTokens != 0 {
 		t.Errorf("first context message should have context_tokens=0, got %d", messages[0].ContextTokens)
-	}
-}
-
-func TestCoreDB_GetMessagesBefore(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("pageuser", "hash")
-
-	// Create 5 messages
-	var lastID int64
-	for i := 0; i < 5; i++ {
-		msg, _ := db.CreateMessage(user.ID, BobotUserID, "user", fmt.Sprintf("msg%d", i), fmt.Sprintf("msg%d", i))
-		lastID = msg.ID
-	}
-
-	// Get 2 messages before the last one
-	messages, err := db.GetPrivateChatMessagesBefore(user.ID, lastID, 2)
-	if err != nil {
-		t.Fatalf("failed to get messages: %v", err)
-	}
-
-	if len(messages) != 2 {
-		t.Errorf("expected 2 messages, got %d", len(messages))
-	}
-
-	// Should be in DESC order (newest first of the older ones)
-	if messages[0].Content != "msg3" {
-		t.Errorf("expected msg3, got %s", messages[0].Content)
-	}
-	if messages[1].Content != "msg2" {
-		t.Errorf("expected msg2, got %s", messages[1].Content)
-	}
-}
-
-func TestCoreDB_GetMessagesSince(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("sinceuser", "hash")
-
-	// Create messages with time gaps
-	// Note: SQLite CURRENT_TIMESTAMP has second precision, so we need >1s gap
-	db.CreateMessage(user.ID, BobotUserID, "user", "old message", "old message")
-	time.Sleep(1100 * time.Millisecond)
-
-	since := time.Now()
-	time.Sleep(1100 * time.Millisecond)
-
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "new message 1", "new message 1")
-	db.CreateMessage(user.ID, BobotUserID, "user", "new message 2", "new message 2")
-
-	messages, err := db.GetPrivateChatMessagesSince(user.ID, since)
-	if err != nil {
-		t.Fatalf("failed to get messages: %v", err)
-	}
-
-	if len(messages) != 2 {
-		t.Errorf("expected 2 messages, got %d", len(messages))
-	}
-}
-
-func TestCoreDB_GetRecentMessagesIncludesTokens(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("recentuser", "hash")
-
-	// Create message with context tracking
-	db.CreateMessageWithContext(user.ID, BobotUserID, "user", "Hello world", "Hello world")
-
-	messages, err := db.GetPrivateChatRecentMessages(user.ID, 10)
-	if err != nil {
-		t.Fatalf("failed to get messages: %v", err)
-	}
-
-	if len(messages) != 1 {
-		t.Fatalf("expected 1 message, got %d", len(messages))
-	}
-
-	// Tokens should be populated
-	if messages[0].Tokens != 2 { // "Hello world" = 11 chars / 4 = 2
-		t.Errorf("expected tokens=2, got %d", messages[0].Tokens)
 	}
 }
 
@@ -1017,11 +843,12 @@ func TestCoreDB_GetUserMessagesSince(t *testing.T) {
 	defer db.Close()
 
 	user, _ := db.CreateUser("msguser", "hash")
+	bobotTopic, _ := db.CreateBobotTopic(user.ID)
 
 	// Create mixed messages
-	msg1, _ := db.CreateMessage(user.ID, BobotUserID, "user", "Hello", "Hello")        // user msg
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi!", "Hi!")                  // assistant msg
-	msg3, _ := db.CreateMessage(user.ID, BobotUserID, "user", "How are you?", "How are you?") // user msg
+	msg1, _ := db.CreateTopicMessage(bobotTopic.ID, user.ID, "user", "Hello", "Hello")        // user msg
+	db.CreateTopicMessage(bobotTopic.ID, BobotUserID, "assistant", "Hi!", "Hi!")               // assistant msg
+	msg3, _ := db.CreateTopicMessage(bobotTopic.ID, user.ID, "user", "How are you?", "How are you?") // user msg
 
 	// Get messages since before all messages
 	msgs, err := db.GetUserMessagesSince(user.ID, 0)
@@ -1249,34 +1076,6 @@ func TestCoreDB_GetUnreadChats_NewMessageAfterRead(t *testing.T) {
 	}
 	if !unreads[bobotTopic.ID] {
 		t.Error("expected bobot topic to be unread after new message")
-	}
-}
-
-func TestCoreDB_GetLatestPrivateMessageID(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	user, _ := db.CreateUser("reader", "hash")
-
-	// No messages
-	id, err := db.GetLatestPrivateMessageID(user.ID)
-	if err != nil {
-		t.Fatalf("GetLatestPrivateMessageID failed: %v", err)
-	}
-	if id != 0 {
-		t.Errorf("expected 0 for no messages, got %d", id)
-	}
-
-	// Create messages
-	db.CreateMessage(user.ID, BobotUserID, "user", "first", "first")
-	msg2, _ := db.CreateMessage(BobotUserID, user.ID, "assistant", "second", "second")
-
-	id, err = db.GetLatestPrivateMessageID(user.ID)
-	if err != nil {
-		t.Fatalf("GetLatestPrivateMessageID failed: %v", err)
-	}
-	if id != msg2.ID {
-		t.Errorf("expected %d, got %d", msg2.ID, id)
 	}
 }
 

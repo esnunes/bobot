@@ -25,8 +25,7 @@ func UserDataFromContext(ctx context.Context) UserData {
 type chatDataKey struct{}
 
 type ChatData struct {
-	ReceiverID *int64
-	TopicID    *int64
+	TopicID *int64
 }
 
 // ContextWithChatData returns a new context with the chat data stored.

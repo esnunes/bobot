@@ -17,10 +17,6 @@ var ErrNotFound = errors.New("not found")
 // This user is created during migration with ID 0.
 const BobotUserID = int64(0)
 
-// PrivateChatTopicID is the sentinel value for the private Bobot chat.
-// In the chat_read_status table, this maps to topic_id IS NULL.
-const PrivateChatTopicID = int64(0)
-
 const WelcomeMessage = `
 👋 Olá! Seja muito bem-vindo(a)!
 
@@ -471,6 +467,11 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Cleanup: drop old private chat indexes (data has been migrated to topics)
+	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_private_chat`)
+	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_context`)
+	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_chat_read_status_private`)
+
 	return nil
 }
 
@@ -706,90 +707,6 @@ func (c *CoreDB) UserCount() (int, error) {
 	return count, err
 }
 
-func (c *CoreDB) CreateMessage(senderID, receiverID int64, role, content, rawContent string) (*Message, error) {
-	result, err := c.db.Exec(
-		"INSERT INTO messages (sender_id, receiver_id, role, content, raw_content) VALUES (?, ?, ?, ?, ?)",
-		senderID, receiverID, role, content, rawContent,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	id, _ := result.LastInsertId()
-	return &Message{
-		ID:         id,
-		SenderID:   senderID,
-		ReceiverID: &receiverID,
-		Role:       role,
-		Content:    content,
-		RawContent: rawContent,
-		CreatedAt:  time.Now(),
-	}, nil
-}
-
-func (c *CoreDB) CreateMessageWithContext(senderID, receiverID int64, role, content, rawContent string) (*Message, error) {
-	tokens := len(rawContent) / 4
-
-	// Get the latest message's context state for this private chat (bidirectional)
-	var prevContextTokens, prevTokens int
-	err := c.db.QueryRow(`
-		SELECT tokens, context_tokens FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
-		ORDER BY id DESC LIMIT 1
-	`, senderID, receiverID, receiverID, senderID).Scan(&prevTokens, &prevContextTokens)
-
-	var contextTokens int
-	if err == sql.ErrNoRows {
-		// First message - starts a new chunk
-		contextTokens = 0
-	} else if err != nil {
-		return nil, err
-	} else {
-		// Continue the chunk
-		contextTokens = prevContextTokens + prevTokens + tokens
-	}
-
-	result, err := c.db.Exec(
-		"INSERT INTO messages (sender_id, receiver_id, role, content, raw_content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		senderID, receiverID, role, content, rawContent, tokens, contextTokens,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	id, _ := result.LastInsertId()
-	return &Message{
-		ID:            id,
-		SenderID:      senderID,
-		ReceiverID:    &receiverID,
-		Role:          role,
-		Content:       content,
-		RawContent:    rawContent,
-		Tokens:        tokens,
-		ContextTokens: contextTokens,
-		CreatedAt:     time.Now(),
-	}, nil
-}
-
-// GetPrivateChatMessages returns messages for a private chat between a user and Bobot.
-func (c *CoreDB) GetPrivateChatMessages(userID int64, limit int) ([]Message, error) {
-	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
-		FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-		ORDER BY id ASC
-		LIMIT ?
-	`, userID, userID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return c.scanMessages(rows)
-}
-
 func (c *CoreDB) scanMessages(rows *sql.Rows) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
@@ -807,28 +724,6 @@ func (c *CoreDB) scanMessages(rows *sql.Rows) ([]Message, error) {
 		messages = append(messages, m)
 	}
 	return messages, rows.Err()
-}
-
-// GetPrivateChatRecentMessages returns the most recent messages for a private chat.
-func (c *CoreDB) GetPrivateChatRecentMessages(userID int64, limit int) ([]Message, error) {
-	// Get the most recent N messages, but return in chronological order
-	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at FROM (
-			SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
-			FROM messages
-			WHERE topic_id IS NULL
-			  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-			  AND content != ''
-			ORDER BY id DESC
-			LIMIT ?
-		) ORDER BY id ASC
-	`, userID, userID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return c.scanMessages(rows)
 }
 
 // CreatePrivateMessageWithContextThreshold creates a private message with context window management.
@@ -977,45 +872,6 @@ func (c *CoreDB) GetPrivateChatContextMessages(userID int64) ([]Message, error) 
 		  AND role IN ('user', 'assistant')
 		ORDER BY id ASC
 	`, userID, userID, chunkStartID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return c.scanMessages(rows)
-}
-
-// GetPrivateChatMessagesBefore returns messages before a given ID for a private chat.
-func (c *CoreDB) GetPrivateChatMessagesBefore(userID, beforeID int64, limit int) ([]Message, error) {
-	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
-		FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-		  AND id < ?
-		  AND content != ''
-		ORDER BY id DESC
-		LIMIT ?
-	`, userID, userID, beforeID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return c.scanMessages(rows)
-}
-
-// GetPrivateChatMessagesSince returns messages since a given time for a private chat.
-func (c *CoreDB) GetPrivateChatMessagesSince(userID int64, since time.Time) ([]Message, error) {
-	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
-		FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-		  AND created_at > ?
-		  AND content != ''
-		ORDER BY id ASC
-	`, userID, userID, since.UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -1191,12 +1047,12 @@ func (c *CoreDB) UpsertUserProfile(userID int64, content string, lastMessageID i
 	return err
 }
 
-// GetUserMessagesSince returns user-role private messages sent by a user since a given message ID.
+// GetUserMessagesSince returns user-role messages sent by a user since a given message ID.
 func (c *CoreDB) GetUserMessagesSince(userID int64, sinceMessageID int64) ([]Message, error) {
 	rows, err := c.db.Query(`
 		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
-		WHERE sender_id = ? AND role = 'user' AND topic_id IS NULL AND id > ?
+		WHERE sender_id = ? AND role = 'user' AND id > ?
 		ORDER BY id ASC
 	`, userID, sinceMessageID)
 	if err != nil {
@@ -1764,17 +1620,6 @@ func (c *CoreDB) GetUnreadChats(userID int64) (map[int64]bool, error) {
 	return unreads, rows.Err()
 }
 
-// GetLatestPrivateMessageID returns the ID of the most recent private chat message for a user.
-func (c *CoreDB) GetLatestPrivateMessageID(userID int64) (int64, error) {
-	var id int64
-	err := c.db.QueryRow(`
-		SELECT COALESCE(MAX(id), 0) FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = 0 AND receiver_id = ?) OR (sender_id = ? AND receiver_id = 0))
-	`, userID, userID).Scan(&id)
-	return id, err
-}
-
 // GetLatestTopicMessageID returns the ID of the most recent message in a topic.
 func (c *CoreDB) GetLatestTopicMessageID(topicID int64) (int64, error) {
 	var id int64
@@ -1789,21 +1634,6 @@ type ReadPosition struct {
 	UserID      int64
 	DisplayName string
 	LastReadID  int64
-}
-
-// GetPrivateChatReadPosition returns the last_read_message_id for a user's private chat with Bobot.
-// Returns 0 if no row exists (user has never opened the chat).
-func (c *CoreDB) GetPrivateChatReadPosition(userID int64) (int64, error) {
-	var id int64
-	err := c.db.QueryRow(`
-		SELECT COALESCE(last_read_message_id, 0)
-		FROM chat_read_status
-		WHERE user_id = ? AND topic_id IS NULL
-	`, userID).Scan(&id)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	return id, err
 }
 
 // GetTopicReadPositions returns read positions for all members of a topic,

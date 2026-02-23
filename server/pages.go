@@ -165,12 +165,6 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["signup"] = signupTmpl
 
-	chatTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/chat.html")
-	if err != nil {
-		return err
-	}
-	s.templates["chat"] = chatTmpl
-
 	chatsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/chats.html")
 	if err != nil {
 		return err

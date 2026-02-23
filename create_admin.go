@@ -45,6 +45,11 @@ func runCreateAdmin(coreDB *db.CoreDB) {
 		log.Fatalf("Failed to create admin user: %v", err)
 	}
 
-	coreDB.CreateMessage(db.BobotUserID, user.ID, "assistant", db.WelcomeMessage, db.WelcomeMessage)
+	bobotTopic, err := coreDB.CreateBobotTopic(user.ID)
+	if err != nil {
+		log.Printf("Warning: failed to create bobot topic: %v", err)
+	} else {
+		coreDB.CreateTopicMessageWithContext(bobotTopic.ID, db.BobotUserID, "assistant", db.WelcomeMessage, db.WelcomeMessage, 0, 0)
+	}
 	log.Printf("Created admin user: %s", username)
 }
