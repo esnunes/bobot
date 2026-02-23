@@ -72,11 +72,12 @@ type Invite struct {
 }
 
 type Topic struct {
-	ID        int64
-	Name      string
-	OwnerID   int64
-	DeletedAt *time.Time
-	CreatedAt time.Time
+	ID          int64
+	Name        string
+	OwnerID     int64
+	AutoRespond bool
+	DeletedAt   *time.Time
+	CreatedAt   time.Time
 }
 
 type TopicMember struct {
@@ -451,6 +452,11 @@ func (c *CoreDB) migrate() error {
 
 	// Migrate: add auto_read column to topic_members
 	if err := c.addColumnIfMissing("topic_members", "auto_read", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Migrate: add auto_respond column to topics
+	if err := c.addColumnIfMissing("topics", "auto_respond", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
 
@@ -1206,9 +1212,9 @@ func (c *CoreDB) GetTopicByID(id int64) (*Topic, error) {
 	var topic Topic
 	var deletedAt sql.NullTime
 	err := c.db.QueryRow(
-		"SELECT id, name, owner_id, deleted_at, created_at FROM topics WHERE id = ? AND deleted_at IS NULL",
+		"SELECT id, name, owner_id, auto_respond, deleted_at, created_at FROM topics WHERE id = ? AND deleted_at IS NULL",
 		id,
-	).Scan(&topic.ID, &topic.Name, &topic.OwnerID, &deletedAt, &topic.CreatedAt)
+	).Scan(&topic.ID, &topic.Name, &topic.OwnerID, &topic.AutoRespond, &deletedAt, &topic.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -1272,7 +1278,7 @@ func (c *CoreDB) ListAllTopics() ([]Topic, error) {
 
 func (c *CoreDB) GetUserTopics(userID int64) ([]Topic, error) {
 	rows, err := c.db.Query(`
-		SELECT t.id, t.name, t.owner_id, t.deleted_at, t.created_at
+		SELECT t.id, t.name, t.owner_id, t.auto_respond, t.deleted_at, t.created_at
 		FROM topics t
 		JOIN topic_members tm ON t.id = tm.topic_id
 		WHERE tm.user_id = ? AND t.deleted_at IS NULL
@@ -1287,7 +1293,7 @@ func (c *CoreDB) GetUserTopics(userID int64) ([]Topic, error) {
 	for rows.Next() {
 		var t Topic
 		var deletedAt sql.NullTime
-		if err := rows.Scan(&t.ID, &t.Name, &t.OwnerID, &deletedAt, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.OwnerID, &t.AutoRespond, &deletedAt, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		if deletedAt.Valid {
