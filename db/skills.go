@@ -11,25 +11,20 @@ type SkillRow struct {
 	Description string
 	Content     string
 	UserID      int64
-	TopicID     *int64
+	TopicID     int64
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
 
-func (c *CoreDB) CreateSkill(userID int64, topicID *int64, name, description, content string) (*SkillRow, error) {
-	var result sql.Result
-	var err error
-	if topicID != nil {
-		result, err = c.db.Exec(
-			"INSERT INTO skills (user_id, topic_id, name, description, content) VALUES (?, ?, ?, ?, ?)",
-			userID, *topicID, name, description, content,
-		)
-	} else {
-		result, err = c.db.Exec(
-			"INSERT INTO skills (user_id, name, description, content) VALUES (?, ?, ?, ?)",
-			userID, name, description, content,
-		)
+func (c *CoreDB) CreateSkill(userID, topicID int64, name, description, content string) (*SkillRow, error) {
+	var dbTopicID any = topicID
+	if topicID == 0 {
+		dbTopicID = nil
 	}
+	result, err := c.db.Exec(
+		"INSERT INTO skills (user_id, topic_id, name, description, content) VALUES (?, ?, ?, ?, ?)",
+		userID, dbTopicID, name, description, content,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -60,9 +55,7 @@ func (c *CoreDB) GetSkillByID(id int64) (*SkillRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	if topicID.Valid {
-		s.TopicID = &topicID.Int64
-	}
+	s.TopicID = topicID.Int64
 	return &s, nil
 }
 
@@ -91,9 +84,7 @@ func (c *CoreDB) GetTopicSkillByName(topicID int64, name string) (*SkillRow, err
 	if err != nil {
 		return nil, err
 	}
-	if tid.Valid {
-		s.TopicID = &tid.Int64
-	}
+	s.TopicID = tid.Int64
 	return &s, nil
 }
 
@@ -118,9 +109,7 @@ func (c *CoreDB) scanSkills(rows *sql.Rows) ([]SkillRow, error) {
 		if err := rows.Scan(&s.ID, &s.Name, &s.Description, &s.Content, &s.UserID, &topicID, &s.CreatedAt, &s.UpdatedAt); err != nil {
 			return nil, err
 		}
-		if topicID.Valid {
-			s.TopicID = &topicID.Int64
-		}
+		s.TopicID = topicID.Int64
 		skills = append(skills, s)
 	}
 	return skills, rows.Err()

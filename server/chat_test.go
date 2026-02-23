@@ -214,15 +214,11 @@ func TestTopicMessage(t *testing.T) {
 	// This test verifies the message struct accepts topic_id
 	msg := chatMessage{
 		Content: "Hello",
-		TopicID: ptr(int64(5)),
+		TopicID: 5,
 	}
-	if msg.TopicID == nil || *msg.TopicID != 5 {
+	if msg.TopicID != 5 {
 		t.Error("expected topic_id to be 5")
 	}
-}
-
-func ptr[T any](v T) *T {
-	return &v
 }
 
 func TestWebSocket_SessionCookieAuth(t *testing.T) {

@@ -25,7 +25,7 @@ var upgrader = websocket.Upgrader{
 
 type chatMessage struct {
 	Content string `json:"content"`
-	TopicID *int64 `json:"topic_id"`
+	TopicID int64  `json:"topic_id"`
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -55,18 +55,18 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Resolve null topic_id to user's bobot topic
+		// Resolve zero topic_id to user's bobot topic
 		topicID := msg.TopicID
-		if topicID == nil {
+		if topicID == 0 {
 			bobotTopic, err := s.db.GetUserBobotTopic(userData.UserID)
 			if err != nil || bobotTopic == nil {
 				log.Printf("failed to resolve bobot topic for user %d: %v", userData.UserID, err)
 				continue
 			}
-			topicID = &bobotTopic.ID
+			topicID = bobotTopic.ID
 		}
 
-		s.handleTopicChatMessage(ctx, userData.UserID, *topicID, msg.Content)
+		s.handleTopicChatMessage(ctx, userData.UserID, topicID, msg.Content)
 	}
 }
 
@@ -265,7 +265,7 @@ func (s *Server) handleSlashCommand(ctx context.Context, content string, topicID
 
 	// Inject chat context (TopicID) into Go context
 	ctx = auth.ContextWithChatData(ctx, auth.ChatData{
-		TopicID: &topicID,
+		TopicID: topicID,
 	})
 
 	// Execute the tool

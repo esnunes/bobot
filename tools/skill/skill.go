@@ -116,7 +116,7 @@ func (s *SkillTool) create(userData auth.UserData, chatData auth.ChatData, name,
 		return "", fmt.Errorf("missing skill name. Usage: /skill create <name>")
 	}
 
-	topicID := *chatData.TopicID
+	topicID := chatData.TopicID
 	if err := s.canManageTopicSkills(userData.UserID, userData.Role, topicID); err != nil {
 		return "", err
 	}
@@ -144,7 +144,7 @@ func (s *SkillTool) update(userData auth.UserData, chatData auth.ChatData, name,
 		return "", fmt.Errorf("missing skill name. Usage: /skill update <name>")
 	}
 
-	topicID := *chatData.TopicID
+	topicID := chatData.TopicID
 	skill, err := s.resolveSkill(topicID, name)
 	if err != nil {
 		return "", err
@@ -179,7 +179,7 @@ func (s *SkillTool) deleteSk(userData auth.UserData, chatData auth.ChatData, nam
 		return "", fmt.Errorf("missing skill name. Usage: /skill delete <name>")
 	}
 
-	topicID := *chatData.TopicID
+	topicID := chatData.TopicID
 	skill, err := s.resolveSkill(topicID, name)
 	if err != nil {
 		return "", err
@@ -200,7 +200,7 @@ func (s *SkillTool) list(userData auth.UserData, chatData auth.ChatData) (string
 	var skills []db.SkillRow
 	var err error
 
-	skills, err = s.db.GetTopicSkills(*chatData.TopicID)
+	skills, err = s.db.GetTopicSkills(chatData.TopicID)
 	if err != nil {
 		return "", fmt.Errorf("failed to list skills: %w", err)
 	}

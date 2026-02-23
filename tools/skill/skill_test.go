@@ -29,7 +29,7 @@ func ctxForUser(userID int64, role string) context.Context {
 
 func ctxForUserInTopic(userID int64, role string, topicID int64) context.Context {
 	ctx := ctxForUser(userID, role)
-	return auth.ContextWithChatData(ctx, auth.ChatData{TopicID: &topicID})
+	return auth.ContextWithChatData(ctx, auth.ChatData{TopicID: topicID})
 }
 
 func TestSkillTool_Interface(t *testing.T) {

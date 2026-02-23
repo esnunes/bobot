@@ -72,7 +72,7 @@ func TestExecuteReminder(t *testing.T) {
 	// Create a due reminder with bobot topic
 	past := time.Now().UTC().Add(-5 * time.Minute)
 	tid := bobotTopic.ID
-	schedDB.CreateReminder(user.ID, &tid, "call dentist", past)
+	schedDB.CreateReminder(user.ID, tid, "call dentist", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -114,7 +114,7 @@ func TestExecuteReminderInTopic(t *testing.T) {
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
 	tid := topic.ID
-	schedDB.CreateReminder(user.ID, &tid, "topic reminder", past)
+	schedDB.CreateReminder(user.ID, tid, "topic reminder", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -139,7 +139,7 @@ func TestExecuteReminderBlockedUser(t *testing.T) {
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
 	tid := bobotTopic.ID
-	schedDB.CreateReminder(user.ID, &tid, "should not execute", past)
+	schedDB.CreateReminder(user.ID, tid, "should not execute", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -166,7 +166,7 @@ func TestExecuteReminderDeletedTopic(t *testing.T) {
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
 	tid := topic.ID
-	schedDB.CreateReminder(user.ID, &tid, "should not execute", past)
+	schedDB.CreateReminder(user.ID, tid, "should not execute", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -192,7 +192,7 @@ func TestExecuteCronJob(t *testing.T) {
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
 	tid := bobotTopic.ID
-	schedDB.CreateCronJob(user.ID, &tid, "daily tasks", "summarize my tasks", "0 9 * * 1-5", past)
+	schedDB.CreateCronJob(user.ID, tid, "daily tasks", "summarize my tasks", "0 9 * * 1-5", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -217,7 +217,7 @@ func TestExecuteCronJobBlockedUser(t *testing.T) {
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
 	tid := bobotTopic.ID
-	schedDB.CreateCronJob(user.ID, &tid, "job", "prompt", "0 9 * * *", past)
+	schedDB.CreateCronJob(user.ID, tid, "job", "prompt", "0 9 * * *", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -241,7 +241,7 @@ func TestExecuteReminderFailed(t *testing.T) {
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
 	tid := bobotTopic.ID
-	schedDB.CreateReminder(user.ID, &tid, "will fail", past)
+	schedDB.CreateReminder(user.ID, tid, "will fail", past)
 
 	pipeline.failNext = true
 
@@ -262,8 +262,8 @@ func TestFutureItemsNotExecuted(t *testing.T) {
 
 	future := time.Now().UTC().Add(1 * time.Hour)
 	tid := bobotTopic.ID
-	schedDB.CreateReminder(user.ID, &tid, "future reminder", future)
-	schedDB.CreateCronJob(user.ID, &tid, "future job", "prompt", "0 9 * * *", future)
+	schedDB.CreateReminder(user.ID, tid, "future reminder", future)
+	schedDB.CreateCronJob(user.ID, tid, "future job", "prompt", "0 9 * * *", future)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -282,7 +282,7 @@ func TestCoalescingMultipleMissedRuns(t *testing.T) {
 	// Create a cron job that missed many runs (next_run_at far in the past)
 	longPast := time.Now().UTC().Add(-24 * time.Hour)
 	tid := bobotTopic.ID
-	schedDB.CreateCronJob(user.ID, &tid, "missed job", "prompt", "0 * * * *", longPast)
+	schedDB.CreateCronJob(user.ID, tid, "missed job", "prompt", "0 * * * *", longPast)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())

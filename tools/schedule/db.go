@@ -15,7 +15,7 @@ var ErrNotFound = errors.New("not found")
 type Reminder struct {
 	ID         int64
 	UserID     int64
-	TopicID    *int64
+	TopicID    int64
 	Message    string
 	RunAt      time.Time
 	Status     string // pending, executed, failed, cancelled
@@ -28,7 +28,7 @@ type Reminder struct {
 type CronJob struct {
 	ID        int64
 	UserID    int64
-	TopicID   *int64
+	TopicID   int64
 	Name      string
 	Prompt    string
 	CronExpr  string
@@ -208,7 +208,7 @@ func (s *ScheduleDB) MigrateOrphanedToTopics(getBobotTopicID func(userID int64) 
 
 // --- Reminders ---
 
-func (s *ScheduleDB) CreateReminder(userID int64, topicID *int64, message string, runAt time.Time) (int64, error) {
+func (s *ScheduleDB) CreateReminder(userID, topicID int64, message string, runAt time.Time) (int64, error) {
 	result, err := s.db.Exec(
 		"INSERT INTO reminders (user_id, topic_id, message, run_at) VALUES (?, ?, ?, ?)",
 		userID, topicID, message, formatTime(runAt),
@@ -221,18 +221,20 @@ func (s *ScheduleDB) CreateReminder(userID int64, topicID *int64, message string
 
 func (s *ScheduleDB) GetReminder(id int64) (*Reminder, error) {
 	var r Reminder
+	var topicID sql.NullInt64
 	var runAt, createdAt, updatedAt string
 	var executedAt, errStr *string
 	err := s.db.QueryRow(
 		"SELECT id, user_id, topic_id, message, run_at, status, executed_at, error, created_at, updated_at FROM reminders WHERE id = ?",
 		id,
-	).Scan(&r.ID, &r.UserID, &r.TopicID, &r.Message, &runAt, &r.Status, &executedAt, &errStr, &createdAt, &updatedAt)
+	).Scan(&r.ID, &r.UserID, &topicID, &r.Message, &runAt, &r.Status, &executedAt, &errStr, &createdAt, &updatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
+	r.TopicID = topicID.Int64
 	r.RunAt, _ = parseTime(runAt)
 	r.CreatedAt, _ = parseTime(createdAt)
 	r.UpdatedAt, _ = parseTime(updatedAt)
@@ -311,7 +313,7 @@ func (s *ScheduleDB) MarkReminderFailed(id int64, errMsg string) error {
 
 // --- Cron Jobs ---
 
-func (s *ScheduleDB) CreateCronJob(userID int64, topicID *int64, name, prompt, cronExpr string, nextRunAt time.Time) (int64, error) {
+func (s *ScheduleDB) CreateCronJob(userID, topicID int64, name, prompt, cronExpr string, nextRunAt time.Time) (int64, error) {
 	result, err := s.db.Exec(
 		"INSERT INTO cron_jobs (user_id, topic_id, name, prompt, cron_expr, next_run_at) VALUES (?, ?, ?, ?, ?, ?)",
 		userID, topicID, name, prompt, cronExpr, formatTime(nextRunAt),
@@ -324,18 +326,20 @@ func (s *ScheduleDB) CreateCronJob(userID int64, topicID *int64, name, prompt, c
 
 func (s *ScheduleDB) GetCronJob(id int64) (*CronJob, error) {
 	var j CronJob
+	var topicID sql.NullInt64
 	var nextRunAt, createdAt, updatedAt string
 	var enabled int
 	err := s.db.QueryRow(
 		"SELECT id, user_id, topic_id, name, prompt, cron_expr, enabled, next_run_at, created_at, updated_at FROM cron_jobs WHERE id = ?",
 		id,
-	).Scan(&j.ID, &j.UserID, &j.TopicID, &j.Name, &j.Prompt, &j.CronExpr, &enabled, &nextRunAt, &createdAt, &updatedAt)
+	).Scan(&j.ID, &j.UserID, &topicID, &j.Name, &j.Prompt, &j.CronExpr, &enabled, &nextRunAt, &createdAt, &updatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
+	j.TopicID = topicID.Int64
 	j.Enabled = enabled == 1
 	j.NextRunAt, _ = parseTime(nextRunAt)
 	j.CreatedAt, _ = parseTime(createdAt)
@@ -484,11 +488,13 @@ func scanReminders(rows *sql.Rows) ([]Reminder, error) {
 	var reminders []Reminder
 	for rows.Next() {
 		var r Reminder
+		var topicID sql.NullInt64
 		var runAt, createdAt, updatedAt string
 		var executedAt, errStr *string
-		if err := rows.Scan(&r.ID, &r.UserID, &r.TopicID, &r.Message, &runAt, &r.Status, &executedAt, &errStr, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.UserID, &topicID, &r.Message, &runAt, &r.Status, &executedAt, &errStr, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
+		r.TopicID = topicID.Int64
 		r.RunAt, _ = parseTime(runAt)
 		r.CreatedAt, _ = parseTime(createdAt)
 		r.UpdatedAt, _ = parseTime(updatedAt)
@@ -503,11 +509,13 @@ func scanCronJobs(rows *sql.Rows) ([]CronJob, error) {
 	var jobs []CronJob
 	for rows.Next() {
 		var j CronJob
+		var topicID sql.NullInt64
 		var nextRunAt, createdAt, updatedAt string
 		var enabled int
-		if err := rows.Scan(&j.ID, &j.UserID, &j.TopicID, &j.Name, &j.Prompt, &j.CronExpr, &enabled, &nextRunAt, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&j.ID, &j.UserID, &topicID, &j.Name, &j.Prompt, &j.CronExpr, &enabled, &nextRunAt, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
+		j.TopicID = topicID.Int64
 		j.Enabled = enabled == 1
 		j.NextRunAt, _ = parseTime(nextRunAt)
 		j.CreatedAt, _ = parseTime(createdAt)

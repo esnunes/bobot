@@ -132,7 +132,7 @@ func (e *Engine) Chat(ctx context.Context, opts ChatOptions) (string, error) {
 	})
 
 	// Set ChatData for tool calls
-	ctx = auth.ContextWithChatData(ctx, auth.ChatData{TopicID: &opts.TopicID})
+	ctx = auth.ContextWithChatData(ctx, auth.ChatData{TopicID: opts.TopicID})
 
 	// Helper to save messages
 	save := func(role, content, rawContent string) {

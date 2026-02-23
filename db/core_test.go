@@ -534,7 +534,7 @@ func TestCreateTopicMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTopicMessage failed: %v", err)
 	}
-	if msg.TopicID == nil || *msg.TopicID != topic.ID {
+	if msg.TopicID != topic.ID {
 		t.Error("expected topic_id to be set")
 	}
 	if msg.Content != "Hello topic!" {

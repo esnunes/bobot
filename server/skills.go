@@ -91,8 +91,8 @@ func (s *Server) handleSkillFormPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if skill.TopicID != nil {
-			topicID = *skill.TopicID
+		if skill.TopicID != 0 {
+			topicID = skill.TopicID
 		}
 
 		s.render(w, "skill_form", PageData{
@@ -133,7 +133,7 @@ func (s *Server) handleCreateSkillForm(w http.ResponseWriter, r *http.Request) {
 	content := r.FormValue("content")
 	topicIDStr := r.FormValue("topic_id")
 
-	var topicID *int64
+	var topicID int64
 	redirectPath := "/skills"
 
 	if topicIDStr != "" {
@@ -146,7 +146,7 @@ func (s *Server) handleCreateSkillForm(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}
-		topicID = &tid
+		topicID = tid
 		redirectPath = fmt.Sprintf("/skills?topic_id=%d", tid)
 	}
 
@@ -202,8 +202,8 @@ func (s *Server) handleUpdateSkillForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redirectPath := "/skills"
-	if skill.TopicID != nil {
-		redirectPath = fmt.Sprintf("/skills?topic_id=%d", *skill.TopicID)
+	if skill.TopicID != 0 {
+		redirectPath = fmt.Sprintf("/skills?topic_id=%d", skill.TopicID)
 	}
 
 	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+redirectPath+`"}}`)
@@ -240,8 +240,8 @@ func (s *Server) handleDeleteSkillForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redirectPath := "/skills"
-	if skill.TopicID != nil {
-		redirectPath = fmt.Sprintf("/skills?topic_id=%d", *skill.TopicID)
+	if skill.TopicID != 0 {
+		redirectPath = fmt.Sprintf("/skills?topic_id=%d", skill.TopicID)
 	}
 
 	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+redirectPath+`"}}`)
@@ -265,8 +265,8 @@ func (s *Server) canManageTopicSkills(userData auth.UserData, topicID int64) err
 
 // canManageSkill checks if a user can update/delete a specific skill.
 func (s *Server) canManageSkill(userData auth.UserData, skill *db.SkillRow) error {
-	if skill.TopicID != nil {
-		return s.canManageTopicSkills(userData, *skill.TopicID)
+	if skill.TopicID != 0 {
+		return s.canManageTopicSkills(userData, skill.TopicID)
 	}
 	if skill.UserID != userData.UserID {
 		return fmt.Errorf("forbidden")
@@ -276,8 +276,8 @@ func (s *Server) canManageSkill(userData auth.UserData, skill *db.SkillRow) erro
 
 // canViewSkill checks if a user can view a specific skill.
 func (s *Server) canViewSkill(userData auth.UserData, skill *db.SkillRow) error {
-	if skill.TopicID != nil {
-		isMember, err := s.db.IsTopicMember(*skill.TopicID, userData.UserID)
+	if skill.TopicID != 0 {
+		isMember, err := s.db.IsTopicMember(skill.TopicID, userData.UserID)
 		if err != nil || !isMember {
 			return fmt.Errorf("forbidden")
 		}

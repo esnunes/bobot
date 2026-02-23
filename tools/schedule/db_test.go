@@ -24,7 +24,7 @@ func TestReminderCRUD(t *testing.T) {
 	runAt := time.Date(2026, 2, 12, 15, 0, 0, 0, time.UTC)
 
 	// Create
-	id, err := db.CreateReminder(1, nil, "call dentist", runAt)
+	id, err := db.CreateReminder(1, 0, "call dentist", runAt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,21 +46,20 @@ func TestReminderCRUD(t *testing.T) {
 	if r.UserID != 1 {
 		t.Errorf("got user_id %d, want 1", r.UserID)
 	}
-	if r.TopicID != nil {
-		t.Errorf("got topic_id %v, want nil", r.TopicID)
+	if r.TopicID != 0 {
+		t.Errorf("got topic_id %v, want 0", r.TopicID)
 	}
 	if !r.RunAt.Equal(runAt) {
 		t.Errorf("got run_at %v, want %v", r.RunAt, runAt)
 	}
 
 	// Create with topic
-	topicID := int64(42)
-	id2, err := db.CreateReminder(1, &topicID, "topic reminder", runAt)
+	id2, err := db.CreateReminder(1, 42, "topic reminder", runAt)
 	if err != nil {
 		t.Fatal(err)
 	}
 	r2, _ := db.GetReminder(id2)
-	if r2.TopicID == nil || *r2.TopicID != 42 {
+	if r2.TopicID != 42 {
 		t.Errorf("got topic_id %v, want 42", r2.TopicID)
 	}
 
@@ -120,8 +119,8 @@ func TestGetDueReminders(t *testing.T) {
 	future := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	now := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 
-	db.CreateReminder(1, nil, "past reminder", past)
-	db.CreateReminder(1, nil, "future reminder", future)
+	db.CreateReminder(1, 0, "past reminder", past)
+	db.CreateReminder(1, 0, "future reminder", future)
 
 	due, err := db.GetDueReminders(now)
 	if err != nil {
@@ -139,7 +138,7 @@ func TestMarkReminderExecuted(t *testing.T) {
 	db := newTestDB(t)
 
 	runAt := time.Date(2026, 2, 12, 15, 0, 0, 0, time.UTC)
-	id, _ := db.CreateReminder(1, nil, "test", runAt)
+	id, _ := db.CreateReminder(1, 0, "test", runAt)
 
 	execAt := time.Date(2026, 2, 12, 15, 1, 0, 0, time.UTC)
 	err := db.MarkReminderExecuted(id, execAt)
@@ -160,7 +159,7 @@ func TestMarkReminderFailed(t *testing.T) {
 	db := newTestDB(t)
 
 	runAt := time.Date(2026, 2, 12, 15, 0, 0, 0, time.UTC)
-	id, _ := db.CreateReminder(1, nil, "test", runAt)
+	id, _ := db.CreateReminder(1, 0, "test", runAt)
 
 	err := db.MarkReminderFailed(id, "execution timeout")
 	if err != nil {
@@ -182,7 +181,7 @@ func TestCronJobCRUD(t *testing.T) {
 	nextRun := time.Date(2026, 2, 13, 9, 0, 0, 0, time.UTC)
 
 	// Create
-	id, err := db.CreateCronJob(1, nil, "daily tasks", "summarize my tasks", "0 9 * * 1-5", nextRun)
+	id, err := db.CreateCronJob(1, 0, "daily tasks", "summarize my tasks", "0 9 * * 1-5", nextRun)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,11 +274,11 @@ func TestGetDueCronJobs(t *testing.T) {
 	future := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	now := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 
-	db.CreateCronJob(1, nil, "past job", "prompt1", "0 9 * * *", past)
-	db.CreateCronJob(1, nil, "future job", "prompt2", "0 9 * * *", future)
+	db.CreateCronJob(1, 0, "past job", "prompt1", "0 9 * * *", past)
+	db.CreateCronJob(1, 0, "future job", "prompt2", "0 9 * * *", future)
 
 	// Create a disabled job in the past
-	id3, _ := db.CreateCronJob(1, nil, "disabled past", "prompt3", "0 9 * * *", past)
+	id3, _ := db.CreateCronJob(1, 0, "disabled past", "prompt3", "0 9 * * *", past)
 	db.SetCronJobEnabled(id3, 1, false)
 
 	due, err := db.GetDueCronJobs(now)
@@ -298,10 +297,8 @@ func TestCronJobByTopic(t *testing.T) {
 	db := newTestDB(t)
 
 	nextRun := time.Date(2026, 2, 13, 9, 0, 0, 0, time.UTC)
-	topicID := int64(5)
-
-	db.CreateCronJob(1, &topicID, "topic job", "prompt", "0 9 * * *", nextRun)
-	db.CreateCronJob(1, nil, "private job", "prompt2", "0 9 * * *", nextRun)
+	db.CreateCronJob(1, 5, "topic job", "prompt", "0 9 * * *", nextRun)
+	db.CreateCronJob(1, 0, "private job", "prompt2", "0 9 * * *", nextRun)
 
 	jobs, err := db.ListCronJobsByTopic(5)
 	if err != nil {
@@ -319,7 +316,7 @@ func TestExecutionCRUD(t *testing.T) {
 	db := newTestDB(t)
 
 	nextRun := time.Date(2026, 2, 13, 9, 0, 0, 0, time.UTC)
-	jobID, _ := db.CreateCronJob(1, nil, "job", "prompt", "0 9 * * *", nextRun)
+	jobID, _ := db.CreateCronJob(1, 0, "job", "prompt", "0 9 * * *", nextRun)
 
 	scheduledAt := time.Date(2026, 2, 13, 9, 0, 0, 0, time.UTC)
 	startedAt := time.Date(2026, 2, 13, 9, 0, 1, 0, time.UTC)

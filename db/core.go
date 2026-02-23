@@ -48,7 +48,7 @@ type Message struct {
 	ID            int64
 	SenderID      int64  // who sent the message (user ID or BobotUserID)
 	ReceiverID    *int64 // who receives (NULL for topic messages)
-	TopicID       *int64 // nil for 1:1 chats, set for topic messages
+	TopicID       int64
 	Role          string
 	Content       string
 	RawContent    string
@@ -732,9 +732,7 @@ func (c *CoreDB) scanMessages(rows *sql.Rows) ([]Message, error) {
 		if receiverID.Valid {
 			m.ReceiverID = &receiverID.Int64
 		}
-		if topicID.Valid {
-			m.TopicID = &topicID.Int64
-		}
+		m.TopicID = topicID.Int64
 		messages = append(messages, m)
 	}
 	return messages, rows.Err()
@@ -756,7 +754,7 @@ func (c *CoreDB) CreateTopicMessage(topicID, senderID int64, role, content, rawC
 	return &Message{
 		ID:         id,
 		SenderID:   senderID,
-		TopicID:    &topicID,
+		TopicID:    topicID,
 		Role:       role,
 		Content:    content,
 		RawContent: rawContent,
@@ -1340,7 +1338,7 @@ func (c *CoreDB) CreateTopicMessageWithContext(topicID, senderID int64, role, co
 	return &Message{
 		ID:            id,
 		SenderID:      senderID,
-		TopicID:       &topicID,
+		TopicID:       topicID,
 		Role:          role,
 		Content:       content,
 		RawContent:    rawContent,

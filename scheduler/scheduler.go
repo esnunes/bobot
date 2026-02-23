@@ -134,9 +134,8 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 		return
 	}
 
-	topicID := *r.TopicID
-	if !s.isTopicValid(r.UserID, topicID) {
-		slog.Warn("scheduler: skipping reminder for invalid topic", "id", r.ID, "topic_id", topicID)
+	if !s.isTopicValid(r.UserID, r.TopicID) {
+		slog.Warn("scheduler: skipping reminder for invalid topic", "id", r.ID, "topic_id", r.TopicID)
 		s.scheduleDB.MarkReminderFailed(r.ID, "topic deleted or user removed")
 		return
 	}
@@ -151,8 +150,8 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 
 	content := "<bobot-remind>" + r.Message + "</bobot-remind>"
 
-	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: &topicID})
-	_, execErr := s.pipeline.SendMessage(execCtx, r.UserID, topicID, content, user.DisplayName)
+	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: r.TopicID})
+	_, execErr := s.pipeline.SendMessage(execCtx, r.UserID, r.TopicID, content, user.DisplayName)
 
 	if execErr != nil {
 		slog.Error("scheduler: reminder execution failed", "id", r.ID, "error", execErr)
@@ -175,9 +174,8 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 		return
 	}
 
-	topicID := *j.TopicID
-	if !s.isTopicValid(j.UserID, topicID) {
-		slog.Warn("scheduler: disabling cron job for invalid topic", "id", j.ID, "topic_id", topicID)
+	if !s.isTopicValid(j.UserID, j.TopicID) {
+		slog.Warn("scheduler: disabling cron job for invalid topic", "id", j.ID, "topic_id", j.TopicID)
 		s.scheduleDB.DisableCronJob(j.ID)
 		return
 	}
@@ -200,8 +198,8 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 
 	content := "<bobot-cron>" + j.Prompt + "</bobot-cron>"
 
-	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: &topicID})
-	_, execErr := s.pipeline.SendMessage(execCtx, j.UserID, topicID, content, user.DisplayName)
+	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: j.TopicID})
+	_, execErr := s.pipeline.SendMessage(execCtx, j.UserID, j.TopicID, content, user.DisplayName)
 
 	completedAt := time.Now().UTC()
 	if execErr != nil {

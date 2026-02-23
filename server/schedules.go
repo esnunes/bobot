@@ -112,8 +112,8 @@ func (s *Server) handleScheduleFormPage(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		if job.TopicID != nil {
-			topicID = *job.TopicID
+		if job.TopicID != 0 {
+			topicID = job.TopicID
 		}
 
 		s.render(w, "schedule_form", PageData{
@@ -169,7 +169,7 @@ func (s *Server) handleCreateScheduleForm(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var topicID *int64
+	var topicID int64
 	redirectPath := "/schedules"
 
 	if topicIDStr != "" {
@@ -183,7 +183,7 @@ func (s *Server) handleCreateScheduleForm(w http.ResponseWriter, r *http.Request
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
-		topicID = &tid
+		topicID = tid
 		redirectPath = fmt.Sprintf("/schedules?topic_id=%d", tid)
 	}
 
@@ -246,8 +246,8 @@ func (s *Server) handleUpdateScheduleForm(w http.ResponseWriter, r *http.Request
 	expr, err := schedule.Parse(cronExprStr)
 	if err != nil {
 		var topicID int64
-		if job.TopicID != nil {
-			topicID = *job.TopicID
+		if job.TopicID != 0 {
+			topicID = job.TopicID
 		}
 		s.render(w, "schedule_form", PageData{
 			Title:   "Edit Schedule",
@@ -271,8 +271,8 @@ func (s *Server) handleUpdateScheduleForm(w http.ResponseWriter, r *http.Request
 	}
 
 	redirectPath := "/schedules"
-	if job.TopicID != nil {
-		redirectPath = fmt.Sprintf("/schedules?topic_id=%d", *job.TopicID)
+	if job.TopicID != 0 {
+		redirectPath = fmt.Sprintf("/schedules?topic_id=%d", job.TopicID)
 	}
 
 	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+redirectPath+`"}}`)
@@ -309,8 +309,8 @@ func (s *Server) handleDeleteScheduleForm(w http.ResponseWriter, r *http.Request
 	}
 
 	redirectPath := "/schedules"
-	if job.TopicID != nil {
-		redirectPath = fmt.Sprintf("/schedules?topic_id=%d", *job.TopicID)
+	if job.TopicID != 0 {
+		redirectPath = fmt.Sprintf("/schedules?topic_id=%d", job.TopicID)
 	}
 
 	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+redirectPath+`"}}`)

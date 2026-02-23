@@ -123,7 +123,7 @@ func (t *CronTool) Execute(ctx context.Context, input map[string]any) (string, e
 	}
 }
 
-func (t *CronTool) create(userID int64, topicID *int64, input map[string]any) (string, error) {
+func (t *CronTool) create(userID, topicID int64, input map[string]any) (string, error) {
 	cronExprStr, _ := input["cron_expr"].(string)
 	if cronExprStr == "" {
 		return "", fmt.Errorf("cron_expr is required")
@@ -159,15 +159,8 @@ func (t *CronTool) create(userID int64, topicID *int64, input map[string]any) (s
 		id, displayName, cronExprStr, nextRunAt.Format("2006-01-02 15:04")), nil
 }
 
-func (t *CronTool) list(userID int64, topicID *int64) (string, error) {
-	var jobs []CronJob
-	var err error
-
-	if topicID != nil {
-		jobs, err = t.db.ListCronJobsByTopic(*topicID)
-	} else {
-		jobs, err = t.db.ListCronJobs(userID)
-	}
+func (t *CronTool) list(userID, topicID int64) (string, error) {
+	jobs, err := t.db.ListCronJobsByTopic(topicID)
 	if err != nil {
 		return "", fmt.Errorf("failed to list cron jobs: %w", err)
 	}

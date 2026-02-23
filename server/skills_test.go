@@ -17,7 +17,7 @@ func TestSkillsPageBobotTopic(t *testing.T) {
 
 	user, _ := coreDB.CreateUser("alice", "hash")
 	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
-	coreDB.CreateSkill(user.ID, &bobotTopic.ID, "groceries", "Manage groceries", "content")
+	coreDB.CreateSkill(user.ID, bobotTopic.ID, "groceries", "Manage groceries", "content")
 
 	req := httptest.NewRequest("GET", "/skills?topic_id="+strconv.FormatInt(bobotTopic.ID, 10), nil)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
@@ -44,7 +44,7 @@ func TestSkillsPageTopic(t *testing.T) {
 	user, _ := coreDB.CreateUser("alice", "hash")
 	topic, _ := coreDB.CreateTopic("General", user.ID)
 	coreDB.AddTopicMember(topic.ID, user.ID)
-	coreDB.CreateSkill(user.ID, &topic.ID, "notes", "Meeting notes", "content")
+	coreDB.CreateSkill(user.ID, topic.ID, "notes", "Meeting notes", "content")
 
 	req := httptest.NewRequest("GET", "/skills?topic_id="+strconv.FormatInt(topic.ID, 10), nil)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
@@ -108,7 +108,7 @@ func TestSkillFormPageEdit(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	skill, _ := coreDB.CreateSkill(user.ID, nil, "groceries", "desc", "my content")
+	skill, _ := coreDB.CreateSkill(user.ID, 0, "groceries", "desc", "my content")
 
 	req := httptest.NewRequest("GET", "/skills/"+strconv.FormatInt(skill.ID, 10)+"/edit", nil)
 	req.SetPathValue("id", strconv.FormatInt(skill.ID, 10))
@@ -197,7 +197,7 @@ func TestUpdateSkillForm(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	skill, _ := coreDB.CreateSkill(user.ID, nil, "groceries", "old", "old content")
+	skill, _ := coreDB.CreateSkill(user.ID, 0, "groceries", "old", "old content")
 
 	form := url.Values{}
 	form.Set("description", "new desc")
@@ -226,7 +226,7 @@ func TestDeleteSkillForm(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	skill, _ := coreDB.CreateSkill(user.ID, nil, "groceries", "desc", "content")
+	skill, _ := coreDB.CreateSkill(user.ID, 0, "groceries", "desc", "content")
 
 	req := httptest.NewRequest("DELETE", "/skills/"+strconv.FormatInt(skill.ID, 10), nil)
 	req.SetPathValue("id", strconv.FormatInt(skill.ID, 10))

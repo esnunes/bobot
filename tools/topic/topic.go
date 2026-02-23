@@ -161,7 +161,7 @@ func (t *TopicTool) list(userID int64) (string, error) {
 
 // resolveTopic resolves a topic from either explicit name or current topic ID.
 // When both are available, explicit name takes precedence.
-func (t *TopicTool) resolveTopic(name string, topicID *int64) (*db.Topic, error) {
+func (t *TopicTool) resolveTopic(name string, topicID int64) (*db.Topic, error) {
 	name = strings.TrimSpace(name)
 	if name != "" {
 		topic, err := t.db.GetTopicByName(name)
@@ -170,8 +170,8 @@ func (t *TopicTool) resolveTopic(name string, topicID *int64) (*db.Topic, error)
 		}
 		return topic, err
 	}
-	if topicID != nil {
-		topic, err := t.db.GetTopicByID(*topicID)
+	if topicID != 0 {
+		topic, err := t.db.GetTopicByID(topicID)
 		if err == db.ErrNotFound {
 			return nil, fmt.Errorf("topic not found")
 		}
@@ -180,7 +180,7 @@ func (t *TopicTool) resolveTopic(name string, topicID *int64) (*db.Topic, error)
 	return nil, fmt.Errorf("topic name is required when not in a topic chat")
 }
 
-func (t *TopicTool) deleteTopic(userID int64, name string, topicID *int64) (string, error) {
+func (t *TopicTool) deleteTopic(userID int64, name string, topicID int64) (string, error) {
 	topic, err := t.resolveTopic(name, topicID)
 	if err != nil {
 		return "", err
@@ -194,7 +194,7 @@ func (t *TopicTool) deleteTopic(userID int64, name string, topicID *int64) (stri
 	return fmt.Sprintf("Topic %q deleted.", topic.Name), nil
 }
 
-func (t *TopicTool) leave(userID int64, name string, topicID *int64) (string, error) {
+func (t *TopicTool) leave(userID int64, name string, topicID int64) (string, error) {
 	topic, err := t.resolveTopic(name, topicID)
 	if err != nil {
 		return "", err
@@ -212,7 +212,7 @@ func (t *TopicTool) leave(userID int64, name string, topicID *int64) (string, er
 	return fmt.Sprintf("You have left the topic %q.", topic.Name), nil
 }
 
-func (t *TopicTool) addMember(userID int64, username, topicName string, topicID *int64) (string, error) {
+func (t *TopicTool) addMember(userID int64, username, topicName string, topicID int64) (string, error) {
 	if username == "" {
 		return "", fmt.Errorf("missing username. Usage: /topic add <username> [topic-name]")
 	}
@@ -244,7 +244,7 @@ func (t *TopicTool) addMember(userID int64, username, topicName string, topicID 
 	return fmt.Sprintf("%s has been added to %q.", username, topic.Name), nil
 }
 
-func (t *TopicTool) removeMember(userID int64, username, topicName string, topicID *int64) (string, error) {
+func (t *TopicTool) removeMember(userID int64, username, topicName string, topicID int64) (string, error) {
 	if username == "" {
 		return "", fmt.Errorf("missing username. Usage: /topic remove <username> [topic-name]")
 	}
