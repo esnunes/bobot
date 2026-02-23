@@ -1107,41 +1107,21 @@ func (c *CoreDB) CreateTopic(name string, ownerID int64) (*Topic, error) {
 // CreateBobotTopic creates a "bobot" topic for a user with auto_respond enabled,
 // and adds the user as a member.
 func (c *CoreDB) CreateBobotTopic(userID int64) (*Topic, error) {
-	tx, err := c.db.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	result, err := tx.Exec(
-		"INSERT INTO topics (name, owner_id, auto_respond) VALUES ('bobot', ?, 1)",
-		userID,
-	)
+	topic, err := c.CreateTopic("bobot", userID)
 	if err != nil {
 		return nil, err
 	}
 
-	topicID, _ := result.LastInsertId()
+	if err := c.SetTopicAutoRespond(topic.ID, true); err != nil {
+		return nil, err
+	}
+	topic.AutoRespond = true
 
-	_, err = tx.Exec(
-		"INSERT INTO topic_members (topic_id, user_id) VALUES (?, ?)",
-		topicID, userID,
-	)
-	if err != nil {
+	if err := c.AddTopicMember(topic.ID, userID); err != nil {
 		return nil, err
 	}
 
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	return &Topic{
-		ID:          topicID,
-		Name:        "bobot",
-		OwnerID:     userID,
-		AutoRespond: true,
-		CreatedAt:   time.Now(),
-	}, nil
+	return topic, nil
 }
 
 // GetUserBobotTopic returns the user's "bobot" topic, or nil if not found.
@@ -1168,6 +1148,16 @@ func (c *CoreDB) AddTopicMember(topicID, userID int64) error {
 		"INSERT INTO topic_members (topic_id, user_id) VALUES (?, ?)",
 		topicID, userID,
 	)
+	return err
+}
+
+// SetTopicAutoRespond enables or disables auto_respond for a topic.
+func (c *CoreDB) SetTopicAutoRespond(topicID int64, enabled bool) error {
+	val := 0
+	if enabled {
+		val = 1
+	}
+	_, err := c.db.Exec("UPDATE topics SET auto_respond = ? WHERE id = ?", val, topicID)
 	return err
 }
 
