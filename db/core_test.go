@@ -928,7 +928,7 @@ func TestGetTopicByName(t *testing.T) {
 	}
 }
 
-func TestTopicNameUniqueCaseInsensitive(t *testing.T) {
+func TestTopicNameNotGloballyUnique(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -938,19 +938,10 @@ func TestTopicNameUniqueCaseInsensitive(t *testing.T) {
 		t.Fatalf("first CreateTopic failed: %v", err)
 	}
 
-	// Creating topic with same name (different case) should fail
-	_, err = db.CreateTopic("general", owner.ID)
-	if err == nil {
-		t.Error("expected error when creating duplicate topic name (case-insensitive)")
-	}
-
-	// After deleting, should be able to create again
-	topic, _ := db.GetTopicByName("General")
-	db.SoftDeleteTopic(topic.ID)
-
+	// Creating topic with same name should succeed (names are not globally unique)
 	_, err = db.CreateTopic("General", owner.ID)
 	if err != nil {
-		t.Fatalf("CreateTopic after delete failed: %v", err)
+		t.Fatalf("second CreateTopic failed: %v", err)
 	}
 }
 

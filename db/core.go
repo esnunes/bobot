@@ -460,6 +460,12 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Migrate: drop unique topic name index (topic names are now scoped to members, not globally unique)
+	_, err = c.db.Exec(`DROP INDEX IF EXISTS idx_topics_name_active`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1177,6 +1183,64 @@ func (c *CoreDB) CreateTopic(name string, ownerID int64) (*Topic, error) {
 		OwnerID:   ownerID,
 		CreatedAt: time.Now(),
 	}, nil
+}
+
+// CreateBobotTopic creates a "bobot" topic for a user with auto_respond enabled,
+// and adds the user as a member.
+func (c *CoreDB) CreateBobotTopic(userID int64) (*Topic, error) {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(
+		"INSERT INTO topics (name, owner_id, auto_respond) VALUES ('bobot', ?, 1)",
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	topicID, _ := result.LastInsertId()
+
+	_, err = tx.Exec(
+		"INSERT INTO topic_members (topic_id, user_id) VALUES (?, ?)",
+		topicID, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &Topic{
+		ID:          topicID,
+		Name:        "bobot",
+		OwnerID:     userID,
+		AutoRespond: true,
+		CreatedAt:   time.Now(),
+	}, nil
+}
+
+// GetUserBobotTopic returns the user's "bobot" topic, or nil if not found.
+func (c *CoreDB) GetUserBobotTopic(userID int64) (*Topic, error) {
+	var topic Topic
+	err := c.db.QueryRow(`
+		SELECT t.id, t.name, t.owner_id, t.auto_respond, t.created_at
+		FROM topics t
+		WHERE t.name = 'bobot' AND t.owner_id = ? AND t.deleted_at IS NULL
+	`, userID).Scan(&topic.ID, &topic.Name, &topic.OwnerID, &topic.AutoRespond, &topic.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &topic, nil
 }
 
 // AddTopicMember adds a user to a topic.
