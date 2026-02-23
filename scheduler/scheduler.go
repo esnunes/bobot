@@ -134,14 +134,7 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 		return
 	}
 
-	// Lifecycle guard: require topic ID
-	if r.TopicID == nil {
-		slog.Warn("scheduler: skipping reminder with no topic", "id", r.ID)
-		s.scheduleDB.MarkReminderFailed(r.ID, "no topic ID")
-		return
-	}
 	topicID := *r.TopicID
-
 	if !s.isTopicValid(r.UserID, topicID) {
 		slog.Warn("scheduler: skipping reminder for invalid topic", "id", r.ID, "topic_id", topicID)
 		s.scheduleDB.MarkReminderFailed(r.ID, "topic deleted or user removed")
@@ -182,14 +175,7 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 		return
 	}
 
-	// Lifecycle guard: require topic ID
-	if j.TopicID == nil {
-		slog.Warn("scheduler: disabling cron job with no topic", "id", j.ID)
-		s.scheduleDB.DisableCronJob(j.ID)
-		return
-	}
 	topicID := *j.TopicID
-
 	if !s.isTopicValid(j.UserID, topicID) {
 		slog.Warn("scheduler: disabling cron job for invalid topic", "id", j.ID, "topic_id", topicID)
 		s.scheduleDB.DisableCronJob(j.ID)

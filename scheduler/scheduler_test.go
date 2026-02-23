@@ -134,10 +134,12 @@ func TestExecuteReminderBlockedUser(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("blocked", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 	coreDB.BlockUser(user.ID)
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateReminder(user.ID, nil, "should not execute", past)
+	tid := bobotTopic.ID
+	schedDB.CreateReminder(user.ID, &tid, "should not execute", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -210,10 +212,12 @@ func TestExecuteCronJobBlockedUser(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("blocked", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 	coreDB.BlockUser(user.ID)
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateCronJob(user.ID, nil, "job", "prompt", "0 9 * * *", past)
+	tid := bobotTopic.ID
+	schedDB.CreateCronJob(user.ID, &tid, "job", "prompt", "0 9 * * *", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
@@ -233,10 +237,11 @@ func TestExecuteReminderFailed(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
-	coreDB.CreateBobotTopic(user.ID)
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateReminder(user.ID, nil, "will fail", past)
+	tid := bobotTopic.ID
+	schedDB.CreateReminder(user.ID, &tid, "will fail", past)
 
 	pipeline.failNext = true
 
@@ -253,10 +258,12 @@ func TestFutureItemsNotExecuted(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
 	future := time.Now().UTC().Add(1 * time.Hour)
-	schedDB.CreateReminder(user.ID, nil, "future reminder", future)
-	schedDB.CreateCronJob(user.ID, nil, "future job", "prompt", "0 9 * * *", future)
+	tid := bobotTopic.ID
+	schedDB.CreateReminder(user.ID, &tid, "future reminder", future)
+	schedDB.CreateCronJob(user.ID, &tid, "future job", "prompt", "0 9 * * *", future)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
