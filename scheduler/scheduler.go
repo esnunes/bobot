@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sort"
 	"time"
@@ -14,8 +15,7 @@ import (
 // Pipeline is the interface for sending messages through the chat flow.
 // This avoids importing the server package directly.
 type Pipeline interface {
-	SendPrivateMessage(ctx context.Context, userID int64, content string) (string, error)
-	SendTopicMessage(ctx context.Context, userID int64, topicID int64, content string, displayName string) (string, error)
+	SendMessage(ctx context.Context, userID int64, topicID int64, content string, displayName string) (string, error)
 }
 
 // Scheduler runs due reminders and cron jobs on a 1-minute tick.
@@ -154,13 +154,16 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 
 	content := "<bobot-remind>" + r.Message + "</bobot-remind>"
 
-	var execErr error
-	if r.TopicID != nil {
-		execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: r.TopicID})
-		_, execErr = s.pipeline.SendTopicMessage(execCtx, r.UserID, *r.TopicID, content, user.DisplayName)
-	} else {
-		_, execErr = s.pipeline.SendPrivateMessage(execCtx, r.UserID, content)
+	// Resolve topic ID (use bobot topic for private reminders)
+	topicID, err := s.resolveTopicID(r.UserID, r.TopicID)
+	if err != nil {
+		slog.Error("scheduler: failed to resolve topic for reminder", "id", r.ID, "error", err)
+		s.scheduleDB.MarkReminderFailed(r.ID, err.Error())
+		return
 	}
+
+	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: &topicID})
+	_, execErr := s.pipeline.SendMessage(execCtx, r.UserID, topicID, content, user.DisplayName)
 
 	if execErr != nil {
 		slog.Error("scheduler: reminder execution failed", "id", r.ID, "error", execErr)
@@ -210,13 +213,16 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 
 	content := "<bobot-cron>" + j.Prompt + "</bobot-cron>"
 
-	var execErr error
-	if j.TopicID != nil {
-		execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: j.TopicID})
-		_, execErr = s.pipeline.SendTopicMessage(execCtx, j.UserID, *j.TopicID, content, user.DisplayName)
-	} else {
-		_, execErr = s.pipeline.SendPrivateMessage(execCtx, j.UserID, content)
+	// Resolve topic ID (use bobot topic for private crons)
+	topicID, err := s.resolveTopicID(j.UserID, j.TopicID)
+	if err != nil {
+		slog.Error("scheduler: failed to resolve topic for cron job", "id", j.ID, "error", err)
+		s.scheduleDB.FailExecution(execID, time.Now().UTC(), err.Error())
+		return
 	}
+
+	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: &topicID})
+	_, execErr := s.pipeline.SendMessage(execCtx, j.UserID, topicID, content, user.DisplayName)
 
 	completedAt := time.Now().UTC()
 	if execErr != nil {
@@ -260,4 +266,20 @@ func (s *Scheduler) isTopicValid(userID, topicID int64) bool {
 		return false
 	}
 	return true
+}
+
+// resolveTopicID returns the topic ID to use. If topicID is nil (private chat),
+// looks up the user's bobot topic.
+func (s *Scheduler) resolveTopicID(userID int64, topicID *int64) (int64, error) {
+	if topicID != nil {
+		return *topicID, nil
+	}
+	topic, err := s.coreDB.GetUserBobotTopic(userID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get bobot topic: %w", err)
+	}
+	if topic == nil {
+		return 0, fmt.Errorf("no bobot topic found for user %d", userID)
+	}
+	return topic.ID, nil
 }

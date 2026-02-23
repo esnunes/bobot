@@ -33,49 +33,10 @@ func NewChatPipeline(coreDB *db.CoreDB, engine *assistant.Engine, connections *C
 	}
 }
 
-// SendPrivateMessage saves the user message to DB, broadcasts it, calls engine.Chat(),
-// broadcasts the assistant response, and sends push if offline. Returns the assistant response.
-func (p *ChatPipeline) SendPrivateMessage(ctx context.Context, userID int64, content string) (string, error) {
-	// Save user message: sender=user, receiver=bobot
-	p.db.CreatePrivateMessageWithContextThreshold(
-		userID, db.BobotUserID, "user", content, content,
-		p.cfg.Context.TokensStart, p.cfg.Context.TokensMax,
-	)
-
-	// Broadcast user message
-	userMsgJSON, _ := json.Marshal(map[string]interface{}{
-		"role":    "user",
-		"content": content,
-	})
-	p.connections.Broadcast(userID, userMsgJSON)
-
-	// Get assistant response (engine persists assistant messages internally)
-	response, err := p.engine.Chat(ctx, assistant.ChatOptions{Message: content})
-	if err != nil {
-		slog.Error("pipeline: assistant error", "user_id", userID, "error", err)
-		response = "Sorry, I encountered an error. Please try again."
-	}
-
-	// Broadcast assistant response
-	assistantMsgJSON, _ := json.Marshal(map[string]interface{}{
-		"role":    "assistant",
-		"content": response,
-	})
-	p.connections.Broadcast(userID, assistantMsgJSON)
-
-	// Send push notification if user has no active connections
-	if p.pushSender != nil && p.connections.Count(userID) == 0 {
-		payload := push.BuildPayload("Bobot", push.TruncateMessage(response, 200), "/chat", fmt.Sprintf("msg-private-%d", userID))
-		go p.pushSender.NotifyUser(userID, payload)
-	}
-
-	return response, nil
-}
-
-// SendTopicMessage saves the user message to the topic, broadcasts to all members,
+// SendMessage saves the user message to the topic, broadcasts to all members,
 // calls engine.Chat(), broadcasts the response, and sends push to offline members.
 // Returns the assistant response.
-func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topicID int64, content string, displayName string) (string, error) {
+func (p *ChatPipeline) SendMessage(ctx context.Context, userID int64, topicID int64, content string, displayName string) (string, error) {
 	// Save user message (raw_content includes display name for LLM context)
 	rawContent := fmt.Sprintf("[%s]: %s", displayName, content)
 	p.db.CreateTopicMessageWithContext(

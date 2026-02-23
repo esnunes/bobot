@@ -55,9 +55,10 @@ func setupChatTestServer(t *testing.T) (*Server, string) {
 
 	srv := NewWithAssistant(cfg, coreDB, engine, registry, nil, nil)
 
-	// Create test user and get session token
+	// Create test user with bobot topic and get session token
 	hash, _ := auth.HashPassword("testpass")
 	user, _ := coreDB.CreateUser("testuser", hash)
+	coreDB.CreateBobotTopic(user.ID)
 	token, _ := srv.session.CreateToken(user.ID, "user")
 
 	return srv, token
@@ -111,7 +112,7 @@ func TestChatWebSocket_SendMessage(t *testing.T) {
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
 	// First broadcast: user message echo
-	var userResp map[string]string
+	var userResp map[string]interface{}
 	err = conn.ReadJSON(&userResp)
 	if err != nil {
 		t.Fatalf("failed to read user message echo: %v", err)
@@ -121,7 +122,7 @@ func TestChatWebSocket_SendMessage(t *testing.T) {
 	}
 
 	// Second broadcast: assistant response
-	var assistantResp map[string]string
+	var assistantResp map[string]interface{}
 	err = conn.ReadJSON(&assistantResp)
 	if err != nil {
 		t.Fatalf("failed to read assistant response: %v", err)
@@ -152,9 +153,10 @@ func TestChatWebSocket_SlashCommand(t *testing.T) {
 
 	srv := NewWithAssistant(cfg, coreDB, engine, registry, nil, nil)
 
-	// Create admin user and get token with role
+	// Create admin user with bobot topic and get token with role
 	hash, _ := auth.HashPassword("testpass")
 	adminUser, _ := coreDB.CreateUserFull("admin", hash, "Admin", "admin")
+	coreDB.CreateBobotTopic(adminUser.ID)
 	token, _ := srv.session.CreateToken(adminUser.ID, "admin")
 
 	server := httptest.NewServer(srv)
@@ -180,30 +182,31 @@ func TestChatWebSocket_SlashCommand(t *testing.T) {
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
 	// First: command message echo
-	var userResp map[string]string
+	var userResp map[string]interface{}
 	err = conn.ReadJSON(&userResp)
 	if err != nil {
 		t.Fatalf("failed to read command message echo: %v", err)
 	}
 	if userResp["role"] != "command" {
-		t.Errorf("expected role 'command', got '%s'", userResp["role"])
+		t.Errorf("expected role 'command', got '%v'", userResp["role"])
 	}
 	if userResp["content"] != "/user list" {
-		t.Errorf("expected content '/user list', got '%s'", userResp["content"])
+		t.Errorf("expected content '/user list', got '%v'", userResp["content"])
 	}
 
 	// Second: system response with user list
-	var resp map[string]string
+	var resp map[string]interface{}
 	err = conn.ReadJSON(&resp)
 	if err != nil {
 		t.Fatalf("failed to read response: %v", err)
 	}
 
 	if resp["role"] != "system" {
-		t.Errorf("expected role 'system', got '%s'", resp["role"])
+		t.Errorf("expected role 'system', got '%v'", resp["role"])
 	}
-	if !strings.Contains(resp["content"], "admin") {
-		t.Errorf("expected response to contain 'admin', got: %s", resp["content"])
+	content, _ := resp["content"].(string)
+	if !strings.Contains(content, "admin") {
+		t.Errorf("expected response to contain 'admin', got: %s", content)
 	}
 }
 

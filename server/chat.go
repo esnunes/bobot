@@ -55,49 +55,19 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		if msg.TopicID != nil {
-			s.handleTopicChatMessage(ctx, userData.UserID, *msg.TopicID, msg.Content)
-		} else {
-			s.handlePrivateChatMessage(ctx, userData.UserID, msg.Content)
+		// Resolve null topic_id to user's bobot topic
+		topicID := msg.TopicID
+		if topicID == nil {
+			bobotTopic, err := s.db.GetUserBobotTopic(userData.UserID)
+			if err != nil || bobotTopic == nil {
+				log.Printf("failed to resolve bobot topic for user %d: %v", userData.UserID, err)
+				continue
+			}
+			topicID = &bobotTopic.ID
 		}
+
+		s.handleTopicChatMessage(ctx, userData.UserID, *topicID, msg.Content)
 	}
-}
-
-func (s *Server) handlePrivateChatMessage(ctx context.Context, userID int64, content string) {
-	// Check for slash commands
-	receiverID := db.BobotUserID
-	if response, handled := s.handleSlashCommand(ctx, content, &receiverID, nil); handled {
-		// User sends command: sender=user, receiver=bobot
-		s.db.CreatePrivateMessageWithContextThreshold(
-			userID, db.BobotUserID, "command", content, content,
-			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
-		)
-
-		userMsgJSON, _ := json.Marshal(map[string]interface{}{
-			"role":    "command",
-			"content": content,
-		})
-		s.connections.Broadcast(userID, userMsgJSON)
-
-		// System response: sender=bobot, receiver=user
-		s.db.CreatePrivateMessageWithContextThreshold(
-			db.BobotUserID, userID, "system", response, response,
-			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
-		)
-
-		respJSON, _ := json.Marshal(map[string]interface{}{
-			"role":    "system",
-			"content": response,
-		})
-		s.connections.Broadcast(userID, respJSON)
-
-		s.markChatReadImplicit(userID, db.PrivateChatTopicID)
-		return
-	}
-
-	// Use pipeline for the full message flow
-	s.pipeline.SendPrivateMessage(ctx, userID, content)
-	s.markChatReadImplicit(userID, db.PrivateChatTopicID)
 }
 
 func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int64, content string) {
@@ -116,7 +86,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 	}
 
 	// Check for slash commands
-	if response, handled := s.handleSlashCommand(ctx, content, nil, &topicID); handled {
+	if response, handled := s.handleSlashCommand(ctx, content, topicID); handled {
 		// Save command message
 		s.db.CreateTopicMessageWithContext(
 			topicID, userID, "command", content, content,
@@ -174,9 +144,10 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 	// Send push to offline topic members (exclude sender)
 	s.pushToTopicMembers(topicID, userID, user.DisplayName, content)
 
-	// Check if assistant should respond
-	if shouldTriggerAssistant(content) {
-		s.handleTopicAssistantResponse(ctx, userID, topicID, content, user.DisplayName)
+	// Check if assistant should respond (auto_respond or @bobot mention)
+	topic, _ := s.db.GetTopicByID(topicID)
+	if (topic != nil && topic.AutoRespond) || shouldTriggerAssistant(content) {
+		s.handleTopicAssistantResponse(ctx, topicID, content, user.DisplayName)
 	}
 
 	s.markChatReadImplicit(userID, topicID)
@@ -186,7 +157,7 @@ func shouldTriggerAssistant(content string) bool {
 	return strings.Contains(strings.ToLower(content), "@bobot")
 }
 
-func (s *Server) handleTopicAssistantResponse(ctx context.Context, userID, topicID int64, content, displayName string) {
+func (s *Server) handleTopicAssistantResponse(ctx context.Context, topicID int64, content, displayName string) {
 	response, err := s.engine.Chat(ctx, assistant.ChatOptions{
 		Message:     content,
 		TopicID:     topicID,
@@ -262,7 +233,7 @@ func (s *Server) broadcastToTopic(topicID int64, data []byte) []db.TopicMember {
 
 // handleSlashCommand processes slash commands and returns the response.
 // Returns (response, true) if the message was a slash command, ("", false) otherwise.
-func (s *Server) handleSlashCommand(ctx context.Context, content string, receiverID *int64, topicID *int64) (string, bool) {
+func (s *Server) handleSlashCommand(ctx context.Context, content string, topicID int64) (string, bool) {
 	content = strings.TrimSpace(content)
 	if !strings.HasPrefix(content, "/") {
 		return "", false
@@ -292,10 +263,9 @@ func (s *Server) handleSlashCommand(ctx context.Context, content string, receive
 		return "Error: " + err.Error(), true
 	}
 
-	// Inject chat context (TopicID / ReceiverID) into Go context
+	// Inject chat context (TopicID) into Go context
 	ctx = auth.ContextWithChatData(ctx, auth.ChatData{
-		ReceiverID: receiverID,
-		TopicID:    topicID,
+		TopicID: &topicID,
 	})
 
 	// Execute the tool
