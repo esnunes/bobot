@@ -466,6 +466,73 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Migrate: create bobot topics for existing users and move private messages
+	if err := c.migratePrivateChatsToTopics(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// migratePrivateChatsToTopics creates "bobot" topics for existing users who don't have one,
+// and moves their private messages (topic_id IS NULL) into the bobot topic.
+// Also migrates chat_read_status rows for private chat.
+// This migration is idempotent.
+func (c *CoreDB) migratePrivateChatsToTopics() error {
+	// Find users who have private messages but no bobot topic
+	rows, err := c.db.Query(`
+		SELECT DISTINCT u.id FROM users u
+		WHERE u.id != ?
+		AND NOT EXISTS (
+			SELECT 1 FROM topics t WHERE t.name = 'bobot' AND t.owner_id = u.id AND t.deleted_at IS NULL
+		)
+		AND EXISTS (
+			SELECT 1 FROM messages m WHERE m.topic_id IS NULL AND (m.sender_id = u.id OR m.receiver_id = u.id)
+		)
+	`, BobotUserID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var userIDs []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		userIDs = append(userIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, userID := range userIDs {
+		topic, err := c.CreateBobotTopic(userID)
+		if err != nil {
+			return err
+		}
+
+		// Move private messages into the bobot topic
+		_, err = c.db.Exec(`
+			UPDATE messages SET topic_id = ?
+			WHERE topic_id IS NULL
+			AND (sender_id = ? OR receiver_id = ?)
+		`, topic.ID, userID, userID)
+		if err != nil {
+			return err
+		}
+
+		// Migrate chat_read_status for private chat
+		_, err = c.db.Exec(`
+			UPDATE chat_read_status SET topic_id = ?
+			WHERE topic_id IS NULL AND user_id = ?
+		`, topic.ID, userID)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
