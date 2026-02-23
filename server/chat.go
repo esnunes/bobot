@@ -131,7 +131,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 			"user_id":      userID,
 			"display_name": user.DisplayName,
 		})
-		s.broadcastToTopic(topicID, cmdMsgJSON)
+		members := s.broadcastToTopic(topicID, cmdMsgJSON)
 
 		// Save system response
 		s.db.CreateTopicMessageWithContext(
@@ -148,6 +148,7 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 		})
 		s.broadcastToTopic(topicID, respJSON)
 
+		autoMarkReadForTopic(s.db, s.connections, topicID, members)
 		s.markChatReadImplicit(userID, topicID)
 		return
 	}
@@ -167,7 +168,8 @@ func (s *Server) handleTopicChatMessage(ctx context.Context, userID, topicID int
 		"user_id":      userID,
 		"display_name": user.DisplayName,
 	})
-	s.broadcastToTopic(topicID, userMsgJSON)
+	members := s.broadcastToTopic(topicID, userMsgJSON)
+	autoMarkReadForTopic(s.db, s.connections, topicID, members)
 
 	// Send push to offline topic members (exclude sender)
 	s.pushToTopicMembers(topicID, userID, user.DisplayName, content)
@@ -202,7 +204,8 @@ func (s *Server) handleTopicAssistantResponse(ctx context.Context, userID, topic
 		"content":      response,
 		"display_name": "bobot",
 	})
-	s.broadcastToTopic(topicID, assistantMsgJSON)
+	members := s.broadcastToTopic(topicID, assistantMsgJSON)
+	autoMarkReadForTopic(s.db, s.connections, topicID, members)
 
 	// Send push to offline topic members (exclude nobody — all members get notified for bot responses)
 	s.pushToTopicMembers(topicID, db.BobotUserID, "Bobot", response)
@@ -244,32 +247,17 @@ func (s *Server) pushToTopicMembers(topicID, senderID int64, senderName, content
 	}
 }
 
-func (s *Server) broadcastToTopic(topicID int64, data []byte) {
+func (s *Server) broadcastToTopic(topicID int64, data []byte) []db.TopicMember {
 	members, err := s.db.GetTopicMembers(topicID)
 	if err != nil {
 		log.Printf("failed to get topic members: %v", err)
-		return
+		return nil
 	}
 
 	for _, member := range members {
 		s.connections.Broadcast(member.UserID, data)
 	}
-
-	// Auto-mark as read for members with auto-read enabled
-	var latestID int64
-	for _, member := range members {
-		if !member.AutoRead {
-			continue
-		}
-		if latestID == 0 {
-			latestID, err = s.db.GetLatestTopicMessageID(topicID)
-			if err != nil || latestID == 0 {
-				break
-			}
-		}
-		s.db.MarkChatRead(member.UserID, topicID, latestID)
-		s.broadcastReadEvent(member.UserID, topicID)
-	}
+	return members
 }
 
 // handleSlashCommand processes slash commands and returns the response.

@@ -31,3 +31,22 @@ func (s *Server) broadcastReadEvent(userID int64, topicID int64) {
 	})
 	s.connections.Broadcast(userID, readEvent)
 }
+
+// autoMarkReadForTopic marks the topic as read for all members with auto-read enabled.
+// Shared by both *Server and *ChatPipeline to avoid divergent implementations.
+func autoMarkReadForTopic(coreDB *db.CoreDB, connections *ConnectionRegistry, topicID int64, members []db.TopicMember) {
+	latestID, err := coreDB.GetLatestTopicMessageID(topicID)
+	if err != nil || latestID == 0 {
+		return
+	}
+	readEvent, _ := json.Marshal(map[string]any{
+		"type":     "read",
+		"topic_id": topicID,
+	})
+	for _, member := range members {
+		if member.AutoRead {
+			coreDB.MarkChatRead(member.UserID, topicID, latestID)
+			connections.Broadcast(member.UserID, readEvent)
+		}
+	}
+}

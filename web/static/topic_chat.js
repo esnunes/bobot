@@ -107,6 +107,11 @@ window.TopicChatClient = class TopicChatClient {
                         if (resp.ok) {
                             autoReadBtn.setAttribute('data-auto-read', isAutoRead ? 'false' : 'true');
                             autoReadBtn.textContent = isAutoRead ? 'Enable auto-read' : 'Disable auto-read';
+                            if (!isAutoRead) {
+                                document.dispatchEvent(new CustomEvent('bobot:chat-read', {
+                                    detail: { topic_id: parseInt(topicId, 10) }
+                                }));
+                            }
                         }
                     })
                     .catch(function(err) { console.error('Auto-read toggle failed:', err); })

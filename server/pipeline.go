@@ -91,7 +91,8 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 		"user_id":      userID,
 		"display_name": displayName,
 	})
-	p.broadcastToTopic(topicID, userMsgJSON)
+	members := p.broadcastToTopic(topicID, userMsgJSON)
+	autoMarkReadForTopic(p.db, p.connections, topicID, members)
 
 	// Get assistant response
 	response, err := p.engine.Chat(ctx, assistant.ChatOptions{
@@ -111,7 +112,8 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 		"content":      response,
 		"display_name": "bobot",
 	})
-	p.broadcastToTopic(topicID, assistantMsgJSON)
+	members = p.broadcastToTopic(topicID, assistantMsgJSON)
+	autoMarkReadForTopic(p.db, p.connections, topicID, members)
 
 	// Send push to offline topic members
 	p.pushToTopicMembers(topicID, db.BobotUserID, "Bobot", response)
@@ -119,36 +121,17 @@ func (p *ChatPipeline) SendTopicMessage(ctx context.Context, userID int64, topic
 	return response, nil
 }
 
-func (p *ChatPipeline) broadcastToTopic(topicID int64, data []byte) {
+func (p *ChatPipeline) broadcastToTopic(topicID int64, data []byte) []db.TopicMember {
 	members, err := p.db.GetTopicMembers(topicID)
 	if err != nil {
 		slog.Error("pipeline: failed to get topic members", "topic_id", topicID, "error", err)
-		return
+		return nil
 	}
 
 	for _, member := range members {
 		p.connections.Broadcast(member.UserID, data)
 	}
-
-	// Auto-mark as read for members with auto-read enabled
-	var latestID int64
-	for _, member := range members {
-		if !member.AutoRead {
-			continue
-		}
-		if latestID == 0 {
-			latestID, err = p.db.GetLatestTopicMessageID(topicID)
-			if err != nil || latestID == 0 {
-				break
-			}
-		}
-		p.db.MarkChatRead(member.UserID, topicID, latestID)
-		readEvent, _ := json.Marshal(map[string]any{
-			"type":     "read",
-			"topic_id": topicID,
-		})
-		p.connections.Broadcast(member.UserID, readEvent)
-	}
+	return members
 }
 
 func (p *ChatPipeline) pushToTopicMembers(topicID, senderID int64, senderName, content string) {
