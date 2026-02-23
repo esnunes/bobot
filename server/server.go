@@ -89,10 +89,6 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /health", s.handleHealth)
 	s.router.HandleFunc("GET /ws/chat", s.sessionMiddleware(s.handleChat))
 
-	// Message routes (require auth)
-	s.router.HandleFunc("GET /api/messages/history", s.sessionMiddleware(s.handleMessageHistory))
-	s.router.HandleFunc("GET /api/messages/sync", s.sessionMiddleware(s.handleMessageSync))
-
 	// Topic routes (require auth)
 	s.router.HandleFunc("POST /api/topics", s.sessionMiddleware(s.handleCreateTopic))
 	s.router.HandleFunc("GET /api/topics", s.sessionMiddleware(s.handleListTopics))

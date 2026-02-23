@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -168,40 +167,6 @@ func TestServer_Login_UserNotFound(t *testing.T) {
 // TestServer_Logout was removed - JWT refresh token deletion is obsolete
 // See TestHandleLogout_ClearsCookie and TestHandleLogout_WithAllParam_CreatesRevocation
 // for session-based logout tests
-
-func TestMessageEndpointsRequireAuth(t *testing.T) {
-	tmpDir := t.TempDir()
-	coreDB, _ := db.NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer coreDB.Close()
-
-	cfg := &config.Config{
-		JWT:     config.JWTConfig{Secret: "testsecret"},
-		Session: config.SessionConfig{},
-		History: config.HistoryConfig{
-			DefaultLimit: 50,
-			MaxLimit:     100,
-		},
-		Sync: config.SyncConfig{
-			MaxLookback: 24 * time.Hour,
-		},
-	}
-	srv := New(cfg, coreDB)
-
-	endpoints := []string{
-		"/api/messages/history?before=1",
-		"/api/messages/sync?since=2020-01-01T00:00:00Z",
-	}
-
-	for _, endpoint := range endpoints {
-		req := httptest.NewRequest("GET", endpoint, nil)
-		rec := httptest.NewRecorder()
-		srv.ServeHTTP(rec, req)
-
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("%s: expected 401, got %d", endpoint, rec.Code)
-		}
-	}
-}
 
 func TestLogin_BlockedUser(t *testing.T) {
 	srv := setupTestServer(t)
