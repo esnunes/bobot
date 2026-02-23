@@ -252,6 +252,34 @@ func (s *Server) handleToggleTopicMute(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) handleToggleTopicAutoRead(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	topicID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid topic id", http.StatusBadRequest)
+		return
+	}
+
+	isMember, err := s.db.IsTopicMember(topicID, userData.UserID)
+	if err != nil || !isMember {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	autoRead := r.Method == http.MethodPost
+	if err := s.db.SetTopicMemberAutoRead(topicID, userData.UserID, autoRead); err != nil {
+		http.Error(w, "failed to update auto-read", http.StatusInternalServerError)
+		return
+	}
+
+	if autoRead {
+		s.markChatReadImplicit(userData.UserID, topicID)
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleTopicMessageHistory(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 

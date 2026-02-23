@@ -131,6 +131,7 @@ type PageData struct {
 	HasOtherUnreads bool
 	UnreadJSON      template.JS
 	PushMuted       bool
+	AutoRead        bool
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data PageData) {
@@ -413,6 +414,7 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 	dbMembers, _ := s.db.GetTopicMembers(topicID)
 	members := make([]MemberView, 0, len(dbMembers))
 	var pushMuted bool
+	var autoRead bool
 	for _, m := range dbMembers {
 		members = append(members, MemberView{
 			UserID:      m.UserID,
@@ -421,6 +423,7 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		})
 		if m.UserID == userData.UserID {
 			pushMuted = m.Muted
+			autoRead = m.AutoRead
 		}
 	}
 
@@ -479,5 +482,6 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		HasOtherUnreads: bobotUnread || otherTopicUnreads > 0,
 		UnreadJSON:      buildUnreadJSON(bobotUnread, topicUnreads),
 		PushMuted:       pushMuted,
+		AutoRead:        autoRead,
 	})
 }

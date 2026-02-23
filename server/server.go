@@ -102,6 +102,8 @@ func (s *Server) routes() {
 	s.router.HandleFunc("DELETE /api/topics/{id}/members/{userId}", s.sessionMiddleware(s.handleRemoveTopicMember))
 	s.router.HandleFunc("POST /api/topics/{id}/mute", s.sessionMiddleware(s.handleToggleTopicMute))
 	s.router.HandleFunc("DELETE /api/topics/{id}/mute", s.sessionMiddleware(s.handleToggleTopicMute))
+	s.router.HandleFunc("POST /api/topics/{id}/auto-read", s.sessionMiddleware(s.handleToggleTopicAutoRead))
+	s.router.HandleFunc("DELETE /api/topics/{id}/auto-read", s.sessionMiddleware(s.handleToggleTopicAutoRead))
 	s.router.HandleFunc("GET /api/topics/{id}/messages/history", s.sessionMiddleware(s.handleTopicMessageHistory))
 	s.router.HandleFunc("GET /api/topics/{id}/messages/sync", s.sessionMiddleware(s.handleTopicMessageSync))
 
