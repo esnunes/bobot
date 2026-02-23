@@ -308,12 +308,11 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 
 	topic, err := s.db.GetUserBobotTopic(userData.UserID)
-	if err != nil || topic == nil {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
 
-	target := "/chats/" + strconv.FormatInt(topic.ID, 10)
+	target := "/chats"
+	if err == nil && topic != nil {
+		target = "/chats/" + strconv.FormatInt(topic.ID, 10)
+	}
 	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+target+`"}}`)
 	w.WriteHeader(http.StatusNoContent)
 }
