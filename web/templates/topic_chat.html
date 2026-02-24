@@ -20,7 +20,6 @@
 
 <div id="menu-overlay" class="menu-overlay hidden">
     <div class="menu">
-        {{if not .AutoRespond}}
         <div id="members-list" class="members-list">
             <strong>Members:</strong>
             {{range .Members}}
@@ -28,20 +27,17 @@
             {{end}}
         </div>
         <hr>
-        {{end}}
         <button class="menu-item" data-push-toggle style="display:none">Enable notifications</button>
-        {{if not .AutoRespond}}<button class="menu-item" data-mute-toggle data-topic-id="{{.TopicID}}" data-muted="{{.PushMuted}}" style="display:none">{{if .PushMuted}}Unmute topic{{else}}Mute topic{{end}}</button>{{end}}
+        <button class="menu-item" data-mute-toggle data-topic-id="{{.TopicID}}" data-muted="{{.PushMuted}}" style="display:none">{{if .PushMuted}}Unmute topic{{else}}Mute topic{{end}}</button>
         <button class="menu-item" data-auto-read-toggle data-topic-id="{{.TopicID}}" data-auto-read="{{.AutoRead}}">{{if .AutoRead}}Disable auto-read{{else}}Enable auto-read{{end}}</button>
         {{if .IsAdmin}}<button class="menu-item" hx-get="/admin" hx-target="body">Admin</button>{{end}}
         <button class="menu-item" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">Skills</button>
         <button class="menu-item" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">Schedules</button>
-        {{if not .AutoRespond}}
         <hr>
         {{if eq .OwnerID .CurrentUserID}}
         <button id="delete-btn" class="danger-btn">Delete Topic</button>
         {{else}}
         <button id="leave-btn" class="danger-btn">Leave Topic</button>
-        {{end}}
         {{end}}
     </div>
 </div>
