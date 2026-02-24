@@ -170,6 +170,7 @@ type PageData struct {
 	PushMuted       bool
 	AutoRead        bool
 	AutoRespond     bool
+	DisplayName     string
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data PageData) {
@@ -257,6 +258,12 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["admin_user"] = adminUserTmpl
 
+	settingsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/settings.html")
+	if err != nil {
+		return err
+	}
+	s.templates["settings"] = settingsTmpl
+
 	adminContextTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/admin_context.html")
 	if err != nil {
 		return err
@@ -269,7 +276,7 @@ func (s *Server) loadTemplates() error {
 // validateNavigatePath returns a safe navigation path.
 // Only /chat and /chats/{id} are allowed; anything else defaults to /chat.
 func validateNavigatePath(path string) string {
-	if path == "/chat" || path == "/schedules" || strings.HasPrefix(path, "/schedules?") || path == "/admin" || strings.HasPrefix(path, "/admin/") || navigatePathRe.MatchString(path) {
+	if path == "/chat" || path == "/settings" || strings.HasPrefix(path, "/settings?") || path == "/schedules" || strings.HasPrefix(path, "/schedules?") || path == "/admin" || strings.HasPrefix(path, "/admin/") || navigatePathRe.MatchString(path) {
 		return path
 	}
 	return "/chat"
@@ -497,4 +504,120 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		AutoRead:        autoRead,
 		AutoRespond:     topic.AutoRespond,
 	})
+}
+
+func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	user, err := s.db.GetUserByID(userData.UserID)
+	if err != nil {
+		http.Error(w, "user not found", http.StatusInternalServerError)
+		return
+	}
+
+	data := PageData{
+		Title:         "Settings",
+		CurrentUserID: userData.UserID,
+		IsAdmin:       userData.Role == "admin",
+		DisplayName:   user.DisplayName,
+	}
+
+	// If topic_id is provided, load topic-specific data
+	topicIDStr := r.URL.Query().Get("topic_id")
+	if topicIDStr != "" {
+		topicID, err := strconv.ParseInt(topicIDStr, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid topic_id", http.StatusBadRequest)
+			return
+		}
+
+		isMember, err := s.db.IsTopicMember(topicID, userData.UserID)
+		if err != nil || !isMember {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		topic, err := s.db.GetTopicByID(topicID)
+		if err != nil {
+			http.Error(w, "topic not found", http.StatusNotFound)
+			return
+		}
+
+		dbMembers, _ := s.db.GetTopicMembers(topicID)
+		members := make([]MemberView, 0, len(dbMembers))
+		var pushMuted bool
+		var autoRead bool
+		for _, m := range dbMembers {
+			members = append(members, MemberView{
+				UserID:      m.UserID,
+				Username:    m.Username,
+				DisplayName: m.DisplayName,
+			})
+			if m.UserID == userData.UserID {
+				pushMuted = m.Muted
+				autoRead = m.AutoRead
+			}
+		}
+
+		// Load skills for inline preview
+		skills, _ := s.db.GetTopicSkills(topicID)
+		skillViews := make([]SkillView, 0, len(skills))
+		for _, sk := range skills {
+			skillViews = append(skillViews, SkillView{
+				ID:   sk.ID,
+				Name: sk.Name,
+			})
+		}
+
+		// Load schedules for inline preview
+		var scheduleViews []ScheduleView
+		if s.scheduleDB != nil {
+			jobs, _ := s.scheduleDB.ListCronJobsByTopic(topicID)
+			scheduleViews = make([]ScheduleView, 0, len(jobs))
+			for _, j := range jobs {
+				scheduleViews = append(scheduleViews, ScheduleView{
+					ID:       j.ID,
+					Name:     j.Name,
+					CronExpr: j.CronExpr,
+					Enabled:  j.Enabled,
+				})
+			}
+		}
+
+		data.TopicID = topicID
+		data.TopicName = topic.Name
+		data.OwnerID = topic.OwnerID
+		data.Members = members
+		data.PushMuted = pushMuted
+		data.AutoRead = autoRead
+		data.Skills = skillViews
+		data.Schedules = scheduleViews
+	}
+
+	unreads, _ := s.db.GetUnreadChats(userData.UserID)
+	data.UnreadJSON = buildUnreadJSON(unreads)
+
+	s.render(w, "settings", data)
+}
+
+func (s *Server) handleUpdateDisplayName(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	displayName := strings.TrimSpace(r.FormValue("display_name"))
+	if len(displayName) < 1 {
+		http.Error(w, "display name is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.db.UpdateUserDisplayName(userData.UserID, displayName); err != nil {
+		http.Error(w, "failed to update display name", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

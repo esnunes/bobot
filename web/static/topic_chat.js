@@ -10,10 +10,6 @@ window.TopicChatClient = class TopicChatClient {
         this.messagesEl = document.getElementById('messages');
         this.form = document.getElementById('chat-form');
         this.input = document.getElementById('message-input');
-        this.menuBtn = document.getElementById('menu-btn');
-        this.menuOverlay = document.getElementById('menu-overlay');
-        this.leaveBtn = document.getElementById('leave-btn');  // May be null if owner
-        this.deleteBtn = document.getElementById('delete-btn');  // May be null if not owner
         this.mentionBotBtn = document.getElementById('mention-bot-btn');
         this.isLoadingHistory = false;
         this.oldestMessageId = null;
@@ -77,50 +73,8 @@ window.TopicChatClient = class TopicChatClient {
             return false;
         });
 
-        this.menuBtn.addEventListener('click', () => {
-            this.menuOverlay.classList.remove('hidden');
-        });
-
-        this.menuOverlay.addEventListener('click', (e) => {
-            if (e.target === this.menuOverlay) {
-                this.menuOverlay.classList.add('hidden');
-            }
-        });
-
-        if (this.leaveBtn) {
-            this.leaveBtn.addEventListener('click', () => this.leaveTopic());
-        }
-        if (this.deleteBtn) {
-            this.deleteBtn.addEventListener('click', () => this.deleteTopic());
-        }
-
         if (this.mentionBotBtn) {
             this.mentionBotBtn.addEventListener('click', () => this.mentionBot());
-        }
-
-        // Auto-read toggle
-        var autoReadBtn = document.querySelector('[data-auto-read-toggle]');
-        if (autoReadBtn) {
-            autoReadBtn.addEventListener('click', function() {
-                var topicId = autoReadBtn.getAttribute('data-topic-id');
-                var isAutoRead = autoReadBtn.getAttribute('data-auto-read') === 'true';
-                var method = isAutoRead ? 'DELETE' : 'POST';
-                autoReadBtn.disabled = true;
-                fetch('/api/topics/' + topicId + '/auto-read', { method: method })
-                    .then(function(resp) {
-                        if (resp.ok) {
-                            autoReadBtn.setAttribute('data-auto-read', isAutoRead ? 'false' : 'true');
-                            autoReadBtn.textContent = isAutoRead ? 'Enable auto-read' : 'Disable auto-read';
-                            if (!isAutoRead) {
-                                document.dispatchEvent(new CustomEvent('bobot:chat-read', {
-                                    detail: { topic_id: parseInt(topicId, 10) }
-                                }));
-                            }
-                        }
-                    })
-                    .catch(function(err) { console.error('Auto-read toggle failed:', err); })
-                    .finally(function() { autoReadBtn.disabled = false; });
-            });
         }
 
         // Unread indicator on back button
@@ -327,41 +281,6 @@ window.TopicChatClient = class TopicChatClient {
         this.messagesEl.insertBefore(msgEl, this.messagesEl.firstChild);
     }
 
-    async leaveTopic() {
-        if (!confirm('Are you sure you want to leave this topic?')) return;
-
-        try {
-            const resp = await fetch(`/api/topics/${this.topicId}/members/${this.currentUserId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-
-            if (!resp.ok) throw new Error('Failed to leave topic');
-
-            htmx.ajax('GET', '/chats', {target: 'body', swap: 'innerHTML'});
-        } catch (err) {
-            console.error('Failed to leave topic:', err);
-            alert('Failed to leave topic');
-        }
-    }
-
-    async deleteTopic() {
-        if (!confirm('Are you sure you want to delete this topic? This cannot be undone.')) return;
-
-        try {
-            const resp = await fetch(`/api/topics/${this.topicId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-
-            if (!resp.ok) throw new Error('Failed to delete topic');
-
-            htmx.ajax('GET', '/chats', {target: 'body', swap: 'innerHTML'});
-        } catch (err) {
-            console.error('Failed to delete topic:', err);
-            alert('Failed to delete topic');
-        }
-    }
 };
 
 var container = document.querySelector('[data-page="topic-chat"]');

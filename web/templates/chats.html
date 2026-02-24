@@ -3,7 +3,7 @@
     <header>
         <div></div>
         <h1>Chats</h1>
-        <button id="menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+        <button hx-get="/settings" hx-target="body" aria-label="Settings"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </header>
 
     <main class="chats-list">
@@ -22,12 +22,6 @@
     </main>
 </div>
 
-<div id="menu-overlay" class="menu-overlay hidden">
-    <div class="menu">
-        <button id="logout-btn" hx-post="/logout" hx-on::before-request="htmx.trigger(document.body, 'bobot:logout')">Logout</button>
-    </div>
-</div>
-
 <div id="create-topic-modal" class="modal hidden">
     <div class="modal-content">
         <h2>Create Topic</h2>
@@ -43,20 +37,6 @@
 
 <script>
 (function() {
-    // Menu overlay
-    const menuOverlay = document.getElementById('menu-overlay');
-    const menuBtn = document.getElementById('menu-btn');
-
-    menuBtn.addEventListener('click', () => {
-        menuOverlay.classList.remove('hidden');
-    });
-
-    menuOverlay.addEventListener('click', (e) => {
-        if (e.target === menuOverlay) {
-            menuOverlay.classList.add('hidden');
-        }
-    });
-
     // Create topic modal
     const modal = document.getElementById('create-topic-modal');
     const nameInput = modal.querySelector('input[name="name"]');

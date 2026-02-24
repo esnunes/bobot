@@ -1,0 +1,136 @@
+{{define "content"}}
+<div class="settings-container" data-page="settings"{{if .TopicID}} data-topic-id="{{.TopicID}}" data-owner-id="{{.OwnerID}}" data-current-user-id="{{.CurrentUserID}}"{{end}}>
+    <header>
+        {{if .TopicID}}
+        <button hx-get="/chats/{{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{else}}
+        <button hx-get="/chat" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{end}}
+        <h1>Settings</h1>
+        <div></div>
+    </header>
+
+    <main class="settings-list">
+        {{if .TopicID}}
+        <details class="context-section" open>
+            <summary class="context-section-title">Topic Details</summary>
+            <div class="settings-section-content">
+                <div class="settings-info-row">
+                    <span class="settings-info-label">Name</span>
+                    <span>{{.TopicName}}</span>
+                </div>
+                <div class="settings-info-row">
+                    <span class="settings-info-label">Members</span>
+                    <span>{{len .Members}}</span>
+                </div>
+                <div class="members-list">
+                    {{range .Members}}
+                    <div class="member">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}</div>
+                    {{end}}
+                </div>
+            </div>
+        </details>
+
+        <details class="context-section" open>
+            <summary class="context-section-title">Topic Settings</summary>
+            <div class="settings-section-content">
+                <div class="settings-toggle-row" data-mute-toggle data-topic-id="{{.TopicID}}" data-muted="{{.PushMuted}}" style="display:none">
+                    <div class="settings-toggle-info">
+                        <span class="settings-toggle-label">Mute topic</span>
+                        <span class="settings-toggle-description">Silence push notifications for this topic</span>
+                    </div>
+                    <button class="settings-toggle-btn" role="switch" aria-checked="{{.PushMuted}}">
+                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                    </button>
+                </div>
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-info">
+                        <span class="settings-toggle-label">Auto-read</span>
+                        <span class="settings-toggle-description">Automatically mark messages as read when you open this topic</span>
+                    </div>
+                    <button class="settings-toggle-btn" role="switch" aria-checked="{{.AutoRead}}" data-auto-read-toggle data-topic-id="{{.TopicID}}" data-auto-read="{{.AutoRead}}">
+                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                    </button>
+                </div>
+            </div>
+        </details>
+
+        <details class="context-section" open>
+            <summary class="context-section-title">Topic Tools</summary>
+            <div class="settings-section-content">
+                <div class="settings-tool-group">
+                    <span class="settings-tool-label">Skills</span>
+                    {{if .Skills}}
+                    <div class="settings-tool-list">
+                        {{range .Skills}}<span class="settings-tool-item">{{.Name}}</span>{{end}}
+                    </div>
+                    {{else}}
+                    <span class="settings-tool-empty">No skills</span>
+                    {{end}}
+                    <button class="settings-tool-manage" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">Manage Skills</button>
+                </div>
+                <div class="settings-tool-group">
+                    <span class="settings-tool-label">Schedules</span>
+                    {{if .Schedules}}
+                    <div class="settings-tool-list">
+                        {{range .Schedules}}<span class="settings-tool-item">{{if .Name}}{{.Name}}{{else}}{{.CronExpr}}{{end}}{{if not .Enabled}} (disabled){{end}}</span>{{end}}
+                    </div>
+                    {{else}}
+                    <span class="settings-tool-empty">No schedules</span>
+                    {{end}}
+                    <button class="settings-tool-manage" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">Manage Schedules</button>
+                </div>
+            </div>
+        </details>
+
+        <details class="context-section" open>
+            <summary class="context-section-title settings-danger-title">Danger Zone</summary>
+            <div class="settings-section-content">
+                {{if eq .OwnerID .CurrentUserID}}
+                <button id="delete-btn" class="danger-btn">Delete Topic</button>
+                {{else}}
+                <button id="leave-btn" class="danger-btn">Leave Topic</button>
+                {{end}}
+            </div>
+        </details>
+
+        <hr class="settings-separator">
+        {{end}}
+
+        <details class="context-section" open>
+            <summary class="context-section-title">Account</summary>
+            <div class="settings-section-content">
+                <form class="settings-display-name-form" id="display-name-form">
+                    <label class="settings-info-label" for="display-name-input">Display name</label>
+                    <div class="settings-display-name-row">
+                        <input type="text" id="display-name-input" name="display_name" value="{{.DisplayName}}" autocomplete="off">
+                        <button type="submit" class="settings-save-btn">Save</button>
+                    </div>
+                    <span class="settings-saved-msg" id="display-name-saved" style="display:none">Saved</span>
+                </form>
+
+                <div class="settings-toggle-row" data-push-toggle style="display:none">
+                    <div class="settings-toggle-info">
+                        <span class="settings-toggle-label">Push Notifications</span>
+                        <span class="settings-toggle-description">Enable push notifications for this device</span>
+                    </div>
+                    <button class="settings-toggle-btn" role="switch" aria-checked="false">
+                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                    </button>
+                </div>
+
+                {{if .IsAdmin}}
+                <button class="settings-nav-item" hx-get="/admin" hx-target="body">
+                    <span>Admin</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                {{end}}
+
+                <button id="logout-btn" class="danger-btn" hx-post="/logout" hx-on::before-request="htmx.trigger(document.body, 'bobot:logout')">Logout</button>
+            </div>
+        </details>
+    </main>
+</div>
+
+<script src="/static/settings.js"></script>
+{{end}}
