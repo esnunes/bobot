@@ -1092,12 +1092,17 @@ header {
 
 .admin-list {
   flex: 1;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   padding: var(--space-3) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-3) calc(var(--space-3) + env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+.admin-list > * {
+  flex-shrink: 0;
 }
 
 .admin-section-title {
@@ -1131,6 +1136,19 @@ header {
 
 .admin-item:hover {
   box-shadow: var(--shadows-medium);
+}
+
+.admin-item--static {
+  cursor: default;
+}
+
+.admin-item--static:hover {
+  box-shadow: var(--shadows-low);
+}
+
+.admin-item-name--mono {
+  font-family: monospace;
+  font-size: var(--font-sizes-1);
 }
 
 .admin-item-header {
@@ -1178,6 +1196,30 @@ header {
 .admin-badge.blocked {
   background: #fde2e2;
   color: #d20f39;
+}
+
+/* Admin user info */
+.admin-user-info {
+  background: var(--colors-surface);
+  border-radius: var(--radii-lg);
+  box-shadow: var(--shadows-low);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.admin-user-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-user-info-label {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-text-secondary);
+  font-weight: var(--font-weights-medium);
 }
 
 /* Context inspector */
@@ -1290,9 +1332,32 @@ header {
   margin-left: auto;
 }
 
+.context-message-sender {
+  font-size: var(--font-sizes-1);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-text);
+}
+
 .context-message-timestamp {
   font-size: var(--font-sizes-0);
   color: var(--colors-text-secondary);
+}
+
+.context-member {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-sizes-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radii-sm);
+  color: var(--colors-text);
+}
+
+.context-member:hover {
+  background: var(--colors-background);
 }
 
 .context-read-divider {

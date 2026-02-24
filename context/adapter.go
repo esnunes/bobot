@@ -35,6 +35,7 @@ func (a *CoreDBAdapter) GetTopicContextMessages(topicID int64) ([]assistant.Cont
 	for i, m := range messages {
 		result[i] = assistant.ContextMessage{
 			ID:         m.ID,
+			SenderID:   m.SenderID,
 			Role:       m.Role,
 			Content:    m.Content,
 			RawContent: m.RawContent,

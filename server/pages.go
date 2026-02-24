@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/esnunes/bobot/auth"
+	"github.com/esnunes/bobot/db"
 	"github.com/esnunes/bobot/web"
 )
 
@@ -55,20 +56,13 @@ type ScheduleView struct {
 }
 
 type AdminUserView struct {
-	ID          int64
-	DisplayName string
-	Username    string
-	Role        string
-	Blocked     bool
-	CreatedAt   string
-}
-
-type AdminTopicView struct {
-	ID          int64
-	Name        string
-	OwnerName   string
-	MemberCount int
-	CreatedAt   string
+	ID            int64
+	DisplayName   string
+	Username      string
+	Role          string
+	Blocked       bool
+	CreatedAt     string
+	LastMessageAt string
 }
 
 type ToolBlockView struct {
@@ -81,6 +75,7 @@ type ToolBlockView struct {
 
 type ContextMessageView struct {
 	Role       string
+	SenderName string
 	Content    string
 	RawContent string
 	Tokens     int
@@ -94,9 +89,53 @@ type ContextInspectionView struct {
 	SystemPrompt string
 	Messages     []ContextMessageView
 	Tools        []ToolView
+	Members      []MemberView
 	TotalTokens  int
 	MaxTokens    int
 	RawJSON      string
+	BackURL      string
+}
+
+type AdminUserTopicView struct {
+	ID          int64
+	Name        string
+	IsOwner     bool
+	MemberCount int
+	AutoRespond bool
+	CreatedAt   string
+}
+
+type AdminUserSkillView struct {
+	Name        string
+	Description string
+	TopicName   string
+}
+
+type AdminUserPushSubView struct {
+	Endpoint  string
+	CreatedAt string
+}
+
+type AdminUserReadStatusView struct {
+	TopicName         string
+	LastReadMessageID int64
+	ReadAt            string
+}
+
+type AdminUserDetailView struct {
+	ID            int64
+	DisplayName   string
+	Username      string
+	Role          string
+	Blocked       bool
+	CreatedAt     string
+	LastMessageAt string
+	MessageCount  int
+	Topics        []AdminUserTopicView
+	Profile       string
+	Skills        []AdminUserSkillView
+	PushSubs      []AdminUserPushSubView
+	ReadStatus    []AdminUserReadStatusView
 }
 
 type ToolView struct {
@@ -105,27 +144,27 @@ type ToolView struct {
 }
 
 type PageData struct {
-	Title          string
-	Error          string
-	Code           string
-	TopicID        int64
-	Topics         []TopicView
-	Messages       []MessageView
-	Members        []MemberView
-	TopicName      string
-	OwnerID        int64
-	CurrentUserID  int64
-	Skills         []SkillView
-	Skill          *SkillView
-	Schedules      []ScheduleView
-	Schedule       *ScheduleView
-	VAPIDPublicKey string
-	NavigateTo     string
-	PageDataJSON   template.JS
-	IsAdmin        bool
-	AdminUsers     []AdminUserView
-	AdminTopics    []AdminTopicView
-	Context        *ContextInspectionView
+	Title           string
+	Error           string
+	Code            string
+	TopicID         int64
+	Topics          []TopicView
+	Messages        []MessageView
+	Members         []MemberView
+	TopicName       string
+	OwnerID         int64
+	CurrentUserID   int64
+	Skills          []SkillView
+	Skill           *SkillView
+	Schedules       []ScheduleView
+	Schedule        *ScheduleView
+	VAPIDPublicKey  string
+	NavigateTo      string
+	PageDataJSON    template.JS
+	IsAdmin         bool
+	AdminUsers      []AdminUserView
+	AdminUserDetail *AdminUserDetailView
+	Context         *ContextInspectionView
 	HasOtherUnreads bool
 	UnreadJSON      template.JS
 	PushMuted       bool
@@ -211,6 +250,12 @@ func (s *Server) loadTemplates() error {
 		return err
 	}
 	s.templates["admin"] = adminTmpl
+
+	adminUserTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/admin_user.html")
+	if err != nil {
+		return err
+	}
+	s.templates["admin_user"] = adminUserTmpl
 
 	adminContextTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/admin_context.html")
 	if err != nil {
@@ -374,6 +419,10 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbMembers, _ := s.db.GetTopicMembers(topicID)
+	senderMap := make(map[int64]*db.TopicMember)
+	for i := range dbMembers {
+		senderMap[dbMembers[i].UserID] = &dbMembers[i]
+	}
 	members := make([]MemberView, 0, len(dbMembers))
 	var pushMuted bool
 	var autoRead bool
@@ -409,9 +458,9 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		}
 		switch m.Role {
 		case "user", "command":
-			if user, err := s.db.GetUserByID(m.SenderID); err == nil {
-				jm.UserID = user.ID
-				jm.DisplayName = user.DisplayName
+			if member, ok := senderMap[m.SenderID]; ok {
+				jm.UserID = member.UserID
+				jm.DisplayName = member.DisplayName
 			}
 		case "assistant", "system":
 			jm.DisplayName = "bobot"
