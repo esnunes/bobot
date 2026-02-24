@@ -9,7 +9,6 @@
     if (!container) return;
 
     var topicId = container.dataset.topicId ? parseInt(container.dataset.topicId, 10) : null;
-    var ownerId = container.dataset.ownerId ? parseInt(container.dataset.ownerId, 10) : null;
     var currentUserId = container.dataset.currentUserId ? parseInt(container.dataset.currentUserId, 10) : null;
 
     // Display name form
@@ -80,7 +79,7 @@
     if (deleteBtn && topicId) {
         deleteBtn.addEventListener('click', function() {
             if (!confirm('Are you sure you want to delete this topic? This cannot be undone.')) return;
-            fetch('/api/topics/' + topicId, { method: 'DELETE', credentials: 'include' })
+            fetch('/api/topics/' + topicId, { method: 'DELETE' })
                 .then(function(resp) {
                     if (!resp.ok) throw new Error('Failed to delete topic');
                     htmx.ajax('GET', '/chats', { target: 'body', swap: 'innerHTML' });
@@ -97,7 +96,7 @@
     if (leaveBtn && topicId && currentUserId) {
         leaveBtn.addEventListener('click', function() {
             if (!confirm('Are you sure you want to leave this topic?')) return;
-            fetch('/api/topics/' + topicId + '/members/' + currentUserId, { method: 'DELETE', credentials: 'include' })
+            fetch('/api/topics/' + topicId + '/members/' + currentUserId, { method: 'DELETE' })
                 .then(function(resp) {
                     if (!resp.ok) throw new Error('Failed to leave topic');
                     htmx.ajax('GET', '/chats', { target: 'body', swap: 'innerHTML' });

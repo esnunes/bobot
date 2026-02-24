@@ -609,8 +609,8 @@ func (s *Server) handleUpdateDisplayName(w http.ResponseWriter, r *http.Request)
 	}
 
 	displayName := strings.TrimSpace(r.FormValue("display_name"))
-	if len(displayName) < 1 {
-		http.Error(w, "display name is required", http.StatusBadRequest)
+	if len(displayName) < 1 || len(displayName) > 100 {
+		http.Error(w, "display name must be 1-100 characters", http.StatusBadRequest)
 		return
 	}
 

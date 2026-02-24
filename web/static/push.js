@@ -124,25 +124,10 @@
     isEnabled().then(function (enabled) {
       var pushElements = document.querySelectorAll("[data-push-toggle]");
       pushElements.forEach(function (el) {
-        // Settings page: element is a .settings-toggle-row div
         var toggleBtn = el.querySelector(".settings-toggle-btn");
-        if (toggleBtn) {
-          toggleBtn.setAttribute("aria-checked", String(enabled));
-          toggleBtn.onclick = function () {
-            if (enabled) {
-              disablePush();
-            } else {
-              enablePush();
-            }
-          };
-          el.style.display = "";
-          return;
-        }
-        // Legacy menu: element is a button
-        el.textContent = enabled
-          ? "Disable notifications"
-          : "Enable notifications";
-        el.onclick = function () {
+        if (!toggleBtn) return;
+        toggleBtn.setAttribute("aria-checked", String(enabled));
+        toggleBtn.onclick = function () {
           if (enabled) {
             disablePush();
           } else {
@@ -158,56 +143,28 @@
           el.style.display = "none";
           return;
         }
-        // Settings page: element is a .settings-toggle-row div
         var toggleBtn = el.querySelector(".settings-toggle-btn");
-        if (toggleBtn) {
-          var muted = el.getAttribute("data-muted") === "true";
-          toggleBtn.setAttribute("aria-checked", String(muted));
-          toggleBtn.onclick = function () {
-            var topicId = el.getAttribute("data-topic-id");
-            var isMuted = el.getAttribute("data-muted") === "true";
-            var method = isMuted ? "DELETE" : "POST";
-            toggleBtn.disabled = true;
-            fetch("/api/topics/" + topicId + "/mute", { method: method })
-              .then(function (resp) {
-                if (resp.ok) {
-                  var newState = !isMuted;
-                  el.setAttribute("data-muted", String(newState));
-                  toggleBtn.setAttribute("aria-checked", String(newState));
-                }
-              })
-              .catch(function (err) {
-                console.error("Mute toggle failed:", err);
-              })
-              .finally(function () {
-                toggleBtn.disabled = false;
-              });
-          };
-          el.style.display = "";
-          return;
-        }
-        // Legacy menu: element is a button
+        if (!toggleBtn) return;
         var muted = el.getAttribute("data-muted") === "true";
-        el.textContent = muted ? "Unmute topic" : "Mute topic";
-        el.onclick = function () {
+        toggleBtn.setAttribute("aria-checked", String(muted));
+        toggleBtn.onclick = function () {
           var topicId = el.getAttribute("data-topic-id");
           var isMuted = el.getAttribute("data-muted") === "true";
           var method = isMuted ? "DELETE" : "POST";
-          el.disabled = true;
-          fetch("/api/topics/" + topicId + "/mute", {
-            method: method,
-          })
+          toggleBtn.disabled = true;
+          fetch("/api/topics/" + topicId + "/mute", { method: method })
             .then(function (resp) {
               if (resp.ok) {
-                el.setAttribute("data-muted", isMuted ? "false" : "true");
-                el.textContent = isMuted ? "Mute topic" : "Unmute topic";
+                var newState = !isMuted;
+                el.setAttribute("data-muted", String(newState));
+                toggleBtn.setAttribute("aria-checked", String(newState));
               }
             })
             .catch(function (err) {
               console.error("Mute toggle failed:", err);
             })
             .finally(function () {
-              el.disabled = false;
+              toggleBtn.disabled = false;
             });
         };
         el.style.display = "";
