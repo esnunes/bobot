@@ -4,6 +4,7 @@ package db
 import (
 	"database/sql"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -289,6 +290,14 @@ func (c *CoreDB) migrate() error {
 	_, err = c.db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_messages_topic
 		ON messages(topic_id, id) WHERE topic_id IS NOT NULL
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_messages_sender_role
+		ON messages(sender_id, role, created_at)
 	`)
 	if err != nil {
 		return err
@@ -1108,33 +1117,6 @@ func (c *CoreDB) GetTopicByName(name string) (*Topic, error) {
 	return &topic, nil
 }
 
-// GetUserTopics retrieves all topics a user is a member of.
-func (c *CoreDB) ListAllTopics() ([]Topic, error) {
-	rows, err := c.db.Query(`
-		SELECT id, name, owner_id, deleted_at, created_at
-		FROM topics WHERE deleted_at IS NULL
-		ORDER BY created_at DESC
-	`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var topics []Topic
-	for rows.Next() {
-		var t Topic
-		var deletedAt sql.NullTime
-		if err := rows.Scan(&t.ID, &t.Name, &t.OwnerID, &deletedAt, &t.CreatedAt); err != nil {
-			return nil, err
-		}
-		if deletedAt.Valid {
-			t.DeletedAt = &deletedAt.Time
-		}
-		topics = append(topics, t)
-	}
-	return topics, rows.Err()
-}
-
 func (c *CoreDB) GetUserTopics(userID int64) ([]Topic, error) {
 	rows, err := c.db.Query(`
 		SELECT t.id, t.name, t.owner_id, t.auto_respond, t.deleted_at, t.created_at
@@ -1529,6 +1511,119 @@ func (c *CoreDB) GetTopicReadPositions(topicID int64) ([]ReadPosition, error) {
 		var p ReadPosition
 		if err := rows.Scan(&p.UserID, &p.DisplayName, &p.LastReadID); err != nil {
 			return nil, err
+		}
+		positions = append(positions, p)
+	}
+	return positions, rows.Err()
+}
+
+// UserReadPosition represents a user's read position in a single topic.
+type UserReadPosition struct {
+	TopicID           int64
+	TopicName         string
+	LastReadMessageID int64
+	ReadAt            *time.Time
+}
+
+// GetUserMessageStats returns the last message sent date and total message count for a user.
+// Returns nil lastSentAt if the user has never sent a message.
+func (c *CoreDB) GetUserMessageStats(userID int64) (*time.Time, int, error) {
+	var lastSentAtStr sql.NullString
+	var totalCount int
+	err := c.db.QueryRow(`
+		SELECT MAX(created_at), COUNT(*)
+		FROM messages
+		WHERE sender_id = ? AND role = 'user'
+	`, userID).Scan(&lastSentAtStr, &totalCount)
+	if err != nil {
+		return nil, 0, err
+	}
+	// SQLite MAX() aggregates return text strings, not native time values,
+	// so we scan as NullString and parse manually. Two formats are tried
+	// because SQLite stores timestamps with or without timezone offset
+	// depending on how they were inserted.
+	if lastSentAtStr.Valid && lastSentAtStr.String != "" {
+		t, err := time.Parse("2006-01-02 15:04:05-07:00", lastSentAtStr.String)
+		if err != nil {
+			t, err = time.Parse("2006-01-02 15:04:05", lastSentAtStr.String)
+		}
+		if err == nil {
+			return &t, totalCount, nil
+		}
+		slog.Warn("db: unparseable MAX(created_at) from messages", "raw", lastSentAtStr.String, "userID", userID)
+	}
+	return nil, totalCount, nil
+}
+
+// UserMessageStats holds aggregated message statistics for a user.
+type UserMessageStats struct {
+	LastSentAt *time.Time
+	Count      int
+}
+
+// GetAllUserMessageStats returns message stats for all users in a single query.
+func (c *CoreDB) GetAllUserMessageStats() (map[int64]UserMessageStats, error) {
+	rows, err := c.db.Query(`
+		SELECT sender_id, MAX(created_at), COUNT(*)
+		FROM messages
+		WHERE role = 'user'
+		GROUP BY sender_id
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	stats := make(map[int64]UserMessageStats)
+	for rows.Next() {
+		var senderID int64
+		var lastSentAtStr sql.NullString
+		var count int
+		if err := rows.Scan(&senderID, &lastSentAtStr, &count); err != nil {
+			return nil, err
+		}
+		s := UserMessageStats{Count: count}
+		// SQLite MAX() aggregates return text strings, not native time values
+		if lastSentAtStr.Valid && lastSentAtStr.String != "" {
+			t, err := time.Parse("2006-01-02 15:04:05-07:00", lastSentAtStr.String)
+			if err != nil {
+				t, err = time.Parse("2006-01-02 15:04:05", lastSentAtStr.String)
+			}
+			if err == nil {
+				s.LastSentAt = &t
+			} else {
+				slog.Warn("db: unparseable MAX(created_at) from messages", "raw", lastSentAtStr.String, "senderID", senderID)
+			}
+		}
+		stats[senderID] = s
+	}
+	return stats, rows.Err()
+}
+
+// GetUserReadPositions returns read positions for a user across all their topics.
+func (c *CoreDB) GetUserReadPositions(userID int64) ([]UserReadPosition, error) {
+	rows, err := c.db.Query(`
+		SELECT crs.topic_id, t.name, crs.last_read_message_id, m.created_at
+		FROM chat_read_status crs
+		JOIN topics t ON crs.topic_id = t.id
+		LEFT JOIN messages m ON m.id = crs.last_read_message_id
+		WHERE crs.user_id = ?
+		ORDER BY t.name
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var positions []UserReadPosition
+	for rows.Next() {
+		var p UserReadPosition
+		var readAt sql.NullTime
+		if err := rows.Scan(&p.TopicID, &p.TopicName, &p.LastReadMessageID, &readAt); err != nil {
+			return nil, err
+		}
+		if readAt.Valid {
+			p.ReadAt = &readAt.Time
 		}
 		positions = append(positions, p)
 	}

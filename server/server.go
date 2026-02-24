@@ -121,7 +121,7 @@ func (s *Server) routes() {
 
 	// Admin routes (require auth + admin role)
 	s.router.HandleFunc("GET /admin", s.sessionMiddleware(s.adminMiddleware(s.handleAdminPage)))
-	s.router.HandleFunc("GET /admin/users/{id}/context", s.sessionMiddleware(s.adminMiddleware(s.handleAdminUserContextPage)))
+	s.router.HandleFunc("GET /admin/users/{id}", s.sessionMiddleware(s.adminMiddleware(s.handleAdminUserPage)))
 	s.router.HandleFunc("GET /admin/topics/{id}/context", s.sessionMiddleware(s.adminMiddleware(s.handleAdminTopicContextPage)))
 
 	// Push notification routes (require auth)

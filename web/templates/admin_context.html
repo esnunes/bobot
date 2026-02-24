@@ -1,7 +1,7 @@
 {{define "content"}}
 <div class="admin-container" data-page="admin-context">
     <header>
-        <button hx-get="/admin" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <button hx-get="{{.Context.BackURL}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
         <h1>{{.Context.Label}}</h1>
         <div></div>
     </header>
@@ -19,6 +19,15 @@
 
     <main class="admin-list">
         <div id="structured-view">
+            {{if .Context.Members}}
+            <details class="context-section">
+                <summary class="context-section-title">Members ({{len .Context.Members}})</summary>
+                {{range .Context.Members}}
+                <button hx-get="/admin/users/{{.UserID}}" hx-target="body" class="context-member">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}} <span class="admin-item-meta">@{{.Username}}</span></button>
+                {{end}}
+            </details>
+            {{end}}
+
             <details class="context-section">
                 <summary class="context-section-title">System Prompt</summary>
                 <pre class="context-pre"><code>{{.Context.SystemPrompt}}</code></pre>
@@ -31,6 +40,7 @@
                     <div class="context-message">
                         <div class="context-message-header">
                             <span class="admin-badge {{.Role}}">{{.Role}}</span>
+                            {{if .SenderName}}<span class="context-message-sender">{{.SenderName}}</span>{{end}}
                             <span class="context-message-timestamp">{{.Timestamp}}</span>
                             <span class="context-message-tokens">{{.Tokens}} tokens</span>
                         </div>
