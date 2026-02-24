@@ -46,8 +46,7 @@ type User struct {
 
 type Message struct {
 	ID            int64
-	SenderID      int64  // who sent the message (user ID or BobotUserID)
-	ReceiverID    *int64 // who receives (NULL for topic messages)
+	SenderID      int64 // who sent the message (user ID or BobotUserID)
 	TopicID       int64
 	Role          string
 	Content       string
@@ -252,11 +251,6 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
-	// Migrate: add receiver_id column to messages
-	if err := c.addColumnIfMissing("messages", "receiver_id", "INTEGER REFERENCES users(id)"); err != nil {
-		return err
-	}
-
 	// Migrate: rename user_id to sender_id
 	if err := c.renameColumnIfExists("messages", "user_id", "sender_id"); err != nil {
 		return err
@@ -267,38 +261,27 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
-	// Migrate existing private messages: infer sender/receiver from role
-	// User messages: sender=original user, receiver=bobot (0)
-	// Assistant/system messages: sender=bobot (0), receiver=original user
-	_, err = c.db.Exec(`
-		UPDATE messages
-		SET sender_id = CASE WHEN role IN ('assistant', 'system') THEN 0 ELSE sender_id END,
-		    receiver_id = CASE WHEN role IN ('assistant', 'system') THEN sender_id ELSE 0 END
-		WHERE topic_id IS NULL AND receiver_id IS NULL
-	`)
+	// Legacy migration: receiver_id was used for private chat before unification.
+	// If the column still exists, run the legacy migration steps then drop it.
+	hasReceiverID, err := c.columnExists("messages", "receiver_id")
 	if err != nil {
 		return err
+	}
+	if hasReceiverID {
+		// Migrate existing private messages: infer sender/receiver from role
+		_, err = c.db.Exec(`
+			UPDATE messages
+			SET sender_id = CASE WHEN role IN ('assistant', 'system') THEN 0 ELSE sender_id END,
+			    receiver_id = CASE WHEN role IN ('assistant', 'system') THEN sender_id ELSE 0 END
+			WHERE topic_id IS NULL AND receiver_id IS NULL
+		`)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Drop old index if exists
 	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_user_context`)
-
-	// Create new indexes for private chat (bidirectional)
-	_, err = c.db.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_messages_private_chat
-		ON messages(sender_id, receiver_id, id) WHERE topic_id IS NULL
-	`)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.db.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_messages_context
-		ON messages(sender_id, receiver_id, id) WHERE context_tokens = 0 AND topic_id IS NULL
-	`)
-	if err != nil {
-		return err
-	}
 
 	// Drop old index and create new index for topic messages
 	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_group`)
@@ -420,15 +403,7 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
-	// Two partial indexes to enforce uniqueness (SQLite treats NULLs as distinct in UNIQUE)
-	_, err = c.db.Exec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_read_status_private
-		ON chat_read_status(user_id) WHERE topic_id IS NULL
-	`)
-	if err != nil {
-		return err
-	}
-
+	// Unique index for topic chat read status
 	_, err = c.db.Exec(`
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_read_status_topic
 		ON chat_read_status(user_id, topic_id) WHERE topic_id IS NOT NULL
@@ -458,15 +433,22 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
-	// Migrate: create bobot topics for existing users and move private messages
-	if err := c.migratePrivateChatsToTopics(); err != nil {
-		return err
+	// Migrate: create bobot topics for existing users and move private messages.
+	// This migration references receiver_id, so only run if the column exists.
+	if hasReceiverID {
+		if err := c.migratePrivateChatsToTopics(); err != nil {
+			return err
+		}
 	}
 
-	// Cleanup: drop old private chat indexes (data has been migrated to topics)
+	// Cleanup: drop old private chat indexes and receiver_id column
 	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_private_chat`)
 	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_context`)
 	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_chat_read_status_private`)
+
+	if err := c.dropColumnIfExists("messages", "receiver_id"); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -603,6 +585,26 @@ func (c *CoreDB) renameColumnIfExists(table, oldName, newName string) error {
 	return nil
 }
 
+func (c *CoreDB) columnExists(table, column string) (bool, error) {
+	var count int
+	err := c.db.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info(?)
+		WHERE name = ?
+	`, table, column).Scan(&count)
+	return count > 0, err
+}
+
+func (c *CoreDB) dropColumnIfExists(table, column string) error {
+	exists, err := c.columnExists(table, column)
+	if err != nil {
+		return err
+	}
+	if exists {
+		_, err = c.db.Exec("ALTER TABLE " + table + " DROP COLUMN " + column)
+	}
+	return err
+}
+
 func (c *CoreDB) renameTableIfExists(oldName, newName string) error {
 	// Check if old table exists
 	var oldCount int
@@ -725,12 +727,9 @@ func (c *CoreDB) scanMessages(rows *sql.Rows) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		var receiverID, topicID sql.NullInt64
-		if err := rows.Scan(&m.ID, &m.SenderID, &receiverID, &topicID, &m.Role, &m.Content, &m.RawContent, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+		var topicID sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.SenderID, &topicID, &m.Role, &m.Content, &m.RawContent, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
-		}
-		if receiverID.Valid {
-			m.ReceiverID = &receiverID.Int64
 		}
 		m.TopicID = topicID.Int64
 		messages = append(messages, m)
@@ -933,7 +932,7 @@ func (c *CoreDB) UpsertUserProfile(userID int64, content string, lastMessageID i
 // GetUserMessagesSince returns user-role messages sent by a user since a given message ID.
 func (c *CoreDB) GetUserMessagesSince(userID int64, sinceMessageID int64) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE sender_id = ? AND role = 'user' AND id > ?
 		ORDER BY id ASC
@@ -1219,8 +1218,8 @@ func (c *CoreDB) SetTopicMemberAutoRead(topicID, userID int64, autoRead bool) er
 // GetTopicRecentMessages returns the most recent messages for a topic.
 func (c *CoreDB) GetTopicRecentMessages(topicID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at FROM (
-			SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at FROM (
+			SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 			FROM messages
 			WHERE topic_id = ?
 			  AND content != ''
@@ -1239,7 +1238,7 @@ func (c *CoreDB) GetTopicRecentMessages(topicID int64, limit int) ([]Message, er
 // GetTopicMessagesBefore returns messages before a given ID for a topic.
 func (c *CoreDB) GetTopicMessagesBefore(topicID, beforeID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND id < ?
 		  AND content != ''
@@ -1257,7 +1256,7 @@ func (c *CoreDB) GetTopicMessagesBefore(topicID, beforeID int64, limit int) ([]M
 // GetTopicMessagesSince returns messages since a given time for a topic.
 func (c *CoreDB) GetTopicMessagesSince(topicID int64, since time.Time) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND created_at > ?
 		  AND content != ''
@@ -1365,7 +1364,7 @@ func (c *CoreDB) GetTopicContextMessages(topicID int64) ([]Message, error) {
 	}
 
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND id >= ? AND role IN ('user', 'assistant')
 		ORDER BY id ASC
