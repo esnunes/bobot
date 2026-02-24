@@ -150,8 +150,8 @@ CREATE TABLE IF NOT EXISTS device_states (
 | `mode: dry` | `{"airConJobMode": {"currentJobMode": "AIR_DRY"}}` |
 | `mode: fan` | `{"airConJobMode": {"currentJobMode": "FAN"}}` |
 | `fan_speed: <value>` | `{"airFlow": {"windStrength": "<VALUE>"}}` |
-| `display: on` | `{"display": {"displayLight": "DISPLAY_ON"}}` |
-| `display: off` | `{"display": {"displayLight": "DISPLAY_OFF"}}` |
+| `display: on` | `{"display": {"light": "ON"}}` |
+| `display: off` | `{"display": {"light": "OFF"}}` |
 
 Multiple settings can be combined in a single `set` command. Parameters are merged into one control payload.
 

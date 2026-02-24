@@ -287,11 +287,11 @@ func (t *ThinqTool) execSet(input map[string]any) (string, error) {
 	}
 
 	if display, ok := input["display"].(string); ok {
-		val := "DISPLAY_ON"
+		val := "ON"
 		if display == "off" {
-			val = "DISPLAY_OFF"
+			val = "OFF"
 		}
-		cmd["display"] = map[string]any{"displayLight": val}
+		cmd["display"] = map[string]any{"light": val}
 	}
 
 	if len(cmd) == 0 {
@@ -353,7 +353,7 @@ func formatState(deviceID string, state map[string]any) string {
 		}
 	}
 	if disp, ok := state["display"].(map[string]any); ok {
-		if dl, ok := disp["displayLight"].(string); ok {
+		if dl, ok := disp["light"].(string); ok {
 			sb.WriteString(fmt.Sprintf("Display: %s\n", dl))
 		}
 	}
