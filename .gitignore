@@ -25,7 +25,8 @@ coverage.out
 mise.local.toml
 
 # Worktrees
-.worktrees/
+/.worktrees/
+/.claude/worktrees/
 
 # AKB (auto-generated knowledge base)
 docs/akb/*
