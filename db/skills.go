@@ -17,13 +17,9 @@ type SkillRow struct {
 }
 
 func (c *CoreDB) CreateSkill(userID, topicID int64, name, description, content string) (*SkillRow, error) {
-	var dbTopicID any = topicID
-	if topicID == 0 {
-		dbTopicID = nil
-	}
 	result, err := c.db.Exec(
 		"INSERT INTO skills (user_id, topic_id, name, description, content) VALUES (?, ?, ?, ?, ?)",
-		userID, dbTopicID, name, description, content,
+		userID, topicID, name, description, content,
 	)
 	if err != nil {
 		return nil, err

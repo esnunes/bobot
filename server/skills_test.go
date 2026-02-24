@@ -135,11 +135,13 @@ func TestCreateSkillForm(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
 	form := url.Values{}
 	form.Set("name", "groceries")
 	form.Set("description", "Manage grocery lists")
 	form.Set("content", "Use task tool")
+	form.Set("topic_id", strconv.FormatInt(bobotTopic.ID, 10))
 
 	req := httptest.NewRequest("POST", "/skills", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
