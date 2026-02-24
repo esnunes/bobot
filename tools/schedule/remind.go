@@ -117,7 +117,7 @@ func (t *RemindTool) Execute(ctx context.Context, input map[string]any) (string,
 	}
 }
 
-func (t *RemindTool) create(userID int64, topicID *int64, input map[string]any) (string, error) {
+func (t *RemindTool) create(userID, topicID int64, input map[string]any) (string, error) {
 	message, _ := input["message"].(string)
 	if message == "" {
 		return "", fmt.Errorf("message is required")
@@ -151,15 +151,8 @@ func (t *RemindTool) create(userID int64, topicID *int64, input map[string]any) 
 		id, runAt.Format("2006-01-02 15:04"), message), nil
 }
 
-func (t *RemindTool) list(userID int64, topicID *int64) (string, error) {
-	var reminders []Reminder
-	var err error
-
-	if topicID != nil {
-		reminders, err = t.db.ListPendingRemindersByTopic(userID, *topicID)
-	} else {
-		reminders, err = t.db.ListPendingReminders(userID)
-	}
+func (t *RemindTool) list(userID, topicID int64) (string, error) {
+	reminders, err := t.db.ListPendingRemindersByTopic(userID, topicID)
 	if err != nil {
 		return "", fmt.Errorf("failed to list reminders: %w", err)
 	}

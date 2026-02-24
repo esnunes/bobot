@@ -12,41 +12,24 @@ import (
 	"github.com/esnunes/bobot/tools/schedule"
 )
 
-// mockPipeline records calls to SendPrivateMessage and SendTopicMessage.
+// mockPipeline records calls to SendMessage.
 type mockPipeline struct {
 	mu       sync.Mutex
-	private  []privateCall
-	topic    []topicCall
+	calls    []messageCall
 	failNext bool
 }
 
-type privateCall struct {
-	UserID  int64
-	Content string
-}
-
-type topicCall struct {
+type messageCall struct {
 	UserID      int64
 	TopicID     int64
 	Content     string
 	DisplayName string
 }
 
-func (m *mockPipeline) SendPrivateMessage(ctx context.Context, userID int64, content string) (string, error) {
+func (m *mockPipeline) SendMessage(ctx context.Context, userID int64, topicID int64, content string, displayName string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.private = append(m.private, privateCall{UserID: userID, Content: content})
-	if m.failNext {
-		m.failNext = false
-		return "", fmt.Errorf("mock error")
-	}
-	return "ok", nil
-}
-
-func (m *mockPipeline) SendTopicMessage(ctx context.Context, userID int64, topicID int64, content string, displayName string) (string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.topic = append(m.topic, topicCall{UserID: userID, TopicID: topicID, Content: content, DisplayName: displayName})
+	m.calls = append(m.calls, messageCall{UserID: userID, TopicID: topicID, Content: content, DisplayName: displayName})
 	if m.failNext {
 		m.failNext = false
 		return "", fmt.Errorf("mock error")
@@ -76,28 +59,36 @@ func setupTest(t *testing.T) (*schedule.ScheduleDB, *db.CoreDB, *mockPipeline) {
 func TestExecuteReminder(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
-	// Create a test user
+	// Create a test user with a bobot topic (needed for nil-topic reminders)
 	user, err := coreDB.CreateUser("testuser", "hash")
 	if err != nil {
 		t.Fatal(err)
 	}
+	bobotTopic, err := coreDB.CreateBobotTopic(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// Create a due reminder
+	// Create a due reminder with bobot topic
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateReminder(user.ID, nil, "call dentist", past)
+	tid := bobotTopic.ID
+	schedDB.CreateReminder(user.ID, tid, "call dentist", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
 
-	if len(pipeline.private) != 1 {
-		t.Fatalf("expected 1 private message, got %d", len(pipeline.private))
+	if len(pipeline.calls) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(pipeline.calls))
 	}
 	wantContent := "<bobot-remind>call dentist</bobot-remind>"
-	if pipeline.private[0].Content != wantContent {
-		t.Errorf("got content %q, want %q", pipeline.private[0].Content, wantContent)
+	if pipeline.calls[0].Content != wantContent {
+		t.Errorf("got content %q, want %q", pipeline.calls[0].Content, wantContent)
 	}
-	if pipeline.private[0].UserID != user.ID {
-		t.Errorf("got user_id %d, want %d", pipeline.private[0].UserID, user.ID)
+	if pipeline.calls[0].UserID != user.ID {
+		t.Errorf("got user_id %d, want %d", pipeline.calls[0].UserID, user.ID)
+	}
+	if pipeline.calls[0].TopicID != bobotTopic.ID {
+		t.Errorf("got topic_id %d, want %d", pipeline.calls[0].TopicID, bobotTopic.ID)
 	}
 
 	// Verify reminder is marked as executed
@@ -123,19 +114,19 @@ func TestExecuteReminderInTopic(t *testing.T) {
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
 	tid := topic.ID
-	schedDB.CreateReminder(user.ID, &tid, "topic reminder", past)
+	schedDB.CreateReminder(user.ID, tid, "topic reminder", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
 
-	if len(pipeline.topic) != 1 {
-		t.Fatalf("expected 1 topic message, got %d", len(pipeline.topic))
+	if len(pipeline.calls) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(pipeline.calls))
 	}
-	if pipeline.topic[0].Content != "<bobot-remind>topic reminder</bobot-remind>" {
-		t.Errorf("got content %q", pipeline.topic[0].Content)
+	if pipeline.calls[0].Content != "<bobot-remind>topic reminder</bobot-remind>" {
+		t.Errorf("got content %q", pipeline.calls[0].Content)
 	}
-	if pipeline.topic[0].TopicID != topic.ID {
-		t.Errorf("got topic_id %d, want %d", pipeline.topic[0].TopicID, topic.ID)
+	if pipeline.calls[0].TopicID != topic.ID {
+		t.Errorf("got topic_id %d, want %d", pipeline.calls[0].TopicID, topic.ID)
 	}
 }
 
@@ -143,16 +134,18 @@ func TestExecuteReminderBlockedUser(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("blocked", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 	coreDB.BlockUser(user.ID)
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateReminder(user.ID, nil, "should not execute", past)
+	tid := bobotTopic.ID
+	schedDB.CreateReminder(user.ID, tid, "should not execute", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
 
-	if len(pipeline.private) != 0 {
-		t.Errorf("expected 0 messages for blocked user, got %d", len(pipeline.private))
+	if len(pipeline.calls) != 0 {
+		t.Errorf("expected 0 messages for blocked user, got %d", len(pipeline.calls))
 	}
 
 	// Should be marked as failed
@@ -173,13 +166,13 @@ func TestExecuteReminderDeletedTopic(t *testing.T) {
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
 	tid := topic.ID
-	schedDB.CreateReminder(user.ID, &tid, "should not execute", past)
+	schedDB.CreateReminder(user.ID, tid, "should not execute", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
 
-	if len(pipeline.topic) != 0 {
-		t.Errorf("expected 0 messages for deleted topic, got %d", len(pipeline.topic))
+	if len(pipeline.calls) != 0 {
+		t.Errorf("expected 0 messages for deleted topic, got %d", len(pipeline.calls))
 	}
 
 	r, _ := schedDB.GetReminder(1)
@@ -192,18 +185,26 @@ func TestExecuteCronJob(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
+	bobotTopic, err := coreDB.CreateBobotTopic(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateCronJob(user.ID, nil, "daily tasks", "summarize my tasks", "0 9 * * 1-5", past)
+	tid := bobotTopic.ID
+	schedDB.CreateCronJob(user.ID, tid, "daily tasks", "summarize my tasks", "0 9 * * 1-5", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
 
-	if len(pipeline.private) != 1 {
-		t.Fatalf("expected 1 private message, got %d", len(pipeline.private))
+	if len(pipeline.calls) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(pipeline.calls))
 	}
-	if pipeline.private[0].Content != "<bobot-cron>summarize my tasks</bobot-cron>" {
-		t.Errorf("got content %q", pipeline.private[0].Content)
+	if pipeline.calls[0].Content != "<bobot-cron>summarize my tasks</bobot-cron>" {
+		t.Errorf("got content %q", pipeline.calls[0].Content)
+	}
+	if pipeline.calls[0].TopicID != bobotTopic.ID {
+		t.Errorf("got topic_id %d, want %d", pipeline.calls[0].TopicID, bobotTopic.ID)
 	}
 }
 
@@ -211,16 +212,18 @@ func TestExecuteCronJobBlockedUser(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("blocked", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 	coreDB.BlockUser(user.ID)
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateCronJob(user.ID, nil, "job", "prompt", "0 9 * * *", past)
+	tid := bobotTopic.ID
+	schedDB.CreateCronJob(user.ID, tid, "job", "prompt", "0 9 * * *", past)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
 
-	if len(pipeline.private) != 0 {
-		t.Errorf("expected 0 messages for blocked user, got %d", len(pipeline.private))
+	if len(pipeline.calls) != 0 {
+		t.Errorf("expected 0 messages for blocked user, got %d", len(pipeline.calls))
 	}
 
 	// Cron job should be disabled
@@ -234,9 +237,11 @@ func TestExecuteReminderFailed(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
 	past := time.Now().UTC().Add(-5 * time.Minute)
-	schedDB.CreateReminder(user.ID, nil, "will fail", past)
+	tid := bobotTopic.ID
+	schedDB.CreateReminder(user.ID, tid, "will fail", past)
 
 	pipeline.failNext = true
 
@@ -253,16 +258,18 @@ func TestFutureItemsNotExecuted(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
 	future := time.Now().UTC().Add(1 * time.Hour)
-	schedDB.CreateReminder(user.ID, nil, "future reminder", future)
-	schedDB.CreateCronJob(user.ID, nil, "future job", "prompt", "0 9 * * *", future)
+	tid := bobotTopic.ID
+	schedDB.CreateReminder(user.ID, tid, "future reminder", future)
+	schedDB.CreateCronJob(user.ID, tid, "future job", "prompt", "0 9 * * *", future)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
 
-	if len(pipeline.private) != 0 {
-		t.Errorf("expected 0 messages for future items, got %d", len(pipeline.private))
+	if len(pipeline.calls) != 0 {
+		t.Errorf("expected 0 messages for future items, got %d", len(pipeline.calls))
 	}
 }
 
@@ -270,17 +277,19 @@ func TestCoalescingMultipleMissedRuns(t *testing.T) {
 	schedDB, coreDB, pipeline := setupTest(t)
 
 	user, _ := coreDB.CreateUser("testuser", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
 	// Create a cron job that missed many runs (next_run_at far in the past)
 	longPast := time.Now().UTC().Add(-24 * time.Hour)
-	schedDB.CreateCronJob(user.ID, nil, "missed job", "prompt", "0 * * * *", longPast)
+	tid := bobotTopic.ID
+	schedDB.CreateCronJob(user.ID, tid, "missed job", "prompt", "0 * * * *", longPast)
 
 	s := New(schedDB, coreDB, pipeline, 5*time.Minute)
 	s.tick(context.Background())
 
 	// Should execute exactly once (coalescing)
-	if len(pipeline.private) != 1 {
-		t.Errorf("expected 1 message (coalesced), got %d", len(pipeline.private))
+	if len(pipeline.calls) != 1 {
+		t.Errorf("expected 1 message (coalesced), got %d", len(pipeline.calls))
 	}
 }
 

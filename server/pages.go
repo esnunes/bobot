@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/esnunes/bobot/auth"
-	"github.com/esnunes/bobot/db"
 	"github.com/esnunes/bobot/web"
 )
 
@@ -127,11 +126,11 @@ type PageData struct {
 	AdminUsers     []AdminUserView
 	AdminTopics    []AdminTopicView
 	Context        *ContextInspectionView
-	BobotHasUnread  bool
 	HasOtherUnreads bool
 	UnreadJSON      template.JS
 	PushMuted       bool
 	AutoRead        bool
+	AutoRespond     bool
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data PageData) {
@@ -139,14 +138,10 @@ func (s *Server) render(w http.ResponseWriter, name string, data PageData) {
 	s.templates[name].Execute(w, data)
 }
 
-// buildUnreadJSON returns a JSON array of chat IDs with unread messages.
-// Private bobot chat is represented as 0.
-func buildUnreadJSON(bobotUnread bool, topicUnreads map[int64]bool) template.JS {
+// buildUnreadJSON returns a JSON array of topic IDs with unread messages.
+func buildUnreadJSON(unreads map[int64]bool) template.JS {
 	var ids []int64
-	if bobotUnread {
-		ids = append(ids, 0)
-	}
-	for topicID := range topicUnreads {
+	for topicID := range unreads {
 		ids = append(ids, topicID)
 	}
 	if len(ids) == 0 {
@@ -168,12 +163,6 @@ func (s *Server) loadTemplates() error {
 		return err
 	}
 	s.templates["signup"] = signupTmpl
-
-	chatTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/chat.html")
-	if err != nil {
-		return err
-	}
-	s.templates["chat"] = chatTmpl
 
 	chatsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/chats.html")
 	if err != nil {
@@ -318,40 +307,14 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 
-	dbMessages, _ := s.db.GetPrivateChatRecentMessages(userData.UserID, 50)
+	topic, err := s.db.GetUserBobotTopic(userData.UserID)
 
-	type chatMessageJSON struct {
-		ID        int64  `json:"id"`
-		Role      string `json:"role"`
-		Content   string `json:"content"`
-		CreatedAt string `json:"created_at"`
+	target := "/chats"
+	if err == nil && topic != nil {
+		target = "/chats/" + strconv.FormatInt(topic.ID, 10)
 	}
-
-	jsonMessages := make([]chatMessageJSON, 0, len(dbMessages))
-	for _, m := range dbMessages {
-		jsonMessages = append(jsonMessages, chatMessageJSON{
-			ID:        m.ID,
-			Role:      m.Role,
-			Content:   m.Content,
-			CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		})
-	}
-
-	jsonData, _ := json.Marshal(map[string]any{
-		"messages": jsonMessages,
-	})
-
-	s.markChatReadImplicit(userData.UserID, db.PrivateChatTopicID)
-
-	bobotUnread, topicUnreads, _ := s.db.GetUnreadChats(userData.UserID)
-
-	s.render(w, "chat", PageData{
-		Title:           "Chat",
-		PageDataJSON:    template.JS(jsonData),
-		IsAdmin:         userData.Role == "admin",
-		HasOtherUnreads: len(topicUnreads) > 0,
-		UnreadJSON:      buildUnreadJSON(bobotUnread, topicUnreads),
-	})
+	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+target+`"}}`)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleChatsPage(w http.ResponseWriter, r *http.Request) {
@@ -363,7 +326,7 @@ func (s *Server) handleChatsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bobotUnread, topicUnreads, _ := s.db.GetUnreadChats(userData.UserID)
+	unreads, _ := s.db.GetUnreadChats(userData.UserID)
 
 	topicViews := make([]TopicView, 0, len(topics))
 	for _, t := range topics {
@@ -372,15 +335,14 @@ func (s *Server) handleChatsPage(w http.ResponseWriter, r *http.Request) {
 			ID:          t.ID,
 			Name:        t.Name,
 			MemberCount: len(members),
-			HasUnread:   topicUnreads[t.ID],
+			HasUnread:   unreads[t.ID],
 		})
 	}
 
 	s.render(w, "chats", PageData{
-		Title:          "Chats",
-		Topics:         topicViews,
-		BobotHasUnread: bobotUnread,
-		UnreadJSON:     buildUnreadJSON(bobotUnread, topicUnreads),
+		Title:      "Chats",
+		Topics:     topicViews,
+		UnreadJSON: buildUnreadJSON(unreads),
 	})
 }
 
@@ -460,14 +422,15 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 	jsonData, _ := json.Marshal(map[string]any{
 		"current_user_id": userData.UserID,
 		"messages":        jsonMessages,
+		"auto_respond":    topic.AutoRespond,
 	})
 
 	s.markChatReadImplicit(userData.UserID, topicID)
 
-	bobotUnread, topicUnreads, _ := s.db.GetUnreadChats(userData.UserID)
-	otherTopicUnreads := len(topicUnreads)
-	if topicUnreads[topicID] {
-		otherTopicUnreads--
+	unreads, _ := s.db.GetUnreadChats(userData.UserID)
+	otherUnreads := len(unreads)
+	if unreads[topicID] {
+		otherUnreads--
 	}
 
 	s.render(w, "topic_chat", PageData{
@@ -479,9 +442,10 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		Members:         members,
 		PageDataJSON:    template.JS(jsonData),
 		IsAdmin:         userData.Role == "admin",
-		HasOtherUnreads: bobotUnread || otherTopicUnreads > 0,
-		UnreadJSON:      buildUnreadJSON(bobotUnread, topicUnreads),
+		HasOtherUnreads: otherUnreads > 0,
+		UnreadJSON:      buildUnreadJSON(unreads),
 		PushMuted:       pushMuted,
 		AutoRead:        autoRead,
+		AutoRespond:     topic.AutoRespond,
 	})
 }

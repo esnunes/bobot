@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -169,40 +168,6 @@ func TestServer_Login_UserNotFound(t *testing.T) {
 // See TestHandleLogout_ClearsCookie and TestHandleLogout_WithAllParam_CreatesRevocation
 // for session-based logout tests
 
-func TestMessageEndpointsRequireAuth(t *testing.T) {
-	tmpDir := t.TempDir()
-	coreDB, _ := db.NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer coreDB.Close()
-
-	cfg := &config.Config{
-		JWT:     config.JWTConfig{Secret: "testsecret"},
-		Session: config.SessionConfig{},
-		History: config.HistoryConfig{
-			DefaultLimit: 50,
-			MaxLimit:     100,
-		},
-		Sync: config.SyncConfig{
-			MaxLookback: 24 * time.Hour,
-		},
-	}
-	srv := New(cfg, coreDB)
-
-	endpoints := []string{
-		"/api/messages/history?before=1",
-		"/api/messages/sync?since=2020-01-01T00:00:00Z",
-	}
-
-	for _, endpoint := range endpoints {
-		req := httptest.NewRequest("GET", endpoint, nil)
-		rec := httptest.NewRecorder()
-		srv.ServeHTTP(rec, req)
-
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("%s: expected 401, got %d", endpoint, rec.Code)
-		}
-	}
-}
-
 func TestLogin_BlockedUser(t *testing.T) {
 	srv := setupTestServer(t)
 
@@ -271,8 +236,20 @@ func TestSignup_ValidInvite(t *testing.T) {
 		t.Error("invite should be marked as used")
 	}
 
-	// Verify welcome message was sent
-	messages, err := srv.db.GetPrivateChatMessages(user.ID, 10)
+	// Verify bobot topic was created
+	bobotTopic, err := srv.db.GetUserBobotTopic(user.ID)
+	if err != nil {
+		t.Fatalf("failed to get bobot topic: %v", err)
+	}
+	if bobotTopic == nil {
+		t.Fatal("expected bobot topic to be created")
+	}
+	if !bobotTopic.AutoRespond {
+		t.Error("expected bobot topic to have auto_respond enabled")
+	}
+
+	// Verify welcome message was sent in bobot topic
+	messages, err := srv.db.GetTopicRecentMessages(bobotTopic.ID, 10)
 	if err != nil {
 		t.Fatalf("failed to get messages: %v", err)
 	}

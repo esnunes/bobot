@@ -106,10 +106,6 @@ type mockContextProvider struct {
 	messages []ContextMessage
 }
 
-func (m *mockContextProvider) GetContextMessages(userID int64) ([]ContextMessage, error) {
-	return m.messages, nil
-}
-
 func (m *mockContextProvider) GetTopicContextMessages(topicID int64) ([]ContextMessage, error) {
 	return m.messages, nil
 }
@@ -154,12 +150,7 @@ func TestEngine_Chat_WithContextMessages(t *testing.T) {
 }
 
 type mockTopicContextProvider struct {
-	privateMessages []ContextMessage
-	topicMessages   []ContextMessage
-}
-
-func (m *mockTopicContextProvider) GetContextMessages(userID int64) ([]ContextMessage, error) {
-	return m.privateMessages, nil
+	topicMessages []ContextMessage
 }
 
 func (m *mockTopicContextProvider) GetTopicContextMessages(topicID int64) ([]ContextMessage, error) {
@@ -167,13 +158,7 @@ func (m *mockTopicContextProvider) GetTopicContextMessages(topicID int64) ([]Con
 }
 
 type mockTopicProfileProvider struct {
-	userProfiles  map[int64]string
 	topicProfiles map[int64]string
-}
-
-func (m *mockTopicProfileProvider) GetUserProfile(userID int64) (string, int64, error) {
-	content := m.userProfiles[userID]
-	return content, 0, nil
 }
 
 func (m *mockTopicProfileProvider) GetTopicMemberProfiles(topicID int64) (string, error) {
@@ -181,8 +166,7 @@ func (m *mockTopicProfileProvider) GetTopicMemberProfiles(topicID int64) (string
 }
 
 type mockTopicMessageSaver struct {
-	privateMessages []savedMessage
-	topicMessages   []savedTopicMessage
+	topicMessages []savedTopicMessage
 }
 
 type savedTopicMessage struct {
@@ -191,13 +175,6 @@ type savedTopicMessage struct {
 	Role       string
 	Content    string
 	RawContent string
-}
-
-func (m *mockTopicMessageSaver) SaveMessage(userID int64, role, content, rawContent string) error {
-	m.privateMessages = append(m.privateMessages, savedMessage{
-		UserID: userID, Role: role, Content: content, RawContent: rawContent,
-	})
-	return nil
 }
 
 func (m *mockTopicMessageSaver) SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error {
@@ -285,9 +262,6 @@ func TestEngine_Chat_TopicSimpleResponse(t *testing.T) {
 	if saver.topicMessages[0].TopicID != 42 {
 		t.Errorf("expected topicID 42, got %d", saver.topicMessages[0].TopicID)
 	}
-	if len(saver.privateMessages) != 0 {
-		t.Errorf("expected 0 private messages saved, got %d", len(saver.privateMessages))
-	}
 }
 
 func TestEngine_Chat_TopicWithTools(t *testing.T) {
@@ -341,16 +315,9 @@ type mockProfileProvider struct {
 	profiles map[int64]string
 }
 
-func (m *mockProfileProvider) GetUserProfile(userID int64) (string, int64, error) {
-	content, ok := m.profiles[userID]
-	if !ok {
-		return "", 0, nil
-	}
-	return content, 0, nil
-}
-
 func (m *mockProfileProvider) GetTopicMemberProfiles(topicID int64) (string, error) {
-	return "", nil
+	content := m.profiles[topicID]
+	return content, nil
 }
 
 func TestEngine_Chat_InjectsProfile(t *testing.T) {
@@ -365,7 +332,7 @@ func TestEngine_Chat_InjectsProfile(t *testing.T) {
 	mockCtxProvider := &mockContextProvider{messages: nil}
 	mockProfile := &mockProfileProvider{
 		profiles: map[int64]string{
-			1: "Eduardo lives in Berlin. Prefers concise responses.",
+			10: "Eduardo lives in Berlin. Prefers concise responses.",
 		},
 	}
 
@@ -373,7 +340,7 @@ func TestEngine_Chat_InjectsProfile(t *testing.T) {
 	engine := NewEngine(mockProv, registry, nil, mockCtxProvider, mockProfile)
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1})
-	_, err := engine.Chat(ctx, ChatOptions{Message: "Hi"})
+	_, err := engine.Chat(ctx, ChatOptions{Message: "Hi", TopicID: 10})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -381,33 +348,20 @@ func TestEngine_Chat_InjectsProfile(t *testing.T) {
 	if !strings.Contains(capturedSystemPrompt, "Eduardo lives in Berlin") {
 		t.Error("expected system prompt to contain user profile")
 	}
-	if !strings.Contains(capturedSystemPrompt, "<user-profile>") {
-		t.Error("expected system prompt to contain <user-profile> tags")
-	}
-}
-
-type savedMessage struct {
-	UserID     int64
-	Role       string
-	Content    string
-	RawContent string
 }
 
 type mockMessageSaver struct {
-	messages []savedMessage
+	messages []savedTopicMessage
 }
 
-func (m *mockMessageSaver) SaveMessage(userID int64, role, content, rawContent string) error {
-	m.messages = append(m.messages, savedMessage{
+func (m *mockMessageSaver) SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error {
+	m.messages = append(m.messages, savedTopicMessage{
+		TopicID:    topicID,
 		UserID:     userID,
 		Role:       role,
 		Content:    content,
 		RawContent: rawContent,
 	})
-	return nil
-}
-
-func (m *mockMessageSaver) SaveTopicMessage(topicID, userID int64, role, content, rawContent string) error {
 	return nil
 }
 
@@ -529,15 +483,7 @@ func TestEngine_Chat_NoProfileNoInjection(t *testing.T) {
 }
 
 type mockSkillProvider struct {
-	privateSkills map[int64][]Skill
-	topicSkills   map[int64][]Skill
-}
-
-func (m *mockSkillProvider) GetPrivateChatSkills(userID int64) ([]Skill, error) {
-	if m.privateSkills == nil {
-		return nil, nil
-	}
-	return m.privateSkills[userID], nil
+	topicSkills map[int64][]Skill
 }
 
 func (m *mockSkillProvider) GetTopicSkills(topicID int64) ([]Skill, error) {
@@ -560,8 +506,8 @@ func TestEngine_MergesUserSkillsIntoPrompt(t *testing.T) {
 	builtinSkills := []Skill{{Name: "builtin", Description: "Built-in skill", Content: "builtin content"}}
 
 	skillProvider := &mockSkillProvider{
-		privateSkills: map[int64][]Skill{
-			1: {{Name: "custom", Description: "Custom skill", Content: "custom content"}},
+		topicSkills: map[int64][]Skill{
+			10: {{Name: "custom", Description: "Custom skill", Content: "custom content"}},
 		},
 	}
 
@@ -571,7 +517,7 @@ func TestEngine_MergesUserSkillsIntoPrompt(t *testing.T) {
 
 	ctx := auth.ContextWithUserData(context.Background(), auth.UserData{UserID: 1, Role: "user"})
 
-	engine.Chat(ctx, ChatOptions{Message: "hello"})
+	engine.Chat(ctx, ChatOptions{Message: "hello", TopicID: 10})
 
 	if capturedSystemPrompt == "" {
 		t.Fatal("expected system prompt to be set")

@@ -3,9 +3,7 @@ package db
 
 import (
 	"database/sql"
-	"fmt"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -164,60 +162,6 @@ func TestCoreDB_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestCoreDB_Messages(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("msguser", "hash")
-
-	// Create messages: user sends to bobot
-	msg1, err := db.CreateMessage(user.ID, BobotUserID, "user", "Hello", "Hello")
-	if err != nil {
-		t.Fatalf("failed to create message: %v", err)
-	}
-	if msg1.Content != "Hello" {
-		t.Errorf("expected content Hello, got %s", msg1.Content)
-	}
-
-	// Bobot responds to user
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi there!", "Hi there!")
-
-	// Get messages
-	messages, err := db.GetPrivateChatMessages(user.ID, 10)
-	if err != nil {
-		t.Fatalf("failed to get messages: %v", err)
-	}
-	if len(messages) != 2 {
-		t.Errorf("expected 2 messages, got %d", len(messages))
-	}
-
-	// Messages should be in chronological order
-	if messages[0].Role != "user" {
-		t.Error("first message should be from user")
-	}
-	if messages[1].Role != "assistant" {
-		t.Error("second message should be from assistant")
-	}
-}
-
-func TestCoreDB_GetMessagesLimit(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("limituser", "hash")
-
-	for i := 0; i < 5; i++ {
-		db.CreateMessage(user.ID, BobotUserID, "user", "msg", "msg")
-	}
-
-	messages, _ := db.GetPrivateChatMessages(user.ID, 3)
-	if len(messages) != 3 {
-		t.Errorf("expected 3 messages, got %d", len(messages))
-	}
-}
-
 func TestCoreDB_MessageTokenColumns(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
@@ -232,219 +176,6 @@ func TestCoreDB_MessageTokenColumns(t *testing.T) {
 	// Should get no rows error, not column missing error
 	if err != nil && err.Error() != "sql: no rows in result set" {
 		t.Errorf("expected no rows error or success, got: %v", err)
-	}
-}
-
-func TestCoreDB_CreateMessageWithTokens(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("tokenuser", "hash")
-
-	// First message starts a chunk (context_tokens = 0)
-	msg1, err := db.CreateMessageWithContext(user.ID, BobotUserID, "user", "Hello world", "Hello world")
-	if err != nil {
-		t.Fatalf("failed to create message: %v", err)
-	}
-
-	// "Hello world" = 11 chars / 4 = 2 tokens (integer division)
-	if msg1.Tokens != 2 {
-		t.Errorf("expected 2 tokens, got %d", msg1.Tokens)
-	}
-	if msg1.ContextTokens != 0 {
-		t.Errorf("first message should have context_tokens=0, got %d", msg1.ContextTokens)
-	}
-
-	// Second message continues the chunk (bobot responds to user)
-	msg2, _ := db.CreateMessageWithContext(BobotUserID, user.ID, "assistant", "Hi there, how can I help?", "Hi there, how can I help?")
-	// "Hi there, how can I help?" = 25 chars / 4 = 6 tokens
-	if msg2.Tokens != 6 {
-		t.Errorf("expected 6 tokens, got %d", msg2.Tokens)
-	}
-	// context_tokens = previous (0 + 2) + current (6) = 8
-	if msg2.ContextTokens != 8 {
-		t.Errorf("expected context_tokens=8, got %d", msg2.ContextTokens)
-	}
-}
-
-func TestCoreDB_ChunkReset(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("chunkuser", "hash")
-
-	// Use thresholds: start=10, max=30
-	// Formula: contextTokens = prevContextTokens + prevTokens + tokens
-	// Each 4 chars = 1 token (integer division)
-
-	// msg1: "aaaa" = 4 chars = 1 token, ctx=0 (first message)
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "aaaa", "aaaa", 10, 30)
-
-	// msg2: "bbbbbbbb" = 8 chars = 2 tokens, ctx = 0 + 1 + 2 = 3
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "bbbbbbbb", "bbbbbbbb", 10, 30)
-
-	// msg3: "cccccccccccc" = 12 chars = 3 tokens, ctx = 3 + 2 + 3 = 8
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "cccccccccccc", "cccccccccccc", 10, 30)
-
-	// msg4: "dddddddddddddddd" = 16 chars = 4 tokens, ctx = 8 + 3 + 4 = 15
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "dddddddddddddddd", "dddddddddddddddd", 10, 30)
-
-	// msg5: "eeeeeeeeeeeeeeeeeeee" = 20 chars = 5 tokens, ctx = 15 + 4 + 5 = 24
-	// 24 < 30, no reset yet
-	msg5, _ := db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "eeeeeeeeeeeeeeeeeeee", "eeeeeeeeeeeeeeeeeeee", 10, 30)
-
-	if msg5.ContextTokens != 24 {
-		t.Errorf("expected context_tokens=24, got %d", msg5.ContextTokens)
-	}
-
-	// msg6: "ffffffffffffffffffffffff" = 24 chars = 6 tokens
-	// Would be ctx = 24 + 5 + 6 = 35 > 30, triggers reset
-	// targetThreshold = 30 - 10 = 20
-	// Find most recent msg with ctx < 20: msg4 has ctx=15 < 20
-	// Subtract 15 from msg4 onwards:
-	//   msg4: 15 - 15 = 0
-	//   msg5: 24 - 15 = 9
-	// Then add msg6: ctx = 9 + 5 + 6 = 20
-	msg6, _ := db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "ffffffffffffffffffffffff", "ffffffffffffffffffffffff", 10, 30)
-
-	if msg6.ContextTokens != 20 {
-		t.Errorf("expected context_tokens=20 after reset, got %d", msg6.ContextTokens)
-	}
-
-	// Verify msg4 is now chunk start (ctx=0)
-	// msg4 is the 4th message overall (OFFSET 3 from the start)
-	var msg4Ctx int
-	db.db.QueryRow("SELECT context_tokens FROM messages WHERE topic_id IS NULL ORDER BY id ASC LIMIT 1 OFFSET 3").Scan(&msg4Ctx)
-	if msg4Ctx != 0 {
-		t.Errorf("expected msg4 context_tokens=0 (chunk start), got %d", msg4Ctx)
-	}
-
-	// Verify msg5 was updated (ctx=9)
-	// msg5 is the 5th message overall (OFFSET 4 from the start)
-	var msg5Ctx int
-	db.db.QueryRow("SELECT context_tokens FROM messages WHERE topic_id IS NULL ORDER BY id ASC LIMIT 1 OFFSET 4").Scan(&msg5Ctx)
-	if msg5Ctx != 9 {
-		t.Errorf("expected msg5 context_tokens=9 after reset, got %d", msg5Ctx)
-	}
-}
-
-func TestCoreDB_GetContextMessages(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("ctxuser", "hash")
-
-	// Create some messages - small thresholds for testing
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "aaaa", "aaaa", 10, 20)         // msg1: ctx=0
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", "bbbb", "bbbb", 10, 20)    // msg2: ctx=2
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "cccc", "cccc", 10, 20)         // msg3: ctx=3
-
-	// Force a reset by adding messages that exceed threshold
-	db.CreatePrivateMessageWithContextThreshold(BobotUserID, user.ID, "assistant", strings.Repeat("d", 40), strings.Repeat("d", 40), 10, 20) // tokens=10, exceeds
-	db.CreatePrivateMessageWithContextThreshold(user.ID, BobotUserID, "user", "eeee", "eeee", 10, 20)          // msg5
-
-	// Get context messages (should only return from most recent chunk start)
-	messages, err := db.GetPrivateChatContextMessages(user.ID)
-	if err != nil {
-		t.Fatalf("failed to get context messages: %v", err)
-	}
-
-	// Should not include msg1 and msg2 (before chunk reset)
-	// First message in result should have context_tokens = 0
-	if len(messages) == 0 {
-		t.Fatal("expected at least one message")
-	}
-	if messages[0].ContextTokens != 0 {
-		t.Errorf("first context message should have context_tokens=0, got %d", messages[0].ContextTokens)
-	}
-}
-
-func TestCoreDB_GetMessagesBefore(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("pageuser", "hash")
-
-	// Create 5 messages
-	var lastID int64
-	for i := 0; i < 5; i++ {
-		msg, _ := db.CreateMessage(user.ID, BobotUserID, "user", fmt.Sprintf("msg%d", i), fmt.Sprintf("msg%d", i))
-		lastID = msg.ID
-	}
-
-	// Get 2 messages before the last one
-	messages, err := db.GetPrivateChatMessagesBefore(user.ID, lastID, 2)
-	if err != nil {
-		t.Fatalf("failed to get messages: %v", err)
-	}
-
-	if len(messages) != 2 {
-		t.Errorf("expected 2 messages, got %d", len(messages))
-	}
-
-	// Should be in DESC order (newest first of the older ones)
-	if messages[0].Content != "msg3" {
-		t.Errorf("expected msg3, got %s", messages[0].Content)
-	}
-	if messages[1].Content != "msg2" {
-		t.Errorf("expected msg2, got %s", messages[1].Content)
-	}
-}
-
-func TestCoreDB_GetMessagesSince(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("sinceuser", "hash")
-
-	// Create messages with time gaps
-	// Note: SQLite CURRENT_TIMESTAMP has second precision, so we need >1s gap
-	db.CreateMessage(user.ID, BobotUserID, "user", "old message", "old message")
-	time.Sleep(1100 * time.Millisecond)
-
-	since := time.Now()
-	time.Sleep(1100 * time.Millisecond)
-
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "new message 1", "new message 1")
-	db.CreateMessage(user.ID, BobotUserID, "user", "new message 2", "new message 2")
-
-	messages, err := db.GetPrivateChatMessagesSince(user.ID, since)
-	if err != nil {
-		t.Fatalf("failed to get messages: %v", err)
-	}
-
-	if len(messages) != 2 {
-		t.Errorf("expected 2 messages, got %d", len(messages))
-	}
-}
-
-func TestCoreDB_GetRecentMessagesIncludesTokens(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
-	defer db.Close()
-
-	user, _ := db.CreateUser("recentuser", "hash")
-
-	// Create message with context tracking
-	db.CreateMessageWithContext(user.ID, BobotUserID, "user", "Hello world", "Hello world")
-
-	messages, err := db.GetPrivateChatRecentMessages(user.ID, 10)
-	if err != nil {
-		t.Fatalf("failed to get messages: %v", err)
-	}
-
-	if len(messages) != 1 {
-		t.Fatalf("expected 1 message, got %d", len(messages))
-	}
-
-	// Tokens should be populated
-	if messages[0].Tokens != 2 { // "Hello world" = 11 chars / 4 = 2
-		t.Errorf("expected tokens=2, got %d", messages[0].Tokens)
 	}
 }
 
@@ -803,7 +534,7 @@ func TestCreateTopicMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTopicMessage failed: %v", err)
 	}
-	if msg.TopicID == nil || *msg.TopicID != topic.ID {
+	if msg.TopicID != topic.ID {
 		t.Error("expected topic_id to be set")
 	}
 	if msg.Content != "Hello topic!" {
@@ -928,7 +659,7 @@ func TestGetTopicByName(t *testing.T) {
 	}
 }
 
-func TestTopicNameUniqueCaseInsensitive(t *testing.T) {
+func TestTopicNameNotGloballyUnique(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -938,19 +669,10 @@ func TestTopicNameUniqueCaseInsensitive(t *testing.T) {
 		t.Fatalf("first CreateTopic failed: %v", err)
 	}
 
-	// Creating topic with same name (different case) should fail
-	_, err = db.CreateTopic("general", owner.ID)
-	if err == nil {
-		t.Error("expected error when creating duplicate topic name (case-insensitive)")
-	}
-
-	// After deleting, should be able to create again
-	topic, _ := db.GetTopicByName("General")
-	db.SoftDeleteTopic(topic.ID)
-
+	// Creating topic with same name should succeed (names are not globally unique)
 	_, err = db.CreateTopic("General", owner.ID)
 	if err != nil {
-		t.Fatalf("CreateTopic after delete failed: %v", err)
+		t.Fatalf("second CreateTopic failed: %v", err)
 	}
 }
 
@@ -1026,11 +748,12 @@ func TestCoreDB_GetUserMessagesSince(t *testing.T) {
 	defer db.Close()
 
 	user, _ := db.CreateUser("msguser", "hash")
+	bobotTopic, _ := db.CreateBobotTopic(user.ID)
 
 	// Create mixed messages
-	msg1, _ := db.CreateMessage(user.ID, BobotUserID, "user", "Hello", "Hello")        // user msg
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "Hi!", "Hi!")                  // assistant msg
-	msg3, _ := db.CreateMessage(user.ID, BobotUserID, "user", "How are you?", "How are you?") // user msg
+	msg1, _ := db.CreateTopicMessage(bobotTopic.ID, user.ID, "user", "Hello", "Hello")        // user msg
+	db.CreateTopicMessage(bobotTopic.ID, BobotUserID, "assistant", "Hi!", "Hi!")               // assistant msg
+	msg3, _ := db.CreateTopicMessage(bobotTopic.ID, user.ID, "user", "How are you?", "How are you?") // user msg
 
 	// Get messages since before all messages
 	msgs, err := db.GetUserMessagesSince(user.ID, 0)
@@ -1117,37 +840,38 @@ func TestDeleteOldSessionRevocations(t *testing.T) {
 	}
 }
 
-func TestCoreDB_MarkChatRead_PrivateChat(t *testing.T) {
+func TestCoreDB_MarkChatRead_BobotTopic(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
 	user, _ := db.CreateUser("reader", "hash")
+	bobotTopic, _ := db.CreateBobotTopic(user.ID)
 
-	// Create a private message
-	msg, _ := db.CreateMessage(user.ID, BobotUserID, "user", "hello", "hello")
+	// Create a message in the bobot topic
+	msg, _ := db.CreateTopicMessage(bobotTopic.ID, user.ID, "user", "hello", "hello")
 
 	// Before marking read, should show unread
-	bobotUnread, _, err := db.GetUnreadChats(user.ID)
+	unreads, err := db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if !bobotUnread {
-		t.Error("expected bobot chat to be unread")
+	if !unreads[bobotTopic.ID] {
+		t.Error("expected bobot topic to be unread")
 	}
 
 	// Mark as read
-	err = db.MarkChatRead(user.ID, PrivateChatTopicID, msg.ID)
+	err = db.MarkChatRead(user.ID, bobotTopic.ID, msg.ID)
 	if err != nil {
 		t.Fatalf("MarkChatRead failed: %v", err)
 	}
 
 	// After marking read, should not show unread
-	bobotUnread, _, err = db.GetUnreadChats(user.ID)
+	unreads, err = db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if bobotUnread {
-		t.Error("expected bobot chat to be read after MarkChatRead")
+	if unreads[bobotTopic.ID] {
+		t.Error("expected bobot topic to be read after MarkChatRead")
 	}
 }
 
@@ -1163,11 +887,11 @@ func TestCoreDB_MarkChatRead_TopicChat(t *testing.T) {
 	msg, _ := db.CreateTopicMessage(topic.ID, user.ID, "user", "hello topic", "hello topic")
 
 	// Before marking read, should show unread
-	_, topicUnreads, err := db.GetUnreadChats(user.ID)
+	unreads, err := db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if !topicUnreads[topic.ID] {
+	if !unreads[topic.ID] {
 		t.Error("expected topic chat to be unread")
 	}
 
@@ -1178,11 +902,11 @@ func TestCoreDB_MarkChatRead_TopicChat(t *testing.T) {
 	}
 
 	// After marking read, should not show unread
-	_, topicUnreads, err = db.GetUnreadChats(user.ID)
+	unreads, err = db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if topicUnreads[topic.ID] {
+	if unreads[topic.ID] {
 		t.Error("expected topic chat to be read after MarkChatRead")
 	}
 }
@@ -1192,28 +916,29 @@ func TestCoreDB_MarkChatRead_Upsert(t *testing.T) {
 	defer db.Close()
 
 	user, _ := db.CreateUser("reader", "hash")
+	bobotTopic, _ := db.CreateBobotTopic(user.ID)
 
 	// Mark read with message ID 1
-	err := db.MarkChatRead(user.ID, PrivateChatTopicID, 1)
+	err := db.MarkChatRead(user.ID, bobotTopic.ID, 1)
 	if err != nil {
 		t.Fatalf("MarkChatRead failed: %v", err)
 	}
 
 	// Mark read again with message ID 5 (upsert)
-	err = db.MarkChatRead(user.ID, PrivateChatTopicID, 5)
+	err = db.MarkChatRead(user.ID, bobotTopic.ID, 5)
 	if err != nil {
 		t.Fatalf("MarkChatRead upsert failed: %v", err)
 	}
 
 	// Verify it was updated, not duplicated
 	var count int
-	db.db.QueryRow("SELECT COUNT(*) FROM chat_read_status WHERE user_id = ?", user.ID).Scan(&count)
+	db.db.QueryRow("SELECT COUNT(*) FROM chat_read_status WHERE user_id = ? AND topic_id = ?", user.ID, bobotTopic.ID).Scan(&count)
 	if count != 1 {
 		t.Errorf("expected 1 row, got %d", count)
 	}
 
 	var lastRead int64
-	db.db.QueryRow("SELECT last_read_message_id FROM chat_read_status WHERE user_id = ? AND topic_id IS NULL", user.ID).Scan(&lastRead)
+	db.db.QueryRow("SELECT last_read_message_id FROM chat_read_status WHERE user_id = ? AND topic_id = ?", user.ID, bobotTopic.ID).Scan(&lastRead)
 	if lastRead != 5 {
 		t.Errorf("expected last_read_message_id=5, got %d", lastRead)
 	}
@@ -1226,15 +951,12 @@ func TestCoreDB_GetUnreadChats_NoRowsMeansRead(t *testing.T) {
 	user, _ := db.CreateUser("newuser", "hash")
 
 	// No messages, no read status — should not show unread
-	bobotUnread, topicUnreads, err := db.GetUnreadChats(user.ID)
+	unreads, err := db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if bobotUnread {
-		t.Error("expected no unread for bobot with no messages")
-	}
-	if len(topicUnreads) != 0 {
-		t.Errorf("expected no unread topics, got %d", len(topicUnreads))
+	if len(unreads) != 0 {
+		t.Errorf("expected no unreads, got %d", len(unreads))
 	}
 }
 
@@ -1243,49 +965,22 @@ func TestCoreDB_GetUnreadChats_NewMessageAfterRead(t *testing.T) {
 	defer db.Close()
 
 	user, _ := db.CreateUser("reader", "hash")
+	bobotTopic, _ := db.CreateBobotTopic(user.ID)
 
-	// Create and read a message
-	msg1, _ := db.CreateMessage(user.ID, BobotUserID, "user", "hello", "hello")
-	db.MarkChatRead(user.ID, PrivateChatTopicID, msg1.ID)
+	// Create and read a message in the bobot topic
+	msg1, _ := db.CreateTopicMessage(bobotTopic.ID, user.ID, "user", "hello", "hello")
+	db.MarkChatRead(user.ID, bobotTopic.ID, msg1.ID)
 
 	// New message arrives from bobot
-	db.CreateMessage(BobotUserID, user.ID, "assistant", "hi there", "hi there")
+	db.CreateTopicMessage(bobotTopic.ID, BobotUserID, "assistant", "hi there", "hi there")
 
 	// Should show unread again
-	bobotUnread, _, err := db.GetUnreadChats(user.ID)
+	unreads, err := db.GetUnreadChats(user.ID)
 	if err != nil {
 		t.Fatalf("GetUnreadChats failed: %v", err)
 	}
-	if !bobotUnread {
-		t.Error("expected bobot chat to be unread after new message")
-	}
-}
-
-func TestCoreDB_GetLatestPrivateMessageID(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
-
-	user, _ := db.CreateUser("reader", "hash")
-
-	// No messages
-	id, err := db.GetLatestPrivateMessageID(user.ID)
-	if err != nil {
-		t.Fatalf("GetLatestPrivateMessageID failed: %v", err)
-	}
-	if id != 0 {
-		t.Errorf("expected 0 for no messages, got %d", id)
-	}
-
-	// Create messages
-	db.CreateMessage(user.ID, BobotUserID, "user", "first", "first")
-	msg2, _ := db.CreateMessage(BobotUserID, user.ID, "assistant", "second", "second")
-
-	id, err = db.GetLatestPrivateMessageID(user.ID)
-	if err != nil {
-		t.Fatalf("GetLatestPrivateMessageID failed: %v", err)
-	}
-	if id != msg2.ID {
-		t.Errorf("expected %d, got %d", msg2.ID, id)
+	if !unreads[bobotTopic.ID] {
+		t.Error("expected bobot topic to be unread after new message")
 	}
 }
 

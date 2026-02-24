@@ -29,7 +29,7 @@ func ctxForUser(userID int64, role string) context.Context {
 
 func ctxForUserInTopic(userID int64, role string, topicID int64) context.Context {
 	ctx := ctxForUser(userID, role)
-	return auth.ContextWithChatData(ctx, auth.ChatData{TopicID: &topicID})
+	return auth.ContextWithChatData(ctx, auth.ChatData{TopicID: topicID})
 }
 
 func TestSkillTool_Interface(t *testing.T) {
@@ -45,14 +45,15 @@ func TestSkillTool_Interface(t *testing.T) {
 	}
 }
 
-func TestSkillTool_CreatePrivate(t *testing.T) {
+func TestSkillTool_Create(t *testing.T) {
 	coreDB := setupTestDB(t)
 	defer coreDB.Close()
 
 	user, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := coreDB.CreateBobotTopic(user.ID)
 	tool := NewSkillTool(coreDB)
 
-	result, err := tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	result, err := tool.Execute(ctxForUserInTopic(user.ID, "user", topic.ID), map[string]any{
 		"command":     "create",
 		"name":        "groceries",
 		"description": "Manage grocery lists",
@@ -66,7 +67,7 @@ func TestSkillTool_CreatePrivate(t *testing.T) {
 	}
 
 	// Verify in DB
-	skill, _ := coreDB.GetPrivateChatSkillByName(user.ID, "groceries")
+	skill, _ := coreDB.GetTopicSkillByName(topic.ID, "groceries")
 	if skill == nil {
 		t.Fatal("expected skill to exist in DB")
 	}
@@ -144,9 +145,10 @@ func TestSkillTool_CreateMissingName(t *testing.T) {
 	defer coreDB.Close()
 
 	user, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := coreDB.CreateBobotTopic(user.ID)
 	tool := NewSkillTool(coreDB)
 
-	_, err := tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	_, err := tool.Execute(ctxForUserInTopic(user.ID, "user", topic.ID), map[string]any{
 		"command": "create",
 		"content": "some content",
 	})
@@ -160,13 +162,15 @@ func TestSkillTool_Update(t *testing.T) {
 	defer coreDB.Close()
 
 	user, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := coreDB.CreateBobotTopic(user.ID)
 	tool := NewSkillTool(coreDB)
 
-	tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	ctx := ctxForUserInTopic(user.ID, "user", topic.ID)
+	tool.Execute(ctx, map[string]any{
 		"command": "create", "name": "groceries", "description": "old", "content": "old content",
 	})
 
-	result, err := tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	result, err := tool.Execute(ctx, map[string]any{
 		"command": "update", "name": "groceries", "description": "new desc", "content": "new content",
 	})
 	if err != nil {
@@ -176,7 +180,7 @@ func TestSkillTool_Update(t *testing.T) {
 		t.Errorf("expected update confirmation, got: %s", result)
 	}
 
-	skill, _ := coreDB.GetPrivateChatSkillByName(user.ID, "groceries")
+	skill, _ := coreDB.GetTopicSkillByName(topic.ID, "groceries")
 	if skill.Content != "new content" {
 		t.Errorf("expected updated content, got %q", skill.Content)
 	}
@@ -187,9 +191,10 @@ func TestSkillTool_UpdateNotFound(t *testing.T) {
 	defer coreDB.Close()
 
 	user, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := coreDB.CreateBobotTopic(user.ID)
 	tool := NewSkillTool(coreDB)
 
-	_, err := tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	_, err := tool.Execute(ctxForUserInTopic(user.ID, "user", topic.ID), map[string]any{
 		"command": "update", "name": "nonexistent", "content": "new content",
 	})
 	if err == nil {
@@ -202,13 +207,15 @@ func TestSkillTool_Delete(t *testing.T) {
 	defer coreDB.Close()
 
 	user, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := coreDB.CreateBobotTopic(user.ID)
 	tool := NewSkillTool(coreDB)
 
-	tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	ctx := ctxForUserInTopic(user.ID, "user", topic.ID)
+	tool.Execute(ctx, map[string]any{
 		"command": "create", "name": "groceries", "content": "content",
 	})
 
-	result, err := tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	result, err := tool.Execute(ctx, map[string]any{
 		"command": "delete", "name": "groceries",
 	})
 	if err != nil {
@@ -224,16 +231,18 @@ func TestSkillTool_List(t *testing.T) {
 	defer coreDB.Close()
 
 	user, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := coreDB.CreateBobotTopic(user.ID)
 	tool := NewSkillTool(coreDB)
 
-	tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	ctx := ctxForUserInTopic(user.ID, "user", topic.ID)
+	tool.Execute(ctx, map[string]any{
 		"command": "create", "name": "groceries", "description": "Grocery lists", "content": "content",
 	})
-	tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	tool.Execute(ctx, map[string]any{
 		"command": "create", "name": "recipes", "description": "Recipe management", "content": "content",
 	})
 
-	result, err := tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	result, err := tool.Execute(ctx, map[string]any{
 		"command": "list",
 	})
 	if err != nil {
@@ -249,9 +258,10 @@ func TestSkillTool_ListEmpty(t *testing.T) {
 	defer coreDB.Close()
 
 	user, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := coreDB.CreateBobotTopic(user.ID)
 	tool := NewSkillTool(coreDB)
 
-	result, err := tool.Execute(ctxForUser(user.ID, "user"), map[string]any{
+	result, err := tool.Execute(ctxForUserInTopic(user.ID, "user", topic.ID), map[string]any{
 		"command": "list",
 	})
 	if err != nil {

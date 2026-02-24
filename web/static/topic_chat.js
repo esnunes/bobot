@@ -19,6 +19,7 @@ window.TopicChatClient = class TopicChatClient {
         this.oldestMessageId = null;
         this.hasMoreHistory = true;
         this.currentUserId = null;
+        this.autoRespond = false;
         this.wsContainer = document.getElementById('ws-connection');
         this.handleTopicMessage = null;
         this.handleUnreadChanged = null;
@@ -39,6 +40,7 @@ window.TopicChatClient = class TopicChatClient {
 
         var data = JSON.parse(dataEl.textContent);
         this.currentUserId = data.current_user_id;
+        this.autoRespond = !!data.auto_respond;
 
         var messages = data.messages || [];
         messages.forEach(function(msg) {
@@ -59,9 +61,11 @@ window.TopicChatClient = class TopicChatClient {
                     this.removeTypingIndicator();
                 }
                 this.addMessage(data, true);
-                // Show typing indicator after user message with @bobot is displayed
-                if (data.role === 'user' && data.content && data.content.toLowerCase().includes('@bobot')) {
-                    this.showTypingIndicator();
+                // Show typing indicator when assistant will respond
+                if (data.role === 'user') {
+                    if (this.autoRespond || (data.content && data.content.toLowerCase().includes('@bobot'))) {
+                        this.showTypingIndicator();
+                    }
                 }
             }
         };

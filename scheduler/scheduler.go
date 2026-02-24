@@ -14,8 +14,7 @@ import (
 // Pipeline is the interface for sending messages through the chat flow.
 // This avoids importing the server package directly.
 type Pipeline interface {
-	SendPrivateMessage(ctx context.Context, userID int64, content string) (string, error)
-	SendTopicMessage(ctx context.Context, userID int64, topicID int64, content string, displayName string) (string, error)
+	SendMessage(ctx context.Context, userID int64, topicID int64, content string, displayName string) (string, error)
 }
 
 // Scheduler runs due reminders and cron jobs on a 1-minute tick.
@@ -135,13 +134,10 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 		return
 	}
 
-	// Lifecycle guard: check topic still valid
-	if r.TopicID != nil {
-		if !s.isTopicValid(r.UserID, *r.TopicID) {
-			slog.Warn("scheduler: skipping reminder for invalid topic", "id", r.ID, "topic_id", *r.TopicID)
-			s.scheduleDB.MarkReminderFailed(r.ID, "topic deleted or user removed")
-			return
-		}
+	if !s.isTopicValid(r.UserID, r.TopicID) {
+		slog.Warn("scheduler: skipping reminder for invalid topic", "id", r.ID, "topic_id", r.TopicID)
+		s.scheduleDB.MarkReminderFailed(r.ID, "topic deleted or user removed")
+		return
 	}
 
 	// Build execution context
@@ -154,13 +150,8 @@ func (s *Scheduler) executeReminder(ctx context.Context, r *schedule.Reminder) {
 
 	content := "<bobot-remind>" + r.Message + "</bobot-remind>"
 
-	var execErr error
-	if r.TopicID != nil {
-		execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: r.TopicID})
-		_, execErr = s.pipeline.SendTopicMessage(execCtx, r.UserID, *r.TopicID, content, user.DisplayName)
-	} else {
-		_, execErr = s.pipeline.SendPrivateMessage(execCtx, r.UserID, content)
-	}
+	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: r.TopicID})
+	_, execErr := s.pipeline.SendMessage(execCtx, r.UserID, r.TopicID, content, user.DisplayName)
 
 	if execErr != nil {
 		slog.Error("scheduler: reminder execution failed", "id", r.ID, "error", execErr)
@@ -183,13 +174,10 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 		return
 	}
 
-	// Lifecycle guard: check topic still valid
-	if j.TopicID != nil {
-		if !s.isTopicValid(j.UserID, *j.TopicID) {
-			slog.Warn("scheduler: disabling cron job for invalid topic", "id", j.ID, "topic_id", *j.TopicID)
-			s.scheduleDB.DisableCronJob(j.ID)
-			return
-		}
+	if !s.isTopicValid(j.UserID, j.TopicID) {
+		slog.Warn("scheduler: disabling cron job for invalid topic", "id", j.ID, "topic_id", j.TopicID)
+		s.scheduleDB.DisableCronJob(j.ID)
+		return
 	}
 
 	// Create execution record
@@ -210,13 +198,8 @@ func (s *Scheduler) executeCronJob(ctx context.Context, j *schedule.CronJob) {
 
 	content := "<bobot-cron>" + j.Prompt + "</bobot-cron>"
 
-	var execErr error
-	if j.TopicID != nil {
-		execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: j.TopicID})
-		_, execErr = s.pipeline.SendTopicMessage(execCtx, j.UserID, *j.TopicID, content, user.DisplayName)
-	} else {
-		_, execErr = s.pipeline.SendPrivateMessage(execCtx, j.UserID, content)
-	}
+	execCtx = auth.ContextWithChatData(execCtx, auth.ChatData{TopicID: j.TopicID})
+	_, execErr := s.pipeline.SendMessage(execCtx, j.UserID, j.TopicID, content, user.DisplayName)
 
 	completedAt := time.Now().UTC()
 	if execErr != nil {
@@ -261,3 +244,4 @@ func (s *Scheduler) isTopicValid(userID, topicID int64) bool {
 	}
 	return true
 }
+

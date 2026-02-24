@@ -18,7 +18,7 @@ func ctxWithUser(userID int64) context.Context {
 func ctxWithUserAndTopic(userID int64, topicID int64) context.Context {
 	ctx := ctxWithUser(userID)
 	return auth.ContextWithChatData(ctx, auth.ChatData{
-		TopicID: &topicID,
+		TopicID: topicID,
 	})
 }
 
@@ -138,9 +138,9 @@ func TestRemindTool_List(t *testing.T) {
 	tool := NewRemindTool(db)
 
 	futureTime := time.Now().UTC().Add(1 * time.Hour)
-	db.CreateReminder(1, nil, "reminder 1", futureTime)
-	db.CreateReminder(1, nil, "reminder 2", futureTime.Add(1*time.Hour))
-	db.CreateReminder(2, nil, "other user", futureTime) // different user
+	db.CreateReminder(1, 0, "reminder 1", futureTime)
+	db.CreateReminder(1, 0, "reminder 2", futureTime.Add(1*time.Hour))
+	db.CreateReminder(2, 0, "other user", futureTime) // different user
 
 	result, err := tool.Execute(ctxWithUser(1), map[string]any{
 		"command": "list",
@@ -173,9 +173,8 @@ func TestRemindTool_ListByTopic(t *testing.T) {
 	tool := NewRemindTool(db)
 
 	futureTime := time.Now().UTC().Add(1 * time.Hour)
-	topicID := int64(42)
-	db.CreateReminder(1, nil, "private reminder", futureTime)
-	db.CreateReminder(1, &topicID, "topic reminder", futureTime)
+	db.CreateReminder(1, 0, "private reminder", futureTime)
+	db.CreateReminder(1, 42, "topic reminder", futureTime)
 
 	// List with topic context should only show topic reminders
 	result, err := tool.Execute(ctxWithUserAndTopic(1, 42), map[string]any{
@@ -194,7 +193,7 @@ func TestRemindTool_Cancel(t *testing.T) {
 	tool := NewRemindTool(db)
 
 	futureTime := time.Now().UTC().Add(1 * time.Hour)
-	id, _ := db.CreateReminder(1, nil, "cancel me", futureTime)
+	id, _ := db.CreateReminder(1, 0, "cancel me", futureTime)
 
 	// Cancel with float64 (JSON deserialization)
 	result, err := tool.Execute(ctxWithUser(1), map[string]any{
@@ -220,7 +219,7 @@ func TestRemindTool_CancelWrongUser(t *testing.T) {
 	tool := NewRemindTool(db)
 
 	futureTime := time.Now().UTC().Add(1 * time.Hour)
-	id, _ := db.CreateReminder(1, nil, "not yours", futureTime)
+	id, _ := db.CreateReminder(1, 0, "not yours", futureTime)
 
 	_, err := tool.Execute(ctxWithUser(2), map[string]any{
 		"command": "cancel",

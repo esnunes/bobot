@@ -112,13 +112,9 @@ func (s *Server) handleScheduleFormPage(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		if job.TopicID != nil {
-			topicID = *job.TopicID
-		}
-
 		s.render(w, "schedule_form", PageData{
 			Title:   "Edit Schedule",
-			TopicID: topicID,
+			TopicID: job.TopicID,
 			Schedule: &ScheduleView{
 				ID:       job.ID,
 				Name:     job.Name,
@@ -169,7 +165,7 @@ func (s *Server) handleCreateScheduleForm(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var topicID *int64
+	var topicID int64
 	redirectPath := "/schedules"
 
 	if topicIDStr != "" {
@@ -183,7 +179,7 @@ func (s *Server) handleCreateScheduleForm(w http.ResponseWriter, r *http.Request
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
-		topicID = &tid
+		topicID = tid
 		redirectPath = fmt.Sprintf("/schedules?topic_id=%d", tid)
 	}
 
@@ -245,13 +241,9 @@ func (s *Server) handleUpdateScheduleForm(w http.ResponseWriter, r *http.Request
 	// Validate cron expression
 	expr, err := schedule.Parse(cronExprStr)
 	if err != nil {
-		var topicID int64
-		if job.TopicID != nil {
-			topicID = *job.TopicID
-		}
 		s.render(w, "schedule_form", PageData{
 			Title:   "Edit Schedule",
-			TopicID: topicID,
+			TopicID: job.TopicID,
 			Error:   fmt.Sprintf("Invalid cron expression: %v", err),
 			Schedule: &ScheduleView{
 				ID:       job.ID,
@@ -270,10 +262,7 @@ func (s *Server) handleUpdateScheduleForm(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	redirectPath := "/schedules"
-	if job.TopicID != nil {
-		redirectPath = fmt.Sprintf("/schedules?topic_id=%d", *job.TopicID)
-	}
+	redirectPath := fmt.Sprintf("/schedules?topic_id=%d", job.TopicID)
 
 	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+redirectPath+`"}}`)
 	w.WriteHeader(http.StatusNoContent)
@@ -308,10 +297,7 @@ func (s *Server) handleDeleteScheduleForm(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	redirectPath := "/schedules"
-	if job.TopicID != nil {
-		redirectPath = fmt.Sprintf("/schedules?topic_id=%d", *job.TopicID)
-	}
+	redirectPath := fmt.Sprintf("/schedules?topic_id=%d", job.TopicID)
 
 	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+redirectPath+`"}}`)
 	w.WriteHeader(http.StatusNoContent)

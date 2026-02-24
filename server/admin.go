@@ -81,7 +81,14 @@ func (s *Server) handleAdminUserContextPage(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	inspection, err := s.engine.InspectPrivateContext(userID, user.Role)
+	// Find the user's bobot topic and inspect it as a topic context
+	bobotTopic, err := s.db.GetUserBobotTopic(userID)
+	if err != nil || bobotTopic == nil {
+		http.Error(w, "bobot topic not found", http.StatusNotFound)
+		return
+	}
+
+	inspection, err := s.engine.InspectTopicContext(bobotTopic.ID)
 	if err != nil {
 		http.Error(w, "failed to inspect context", http.StatusInternalServerError)
 		return
@@ -93,13 +100,16 @@ func (s *Server) handleAdminUserContextPage(w http.ResponseWriter, r *http.Reque
 		label = user.Username
 	}
 
-	// Build read positions for this user's private chat
+	// Build read positions for the bobot topic
 	readPositions := make(map[int64][]string)
-	lastReadID, _ := s.db.GetPrivateChatReadPosition(userID)
-	if lastReadID > 0 {
-		resolvedID := resolveReadPosition(lastReadID, inspection.Messages)
+	positions, _ := s.db.GetTopicReadPositions(bobotTopic.ID)
+	for _, p := range positions {
+		if p.LastReadID <= 0 {
+			continue
+		}
+		resolvedID := resolveReadPosition(p.LastReadID, inspection.Messages)
 		if resolvedID > 0 {
-			readPositions[resolvedID] = []string{"Read"}
+			readPositions[resolvedID] = append(readPositions[resolvedID], p.DisplayName)
 		}
 	}
 

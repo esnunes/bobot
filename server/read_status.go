@@ -10,13 +10,7 @@ import (
 // markChatReadImplicit marks a chat as read using the latest message ID.
 // Used when a user opens a chat page or sends a message.
 func (s *Server) markChatReadImplicit(userID int64, topicID int64) {
-	var latestID int64
-	var err error
-	if topicID == db.PrivateChatTopicID {
-		latestID, err = s.db.GetLatestPrivateMessageID(userID)
-	} else {
-		latestID, err = s.db.GetLatestTopicMessageID(topicID)
-	}
+	latestID, err := s.db.GetLatestTopicMessageID(topicID)
 	if err != nil || latestID == 0 {
 		return
 	}

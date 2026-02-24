@@ -32,20 +32,3 @@ func (s *CoreDBMessageSaver) SaveTopicMessage(topicID, userID int64, role, conte
 	)
 	return err
 }
-
-func (s *CoreDBMessageSaver) SaveMessage(userID int64, role, content, rawContent string) error {
-	var senderID, receiverID int64
-	if role == "assistant" {
-		senderID = db.BobotUserID
-		receiverID = userID
-	} else {
-		senderID = userID
-		receiverID = db.BobotUserID
-	}
-
-	_, err := s.db.CreatePrivateMessageWithContextThreshold(
-		senderID, receiverID, role, content, rawContent,
-		s.tokensStart, s.tokensMax,
-	)
-	return err
-}

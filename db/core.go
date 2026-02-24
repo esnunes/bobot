@@ -17,10 +17,6 @@ var ErrNotFound = errors.New("not found")
 // This user is created during migration with ID 0.
 const BobotUserID = int64(0)
 
-// PrivateChatTopicID is the sentinel value for the private Bobot chat.
-// In the chat_read_status table, this maps to topic_id IS NULL.
-const PrivateChatTopicID = int64(0)
-
 const WelcomeMessage = `
 👋 Olá! Seja muito bem-vindo(a)!
 
@@ -50,9 +46,8 @@ type User struct {
 
 type Message struct {
 	ID            int64
-	SenderID      int64  // who sent the message (user ID or BobotUserID)
-	ReceiverID    *int64 // who receives (NULL for topic messages)
-	TopicID       *int64 // nil for 1:1 chats, set for topic messages
+	SenderID      int64 // who sent the message (user ID or BobotUserID)
+	TopicID       int64
 	Role          string
 	Content       string
 	RawContent    string
@@ -72,11 +67,12 @@ type Invite struct {
 }
 
 type Topic struct {
-	ID        int64
-	Name      string
-	OwnerID   int64
-	DeletedAt *time.Time
-	CreatedAt time.Time
+	ID          int64
+	Name        string
+	OwnerID     int64
+	AutoRespond bool
+	DeletedAt   *time.Time
+	CreatedAt   time.Time
 }
 
 type TopicMember struct {
@@ -255,11 +251,6 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
-	// Migrate: add receiver_id column to messages
-	if err := c.addColumnIfMissing("messages", "receiver_id", "INTEGER REFERENCES users(id)"); err != nil {
-		return err
-	}
-
 	// Migrate: rename user_id to sender_id
 	if err := c.renameColumnIfExists("messages", "user_id", "sender_id"); err != nil {
 		return err
@@ -270,38 +261,27 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
-	// Migrate existing private messages: infer sender/receiver from role
-	// User messages: sender=original user, receiver=bobot (0)
-	// Assistant/system messages: sender=bobot (0), receiver=original user
-	_, err = c.db.Exec(`
-		UPDATE messages
-		SET sender_id = CASE WHEN role IN ('assistant', 'system') THEN 0 ELSE sender_id END,
-		    receiver_id = CASE WHEN role IN ('assistant', 'system') THEN sender_id ELSE 0 END
-		WHERE topic_id IS NULL AND receiver_id IS NULL
-	`)
+	// Legacy migration: receiver_id was used for private chat before unification.
+	// If the column still exists, run the legacy migration steps then drop it.
+	hasReceiverID, err := c.columnExists("messages", "receiver_id")
 	if err != nil {
 		return err
+	}
+	if hasReceiverID {
+		// Migrate existing private messages: infer sender/receiver from role
+		_, err = c.db.Exec(`
+			UPDATE messages
+			SET sender_id = CASE WHEN role IN ('assistant', 'system') THEN 0 ELSE sender_id END,
+			    receiver_id = CASE WHEN role IN ('assistant', 'system') THEN sender_id ELSE 0 END
+			WHERE topic_id IS NULL AND receiver_id IS NULL
+		`)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Drop old index if exists
 	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_user_context`)
-
-	// Create new indexes for private chat (bidirectional)
-	_, err = c.db.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_messages_private_chat
-		ON messages(sender_id, receiver_id, id) WHERE topic_id IS NULL
-	`)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.db.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_messages_context
-		ON messages(sender_id, receiver_id, id) WHERE context_tokens = 0 AND topic_id IS NULL
-	`)
-	if err != nil {
-		return err
-	}
 
 	// Drop old index and create new index for topic messages
 	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_group`)
@@ -336,13 +316,9 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
-	// Migrate: add case-insensitive unique index for active topic names
-	_, err = c.db.Exec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS idx_topics_name_active ON topics(LOWER(name)) WHERE deleted_at IS NULL
-	`)
-	if err != nil {
-		return err
-	}
+	// Note: idx_topics_name_active was previously created here but is now dropped below
+	// (topic names are no longer globally unique — each user has a "bobot" topic).
+	// Kept as no-op for migration ordering.
 
 	// Create user_profiles table
 	_, err = c.db.Exec(`
@@ -427,15 +403,7 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
-	// Two partial indexes to enforce uniqueness (SQLite treats NULLs as distinct in UNIQUE)
-	_, err = c.db.Exec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_read_status_private
-		ON chat_read_status(user_id) WHERE topic_id IS NULL
-	`)
-	if err != nil {
-		return err
-	}
-
+	// Unique index for topic chat read status
 	_, err = c.db.Exec(`
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_read_status_topic
 		ON chat_read_status(user_id, topic_id) WHERE topic_id IS NOT NULL
@@ -451,6 +419,114 @@ func (c *CoreDB) migrate() error {
 
 	// Migrate: add auto_read column to topic_members
 	if err := c.addColumnIfMissing("topic_members", "auto_read", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Migrate: add auto_respond column to topics
+	if err := c.addColumnIfMissing("topics", "auto_respond", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Migrate: drop unique topic name index (topic names are now scoped to members, not globally unique)
+	_, err = c.db.Exec(`DROP INDEX IF EXISTS idx_topics_name_active`)
+	if err != nil {
+		return err
+	}
+
+	// Migrate: create bobot topics for existing users and move private messages.
+	// This migration references receiver_id, so only run if the column exists.
+	if hasReceiverID {
+		if err := c.migratePrivateChatsToTopics(); err != nil {
+			return err
+		}
+	}
+
+	// Cleanup: drop old private chat indexes and receiver_id column
+	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_private_chat`)
+	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_messages_context`)
+	_, _ = c.db.Exec(`DROP INDEX IF EXISTS idx_chat_read_status_private`)
+
+	if err := c.dropColumnIfExists("messages", "receiver_id"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// migratePrivateChatsToTopics creates "bobot" topics for existing users who don't have one,
+// and moves their private messages (topic_id IS NULL) into the bobot topic.
+// Also migrates chat_read_status rows for private chat.
+// This migration is idempotent.
+func (c *CoreDB) migratePrivateChatsToTopics() error {
+	// Find users who have private messages but no bobot topic
+	rows, err := c.db.Query(`
+		SELECT DISTINCT u.id FROM users u
+		WHERE u.id != ?
+		AND NOT EXISTS (
+			SELECT 1 FROM topics t WHERE t.name = 'bobot' AND t.owner_id = u.id AND t.deleted_at IS NULL
+		)
+		AND EXISTS (
+			SELECT 1 FROM messages m WHERE m.topic_id IS NULL AND (m.sender_id = u.id OR m.receiver_id = u.id)
+		)
+	`, BobotUserID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var userIDs []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		userIDs = append(userIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, userID := range userIDs {
+		topic, err := c.CreateBobotTopic(userID)
+		if err != nil {
+			return err
+		}
+
+		// Move private messages into the bobot topic
+		_, err = c.db.Exec(`
+			UPDATE messages SET topic_id = ?
+			WHERE topic_id IS NULL
+			AND (sender_id = ? OR receiver_id = ?)
+		`, topic.ID, userID, userID)
+		if err != nil {
+			return err
+		}
+
+		// Migrate chat_read_status for private chat
+		_, err = c.db.Exec(`
+			UPDATE chat_read_status SET topic_id = ?
+			WHERE topic_id IS NULL AND user_id = ?
+		`, topic.ID, userID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Migrate orphaned private skills (topic_id IS NULL) into each user's bobot topic.
+	// This covers users who already had a bobot topic from a previous migration run.
+	_, err = c.db.Exec(`
+		UPDATE skills SET topic_id = (
+			SELECT t.id FROM topics t
+			WHERE t.name = 'bobot' AND t.owner_id = skills.user_id AND t.deleted_at IS NULL
+			LIMIT 1
+		)
+		WHERE topic_id IS NULL
+		AND EXISTS (
+			SELECT 1 FROM topics t
+			WHERE t.name = 'bobot' AND t.owner_id = skills.user_id AND t.deleted_at IS NULL
+		)
+	`)
+	if err != nil {
 		return err
 	}
 
@@ -507,6 +583,26 @@ func (c *CoreDB) renameColumnIfExists(table, oldName, newName string) error {
 	}
 
 	return nil
+}
+
+func (c *CoreDB) columnExists(table, column string) (bool, error) {
+	var count int
+	err := c.db.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info(?)
+		WHERE name = ?
+	`, table, column).Scan(&count)
+	return count > 0, err
+}
+
+func (c *CoreDB) dropColumnIfExists(table, column string) error {
+	exists, err := c.columnExists(table, column)
+	if err != nil {
+		return err
+	}
+	if exists {
+		_, err = c.db.Exec("ALTER TABLE " + table + " DROP COLUMN " + column)
+	}
+	return err
 }
 
 func (c *CoreDB) renameTableIfExists(oldName, newName string) error {
@@ -627,221 +723,18 @@ func (c *CoreDB) UserCount() (int, error) {
 	return count, err
 }
 
-func (c *CoreDB) CreateMessage(senderID, receiverID int64, role, content, rawContent string) (*Message, error) {
-	result, err := c.db.Exec(
-		"INSERT INTO messages (sender_id, receiver_id, role, content, raw_content) VALUES (?, ?, ?, ?, ?)",
-		senderID, receiverID, role, content, rawContent,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	id, _ := result.LastInsertId()
-	return &Message{
-		ID:         id,
-		SenderID:   senderID,
-		ReceiverID: &receiverID,
-		Role:       role,
-		Content:    content,
-		RawContent: rawContent,
-		CreatedAt:  time.Now(),
-	}, nil
-}
-
-func (c *CoreDB) CreateMessageWithContext(senderID, receiverID int64, role, content, rawContent string) (*Message, error) {
-	tokens := len(rawContent) / 4
-
-	// Get the latest message's context state for this private chat (bidirectional)
-	var prevContextTokens, prevTokens int
-	err := c.db.QueryRow(`
-		SELECT tokens, context_tokens FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
-		ORDER BY id DESC LIMIT 1
-	`, senderID, receiverID, receiverID, senderID).Scan(&prevTokens, &prevContextTokens)
-
-	var contextTokens int
-	if err == sql.ErrNoRows {
-		// First message - starts a new chunk
-		contextTokens = 0
-	} else if err != nil {
-		return nil, err
-	} else {
-		// Continue the chunk
-		contextTokens = prevContextTokens + prevTokens + tokens
-	}
-
-	result, err := c.db.Exec(
-		"INSERT INTO messages (sender_id, receiver_id, role, content, raw_content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		senderID, receiverID, role, content, rawContent, tokens, contextTokens,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	id, _ := result.LastInsertId()
-	return &Message{
-		ID:            id,
-		SenderID:      senderID,
-		ReceiverID:    &receiverID,
-		Role:          role,
-		Content:       content,
-		RawContent:    rawContent,
-		Tokens:        tokens,
-		ContextTokens: contextTokens,
-		CreatedAt:     time.Now(),
-	}, nil
-}
-
-// GetPrivateChatMessages returns messages for a private chat between a user and Bobot.
-func (c *CoreDB) GetPrivateChatMessages(userID int64, limit int) ([]Message, error) {
-	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
-		FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-		ORDER BY id ASC
-		LIMIT ?
-	`, userID, userID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return c.scanMessages(rows)
-}
-
 func (c *CoreDB) scanMessages(rows *sql.Rows) ([]Message, error) {
 	var messages []Message
 	for rows.Next() {
 		var m Message
-		var receiverID, topicID sql.NullInt64
-		if err := rows.Scan(&m.ID, &m.SenderID, &receiverID, &topicID, &m.Role, &m.Content, &m.RawContent, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
+		var topicID sql.NullInt64
+		if err := rows.Scan(&m.ID, &m.SenderID, &topicID, &m.Role, &m.Content, &m.RawContent, &m.Tokens, &m.ContextTokens, &m.CreatedAt); err != nil {
 			return nil, err
 		}
-		if receiverID.Valid {
-			m.ReceiverID = &receiverID.Int64
-		}
-		if topicID.Valid {
-			m.TopicID = &topicID.Int64
-		}
+		m.TopicID = topicID.Int64
 		messages = append(messages, m)
 	}
 	return messages, rows.Err()
-}
-
-// GetPrivateChatRecentMessages returns the most recent messages for a private chat.
-func (c *CoreDB) GetPrivateChatRecentMessages(userID int64, limit int) ([]Message, error) {
-	// Get the most recent N messages, but return in chronological order
-	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at FROM (
-			SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
-			FROM messages
-			WHERE topic_id IS NULL
-			  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-			  AND content != ''
-			ORDER BY id DESC
-			LIMIT ?
-		) ORDER BY id ASC
-	`, userID, userID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return c.scanMessages(rows)
-}
-
-// CreatePrivateMessageWithContextThreshold creates a private message with context window management.
-func (c *CoreDB) CreatePrivateMessageWithContextThreshold(senderID, receiverID int64, role, content, rawContent string, tokensStart, tokensMax int) (*Message, error) {
-	tokens := len(rawContent) / 4
-
-	// Get the latest message's context state (for private chats, bidirectional)
-	var prevContextTokens, prevTokens int
-	err := c.db.QueryRow(`
-		SELECT tokens, context_tokens FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
-		ORDER BY id DESC LIMIT 1
-	`, senderID, receiverID, receiverID, senderID).Scan(&prevTokens, &prevContextTokens)
-
-	var contextTokens int
-	if err == sql.ErrNoRows {
-		// First message - starts a new chunk
-		contextTokens = 0
-	} else if err != nil {
-		return nil, err
-	} else {
-		// Calculate what context_tokens would be
-		contextTokens = prevContextTokens + prevTokens + tokens
-
-		// Check if we need to reset the chunk
-		if contextTokens > tokensMax {
-			targetThreshold := tokensMax - tokensStart
-
-			// Find the new chunk start — must be a real message, not a tool_result
-			var newChunkStartID int64
-			var subtractValue int
-			err := c.db.QueryRow(`
-				SELECT id, context_tokens FROM messages
-				WHERE topic_id IS NULL
-				  AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
-				  AND context_tokens < ?
-				  AND content != ''
-				ORDER BY id DESC LIMIT 1
-			`, senderID, receiverID, receiverID, senderID, targetThreshold).Scan(&newChunkStartID, &subtractValue)
-
-			if err != nil && err != sql.ErrNoRows {
-				return nil, err
-			}
-
-			if err == nil {
-				// Slide the window - update all messages in this private chat
-				_, err = c.db.Exec(`
-					UPDATE messages SET context_tokens = context_tokens - ?
-					WHERE topic_id IS NULL
-					  AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
-					  AND id >= ?
-				`, subtractValue, senderID, receiverID, receiverID, senderID, newChunkStartID)
-				if err != nil {
-					return nil, err
-				}
-
-				// Recalculate contextTokens based on updated values
-				err = c.db.QueryRow(`
-					SELECT tokens, context_tokens FROM messages
-					WHERE topic_id IS NULL
-					  AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
-					ORDER BY id DESC LIMIT 1
-				`, senderID, receiverID, receiverID, senderID).Scan(&prevTokens, &prevContextTokens)
-				if err != nil {
-					return nil, err
-				}
-				contextTokens = prevContextTokens + prevTokens + tokens
-			}
-		}
-	}
-
-	result, err := c.db.Exec(
-		"INSERT INTO messages (sender_id, receiver_id, role, content, raw_content, tokens, context_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		senderID, receiverID, role, content, rawContent, tokens, contextTokens,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	id, _ := result.LastInsertId()
-	return &Message{
-		ID:            id,
-		SenderID:      senderID,
-		ReceiverID:    &receiverID,
-		Role:          role,
-		Content:       content,
-		RawContent:    rawContent,
-		Tokens:        tokens,
-		ContextTokens: contextTokens,
-		CreatedAt:     time.Now(),
-	}, nil
 }
 
 // CreateTopicMessage creates a message in a topic chat.
@@ -860,89 +753,13 @@ func (c *CoreDB) CreateTopicMessage(topicID, senderID int64, role, content, rawC
 	return &Message{
 		ID:         id,
 		SenderID:   senderID,
-		TopicID:    &topicID,
+		TopicID:    topicID,
 		Role:       role,
 		Content:    content,
 		RawContent: rawContent,
 		Tokens:     tokens,
 		CreatedAt:  time.Now(),
 	}, nil
-}
-
-// GetPrivateChatContextMessages returns messages in the current context window for a private chat.
-func (c *CoreDB) GetPrivateChatContextMessages(userID int64) ([]Message, error) {
-	// Find the most recent chunk start for this private chat
-	var chunkStartID int64
-	err := c.db.QueryRow(`
-		SELECT id FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-		  AND context_tokens = 0
-		ORDER BY id DESC LIMIT 1
-	`, userID, userID).Scan(&chunkStartID)
-
-	if err == sql.ErrNoRows {
-		return []Message{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// Fetch all messages from chunk start to present, excluding command/system roles
-	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
-		FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-		  AND id >= ?
-		  AND role IN ('user', 'assistant')
-		ORDER BY id ASC
-	`, userID, userID, chunkStartID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return c.scanMessages(rows)
-}
-
-// GetPrivateChatMessagesBefore returns messages before a given ID for a private chat.
-func (c *CoreDB) GetPrivateChatMessagesBefore(userID, beforeID int64, limit int) ([]Message, error) {
-	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
-		FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-		  AND id < ?
-		  AND content != ''
-		ORDER BY id DESC
-		LIMIT ?
-	`, userID, userID, beforeID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return c.scanMessages(rows)
-}
-
-// GetPrivateChatMessagesSince returns messages since a given time for a private chat.
-func (c *CoreDB) GetPrivateChatMessagesSince(userID int64, since time.Time) ([]Message, error) {
-	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
-		FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = ? AND receiver_id = 0) OR (sender_id = 0 AND receiver_id = ?))
-		  AND created_at > ?
-		  AND content != ''
-		ORDER BY id ASC
-	`, userID, userID, since.UTC())
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return c.scanMessages(rows)
 }
 
 func (c *CoreDB) CreateInvite(createdBy int64, code string) (*Invite, error) {
@@ -1112,12 +929,12 @@ func (c *CoreDB) UpsertUserProfile(userID int64, content string, lastMessageID i
 	return err
 }
 
-// GetUserMessagesSince returns user-role private messages sent by a user since a given message ID.
+// GetUserMessagesSince returns user-role messages sent by a user since a given message ID.
 func (c *CoreDB) GetUserMessagesSince(userID int64, sinceMessageID int64) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
-		WHERE sender_id = ? AND role = 'user' AND topic_id IS NULL AND id > ?
+		WHERE sender_id = ? AND role = 'user' AND id > ?
 		ORDER BY id ASC
 	`, userID, sinceMessageID)
 	if err != nil {
@@ -1173,12 +990,60 @@ func (c *CoreDB) CreateTopic(name string, ownerID int64) (*Topic, error) {
 	}, nil
 }
 
+// CreateBobotTopic creates a "bobot" topic for a user with auto_respond enabled,
+// and adds the user as a member.
+func (c *CoreDB) CreateBobotTopic(userID int64) (*Topic, error) {
+	topic, err := c.CreateTopic("bobot", userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := c.SetTopicAutoRespond(topic.ID, true); err != nil {
+		return nil, err
+	}
+	topic.AutoRespond = true
+
+	if err := c.AddTopicMember(topic.ID, userID); err != nil {
+		return nil, err
+	}
+
+	return topic, nil
+}
+
+// GetUserBobotTopic returns the user's "bobot" topic, or nil if not found.
+func (c *CoreDB) GetUserBobotTopic(userID int64) (*Topic, error) {
+	var topic Topic
+	err := c.db.QueryRow(`
+		SELECT t.id, t.name, t.owner_id, t.auto_respond, t.created_at
+		FROM topics t
+		WHERE t.name = 'bobot' AND t.owner_id = ? AND t.deleted_at IS NULL
+	`, userID).Scan(&topic.ID, &topic.Name, &topic.OwnerID, &topic.AutoRespond, &topic.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &topic, nil
+}
+
 // AddTopicMember adds a user to a topic.
 func (c *CoreDB) AddTopicMember(topicID, userID int64) error {
 	_, err := c.db.Exec(
 		"INSERT INTO topic_members (topic_id, user_id) VALUES (?, ?)",
 		topicID, userID,
 	)
+	return err
+}
+
+// SetTopicAutoRespond enables or disables auto_respond for a topic.
+func (c *CoreDB) SetTopicAutoRespond(topicID int64, enabled bool) error {
+	val := 0
+	if enabled {
+		val = 1
+	}
+	_, err := c.db.Exec("UPDATE topics SET auto_respond = ? WHERE id = ?", val, topicID)
 	return err
 }
 
@@ -1206,9 +1071,9 @@ func (c *CoreDB) GetTopicByID(id int64) (*Topic, error) {
 	var topic Topic
 	var deletedAt sql.NullTime
 	err := c.db.QueryRow(
-		"SELECT id, name, owner_id, deleted_at, created_at FROM topics WHERE id = ? AND deleted_at IS NULL",
+		"SELECT id, name, owner_id, auto_respond, deleted_at, created_at FROM topics WHERE id = ? AND deleted_at IS NULL",
 		id,
-	).Scan(&topic.ID, &topic.Name, &topic.OwnerID, &deletedAt, &topic.CreatedAt)
+	).Scan(&topic.ID, &topic.Name, &topic.OwnerID, &topic.AutoRespond, &deletedAt, &topic.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -1272,7 +1137,7 @@ func (c *CoreDB) ListAllTopics() ([]Topic, error) {
 
 func (c *CoreDB) GetUserTopics(userID int64) ([]Topic, error) {
 	rows, err := c.db.Query(`
-		SELECT t.id, t.name, t.owner_id, t.deleted_at, t.created_at
+		SELECT t.id, t.name, t.owner_id, t.auto_respond, t.deleted_at, t.created_at
 		FROM topics t
 		JOIN topic_members tm ON t.id = tm.topic_id
 		WHERE tm.user_id = ? AND t.deleted_at IS NULL
@@ -1287,7 +1152,7 @@ func (c *CoreDB) GetUserTopics(userID int64) ([]Topic, error) {
 	for rows.Next() {
 		var t Topic
 		var deletedAt sql.NullTime
-		if err := rows.Scan(&t.ID, &t.Name, &t.OwnerID, &deletedAt, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.OwnerID, &t.AutoRespond, &deletedAt, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		if deletedAt.Valid {
@@ -1353,8 +1218,8 @@ func (c *CoreDB) SetTopicMemberAutoRead(topicID, userID int64, autoRead bool) er
 // GetTopicRecentMessages returns the most recent messages for a topic.
 func (c *CoreDB) GetTopicRecentMessages(topicID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at FROM (
-			SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at FROM (
+			SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 			FROM messages
 			WHERE topic_id = ?
 			  AND content != ''
@@ -1373,7 +1238,7 @@ func (c *CoreDB) GetTopicRecentMessages(topicID int64, limit int) ([]Message, er
 // GetTopicMessagesBefore returns messages before a given ID for a topic.
 func (c *CoreDB) GetTopicMessagesBefore(topicID, beforeID int64, limit int) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND id < ?
 		  AND content != ''
@@ -1391,7 +1256,7 @@ func (c *CoreDB) GetTopicMessagesBefore(topicID, beforeID int64, limit int) ([]M
 // GetTopicMessagesSince returns messages since a given time for a topic.
 func (c *CoreDB) GetTopicMessagesSince(topicID int64, since time.Time) ([]Message, error) {
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND created_at > ?
 		  AND content != ''
@@ -1472,7 +1337,7 @@ func (c *CoreDB) CreateTopicMessageWithContext(topicID, senderID int64, role, co
 	return &Message{
 		ID:            id,
 		SenderID:      senderID,
-		TopicID:       &topicID,
+		TopicID:       topicID,
 		Role:          role,
 		Content:       content,
 		RawContent:    rawContent,
@@ -1499,7 +1364,7 @@ func (c *CoreDB) GetTopicContextMessages(topicID int64) ([]Message, error) {
 	}
 
 	rows, err := c.db.Query(`
-		SELECT id, sender_id, receiver_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
+		SELECT id, sender_id, topic_id, role, content, raw_content, tokens, context_tokens, created_at
 		FROM messages
 		WHERE topic_id = ? AND id >= ? AND role IN ('user', 'assistant')
 		ORDER BY id ASC
@@ -1583,18 +1448,8 @@ func (c *CoreDB) GetPushSubscriptions(userID int64) ([]PushSubscription, error) 
 	return subs, rows.Err()
 }
 
-// MarkChatRead updates the last read message ID for a user in a chat.
-// Pass PrivateChatTopicID (0) for the private Bobot chat; it maps to topic_id IS NULL internally.
+// MarkChatRead updates the last read message ID for a user in a topic.
 func (c *CoreDB) MarkChatRead(userID int64, topicID int64, messageID int64) error {
-	if topicID == PrivateChatTopicID {
-		_, err := c.db.Exec(`
-			INSERT INTO chat_read_status (user_id, topic_id, last_read_message_id)
-			VALUES (?, NULL, ?)
-			ON CONFLICT(user_id) WHERE topic_id IS NULL
-			DO UPDATE SET last_read_message_id = excluded.last_read_message_id
-		`, userID, messageID)
-		return err
-	}
 	_, err := c.db.Exec(`
 		INSERT INTO chat_read_status (user_id, topic_id, last_read_message_id)
 		VALUES (?, ?, ?)
@@ -1604,22 +1459,10 @@ func (c *CoreDB) MarkChatRead(userID int64, topicID int64, messageID int64) erro
 	return err
 }
 
-// GetUnreadChats returns the unread status for the private Bobot chat and all topic chats the user is a member of.
+// GetUnreadChats returns a map of topic IDs with unread messages for the user.
+// All chats (including the bobot topic) are tracked via topics.
 // Missing chat_read_status rows are treated as "all read" (no unread indicator).
-func (c *CoreDB) GetUnreadChats(userID int64) (bobotUnread bool, topicUnreads map[int64]bool, err error) {
-	// Check private Bobot chat
-	err = c.db.QueryRow(`
-		SELECT COALESCE(MAX(m.id), 0) > COALESCE(crs.last_read_message_id, 0)
-		FROM messages m
-		LEFT JOIN chat_read_status crs ON crs.user_id = ? AND crs.topic_id IS NULL
-		WHERE m.topic_id IS NULL
-		  AND ((m.sender_id = 0 AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = 0))
-	`, userID, userID, userID).Scan(&bobotUnread)
-	if err != nil {
-		return false, nil, err
-	}
-
-	// Check topic chats
+func (c *CoreDB) GetUnreadChats(userID int64) (map[int64]bool, error) {
 	rows, err := c.db.Query(`
 		SELECT t.id,
 		       COALESCE(MAX(m.id), 0) > COALESCE(crs.last_read_message_id, 0) AS has_unread
@@ -1631,33 +1474,22 @@ func (c *CoreDB) GetUnreadChats(userID int64) (bobotUnread bool, topicUnreads ma
 		GROUP BY t.id
 	`, userID, userID)
 	if err != nil {
-		return false, nil, err
+		return nil, err
 	}
 	defer rows.Close()
 
-	topicUnreads = make(map[int64]bool)
+	unreads := make(map[int64]bool)
 	for rows.Next() {
 		var topicID int64
 		var hasUnread bool
 		if err := rows.Scan(&topicID, &hasUnread); err != nil {
-			return false, nil, err
+			return nil, err
 		}
 		if hasUnread {
-			topicUnreads[topicID] = true
+			unreads[topicID] = true
 		}
 	}
-	return bobotUnread, topicUnreads, rows.Err()
-}
-
-// GetLatestPrivateMessageID returns the ID of the most recent private chat message for a user.
-func (c *CoreDB) GetLatestPrivateMessageID(userID int64) (int64, error) {
-	var id int64
-	err := c.db.QueryRow(`
-		SELECT COALESCE(MAX(id), 0) FROM messages
-		WHERE topic_id IS NULL
-		  AND ((sender_id = 0 AND receiver_id = ?) OR (sender_id = ? AND receiver_id = 0))
-	`, userID, userID).Scan(&id)
-	return id, err
+	return unreads, rows.Err()
 }
 
 // GetLatestTopicMessageID returns the ID of the most recent message in a topic.
@@ -1674,21 +1506,6 @@ type ReadPosition struct {
 	UserID      int64
 	DisplayName string
 	LastReadID  int64
-}
-
-// GetPrivateChatReadPosition returns the last_read_message_id for a user's private chat with Bobot.
-// Returns 0 if no row exists (user has never opened the chat).
-func (c *CoreDB) GetPrivateChatReadPosition(userID int64) (int64, error) {
-	var id int64
-	err := c.db.QueryRow(`
-		SELECT COALESCE(last_read_message_id, 0)
-		FROM chat_read_status
-		WHERE user_id = ? AND topic_id IS NULL
-	`, userID).Scan(&id)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	return id, err
 }
 
 // GetTopicReadPositions returns read positions for all members of a topic,

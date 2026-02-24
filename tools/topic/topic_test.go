@@ -28,7 +28,7 @@ func ctxForUser(userID int64, role string) context.Context {
 
 func ctxForUserInTopic(userID int64, role string, topicID int64) context.Context {
 	ctx := ctxForUser(userID, role)
-	return auth.ContextWithChatData(ctx, auth.ChatData{TopicID: &topicID})
+	return auth.ContextWithChatData(ctx, auth.ChatData{TopicID: topicID})
 }
 
 func TestTopicTool_Create(t *testing.T) {
@@ -73,17 +73,22 @@ func TestTopicTool_CreateMissingName(t *testing.T) {
 	}
 }
 
-func TestTopicTool_CreateDuplicateName(t *testing.T) {
+func TestTopicTool_CreateDuplicateNameAllowed(t *testing.T) {
 	coreDB := setupTestDB(t)
 	defer coreDB.Close()
 
 	user, _ := coreDB.CreateUserFull("alice", "hash", "Alice", "user")
 	tool := NewTopicTool(coreDB)
 
-	tool.Execute(ctxForUser(user.ID, "user"), map[string]any{"command": "create", "name": "General"})
-	_, err := tool.Execute(ctxForUser(user.ID, "user"), map[string]any{"command": "create", "name": "general"})
-	if err == nil {
-		t.Error("expected error for duplicate name")
+	_, err := tool.Execute(ctxForUser(user.ID, "user"), map[string]any{"command": "create", "name": "General"})
+	if err != nil {
+		t.Fatalf("first create failed: %v", err)
+	}
+
+	// Topic names are not globally unique — creating with same name should succeed
+	_, err = tool.Execute(ctxForUser(user.ID, "user"), map[string]any{"command": "create", "name": "general"})
+	if err != nil {
+		t.Fatalf("second create (same name) failed: %v", err)
 	}
 }
 
@@ -425,8 +430,8 @@ func TestTopicTool_NoTopicContext(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when no topic context and no name")
 	}
-	if !strings.Contains(err.Error(), "required") {
-		t.Errorf("expected 'required' in error, got: %v", err)
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
 	}
 }
 

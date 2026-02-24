@@ -114,9 +114,20 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send welcome message from Bobot
-	if _, err := s.db.CreateMessage(db.BobotUserID, user.ID, "assistant", db.WelcomeMessage, db.WelcomeMessage); err != nil {
-		log.Printf("failed to create welcome message for user %d: %v", user.ID, err)
+	// Create bobot topic for the new user
+	bobotTopic, err := s.db.CreateBobotTopic(user.ID)
+	if err != nil {
+		log.Printf("failed to create bobot topic for user %d: %v", user.ID, err)
+	}
+
+	// Send welcome message in the bobot topic
+	if bobotTopic != nil {
+		if _, err := s.db.CreateTopicMessageWithContext(
+			bobotTopic.ID, db.BobotUserID, "assistant", db.WelcomeMessage, db.WelcomeMessage,
+			s.cfg.Context.TokensStart, s.cfg.Context.TokensMax,
+		); err != nil {
+			log.Printf("failed to create welcome message for user %d: %v", user.ID, err)
+		}
 	}
 
 	// Mark invite as used

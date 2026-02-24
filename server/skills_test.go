@@ -11,14 +11,15 @@ import (
 	"github.com/esnunes/bobot/auth"
 )
 
-func TestSkillsPagePrivate(t *testing.T) {
+func TestSkillsPageBobotTopic(t *testing.T) {
 	s, coreDB, cleanup := setupTopicTestServer(t)
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	coreDB.CreateSkill(user.ID, nil, "groceries", "Manage groceries", "content")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
+	coreDB.CreateSkill(user.ID, bobotTopic.ID, "groceries", "Manage groceries", "content")
 
-	req := httptest.NewRequest("GET", "/skills", nil)
+	req := httptest.NewRequest("GET", "/skills?topic_id="+strconv.FormatInt(bobotTopic.ID, 10), nil)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
 	w := httptest.NewRecorder()
 
@@ -43,7 +44,7 @@ func TestSkillsPageTopic(t *testing.T) {
 	user, _ := coreDB.CreateUser("alice", "hash")
 	topic, _ := coreDB.CreateTopic("General", user.ID)
 	coreDB.AddTopicMember(topic.ID, user.ID)
-	coreDB.CreateSkill(user.ID, &topic.ID, "notes", "Meeting notes", "content")
+	coreDB.CreateSkill(user.ID, topic.ID, "notes", "Meeting notes", "content")
 
 	req := httptest.NewRequest("GET", "/skills?topic_id="+strconv.FormatInt(topic.ID, 10), nil)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
@@ -68,8 +69,9 @@ func TestSkillsPageEmpty(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
-	req := httptest.NewRequest("GET", "/skills", nil)
+	req := httptest.NewRequest("GET", "/skills?topic_id="+strconv.FormatInt(bobotTopic.ID, 10), nil)
 	req = req.WithContext(auth.ContextWithUserData(req.Context(), auth.UserData{UserID: user.ID}))
 	w := httptest.NewRecorder()
 
@@ -106,7 +108,8 @@ func TestSkillFormPageEdit(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	skill, _ := coreDB.CreateSkill(user.ID, nil, "groceries", "desc", "my content")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
+	skill, _ := coreDB.CreateSkill(user.ID, bobotTopic.ID, "groceries", "desc", "my content")
 
 	req := httptest.NewRequest("GET", "/skills/"+strconv.FormatInt(skill.ID, 10)+"/edit", nil)
 	req.SetPathValue("id", strconv.FormatInt(skill.ID, 10))
@@ -132,11 +135,13 @@ func TestCreateSkillForm(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
 
 	form := url.Values{}
 	form.Set("name", "groceries")
 	form.Set("description", "Manage grocery lists")
 	form.Set("content", "Use task tool")
+	form.Set("topic_id", strconv.FormatInt(bobotTopic.ID, 10))
 
 	req := httptest.NewRequest("POST", "/skills", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -154,9 +159,12 @@ func TestCreateSkillForm(t *testing.T) {
 		t.Errorf("expected HX-Trigger with redirect, got %q", trigger)
 	}
 
-	skills, _ := coreDB.GetPrivateChatSkills(user.ID)
-	if len(skills) != 1 {
-		t.Errorf("expected 1 skill in DB, got %d", len(skills))
+	skill, err := coreDB.GetSkillByID(1)
+	if err != nil {
+		t.Fatalf("expected skill in DB, got error: %v", err)
+	}
+	if skill.Name != "groceries" {
+		t.Errorf("expected skill name 'groceries', got %q", skill.Name)
 	}
 }
 
@@ -192,7 +200,8 @@ func TestUpdateSkillForm(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	skill, _ := coreDB.CreateSkill(user.ID, nil, "groceries", "old", "old content")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
+	skill, _ := coreDB.CreateSkill(user.ID, bobotTopic.ID, "groceries", "old", "old content")
 
 	form := url.Values{}
 	form.Set("description", "new desc")
@@ -221,7 +230,8 @@ func TestDeleteSkillForm(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	skill, _ := coreDB.CreateSkill(user.ID, nil, "groceries", "desc", "content")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
+	skill, _ := coreDB.CreateSkill(user.ID, bobotTopic.ID, "groceries", "desc", "content")
 
 	req := httptest.NewRequest("DELETE", "/skills/"+strconv.FormatInt(skill.ID, 10), nil)
 	req.SetPathValue("id", strconv.FormatInt(skill.ID, 10))

@@ -15,13 +15,14 @@ func setupSkillTestDB(t *testing.T) *CoreDB {
 	return coreDB
 }
 
-func TestCreatePrivateChatSkill(t *testing.T) {
+func TestCreateBobotTopicSkill(t *testing.T) {
 	db := setupSkillTestDB(t)
 	defer db.Close()
 
 	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := db.CreateBobotTopic(user.ID)
 
-	skill, err := db.CreateSkill(user.ID, nil, "groceries", "Manage grocery lists", "Use task tool for groceries")
+	skill, err := db.CreateSkill(user.ID, topic.ID, "groceries", "Manage grocery lists", "Use task tool for groceries")
 	if err != nil {
 		t.Fatalf("failed to create skill: %v", err)
 	}
@@ -40,23 +41,24 @@ func TestCreateTopicSkill(t *testing.T) {
 	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
 	topic, _ := db.CreateTopic("General", user.ID)
 
-	skill, err := db.CreateSkill(user.ID, &topic.ID, "meeting-notes", "Track meeting notes", "Always summarize meetings")
+	skill, err := db.CreateSkill(user.ID, topic.ID, "meeting-notes", "Track meeting notes", "Always summarize meetings")
 	if err != nil {
 		t.Fatalf("failed to create skill: %v", err)
 	}
-	if skill.TopicID == nil || *skill.TopicID != topic.ID {
+	if skill.TopicID != topic.ID {
 		t.Error("expected skill to be scoped to topic")
 	}
 }
 
-func TestCreateSkillDuplicateNamePrivate(t *testing.T) {
+func TestCreateSkillDuplicateName(t *testing.T) {
 	db := setupSkillTestDB(t)
 	defer db.Close()
 
 	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
+	topic, _ := db.CreateBobotTopic(user.ID)
 
-	db.CreateSkill(user.ID, nil, "groceries", "desc", "content")
-	_, err := db.CreateSkill(user.ID, nil, "groceries", "desc2", "content2")
+	db.CreateSkill(user.ID, topic.ID, "groceries", "desc", "content")
+	_, err := db.CreateSkill(user.ID, topic.ID, "groceries", "desc2", "content2")
 	if err == nil {
 		t.Error("expected error for duplicate skill name")
 	}
@@ -70,27 +72,28 @@ func TestCreateSkillDuplicateNameTopic(t *testing.T) {
 	bob, _ := db.CreateUserFull("bob", "hash", "Bob", "user")
 	topic, _ := db.CreateTopic("General", alice.ID)
 
-	db.CreateSkill(alice.ID, &topic.ID, "notes", "desc", "content")
+	db.CreateSkill(alice.ID, topic.ID, "notes", "desc", "content")
 	// Different user, same topic, same name — should fail
-	_, err := db.CreateSkill(bob.ID, &topic.ID, "notes", "desc2", "content2")
+	_, err := db.CreateSkill(bob.ID, topic.ID, "notes", "desc2", "content2")
 	if err == nil {
 		t.Error("expected error for duplicate skill name in topic")
 	}
 }
 
-func TestCreateSkillSameNameDifferentScopes(t *testing.T) {
+func TestCreateSkillSameNameDifferentTopics(t *testing.T) {
 	db := setupSkillTestDB(t)
 	defer db.Close()
 
 	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
+	bobotTopic, _ := db.CreateBobotTopic(user.ID)
 	topic, _ := db.CreateTopic("General", user.ID)
 
-	// Same name in private + topic should be allowed
-	_, err := db.CreateSkill(user.ID, nil, "groceries", "desc", "content")
+	// Same name in different topics should be allowed
+	_, err := db.CreateSkill(user.ID, bobotTopic.ID, "groceries", "desc", "content")
 	if err != nil {
-		t.Fatalf("private skill failed: %v", err)
+		t.Fatalf("bobot topic skill failed: %v", err)
 	}
-	_, err = db.CreateSkill(user.ID, &topic.ID, "groceries", "desc", "content")
+	_, err = db.CreateSkill(user.ID, topic.ID, "groceries", "desc", "content")
 	if err != nil {
 		t.Fatalf("topic skill failed: %v", err)
 	}
@@ -101,7 +104,8 @@ func TestGetSkillByID(t *testing.T) {
 	defer db.Close()
 
 	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
-	created, _ := db.CreateSkill(user.ID, nil, "groceries", "desc", "content")
+	topic, _ := db.CreateBobotTopic(user.ID)
+	created, _ := db.CreateSkill(user.ID, topic.ID, "groceries", "desc", "content")
 
 	skill, err := db.GetSkillByID(created.ID)
 	if err != nil {
@@ -122,28 +126,6 @@ func TestGetSkillByIDNotFound(t *testing.T) {
 	}
 }
 
-func TestGetPrivateChatSkills(t *testing.T) {
-	db := setupSkillTestDB(t)
-	defer db.Close()
-
-	alice, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
-	bob, _ := db.CreateUserFull("bob", "hash", "Bob", "user")
-	topic, _ := db.CreateTopic("General", alice.ID)
-
-	db.CreateSkill(alice.ID, nil, "groceries", "desc1", "content1")
-	db.CreateSkill(alice.ID, nil, "recipes", "desc2", "content2")
-	db.CreateSkill(alice.ID, &topic.ID, "topic-skill", "desc3", "content3")
-	db.CreateSkill(bob.ID, nil, "bob-skill", "desc4", "content4")
-
-	skills, err := db.GetPrivateChatSkills(alice.ID)
-	if err != nil {
-		t.Fatalf("get private skills failed: %v", err)
-	}
-	if len(skills) != 2 {
-		t.Errorf("expected 2 private skills, got %d", len(skills))
-	}
-}
-
 func TestGetTopicSkills(t *testing.T) {
 	db := setupSkillTestDB(t)
 	defer db.Close()
@@ -152,9 +134,9 @@ func TestGetTopicSkills(t *testing.T) {
 	topic1, _ := db.CreateTopic("General", alice.ID)
 	topic2, _ := db.CreateTopic("Random", alice.ID)
 
-	db.CreateSkill(alice.ID, &topic1.ID, "skill1", "desc", "content")
-	db.CreateSkill(alice.ID, &topic1.ID, "skill2", "desc", "content")
-	db.CreateSkill(alice.ID, &topic2.ID, "skill3", "desc", "content")
+	db.CreateSkill(alice.ID, topic1.ID, "skill1", "desc", "content")
+	db.CreateSkill(alice.ID, topic1.ID, "skill2", "desc", "content")
+	db.CreateSkill(alice.ID, topic2.ID, "skill3", "desc", "content")
 
 	skills, err := db.GetTopicSkills(topic1.ID)
 	if err != nil {
@@ -170,7 +152,8 @@ func TestUpdateSkill(t *testing.T) {
 	defer db.Close()
 
 	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
-	created, _ := db.CreateSkill(user.ID, nil, "groceries", "old desc", "old content")
+	topic, _ := db.CreateBobotTopic(user.ID)
+	created, _ := db.CreateSkill(user.ID, topic.ID, "groceries", "old desc", "old content")
 
 	err := db.UpdateSkill(created.ID, "new desc", "new content")
 	if err != nil {
@@ -191,7 +174,8 @@ func TestDeleteSkill(t *testing.T) {
 	defer db.Close()
 
 	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
-	created, _ := db.CreateSkill(user.ID, nil, "groceries", "desc", "content")
+	topic, _ := db.CreateBobotTopic(user.ID)
+	created, _ := db.CreateSkill(user.ID, topic.ID, "groceries", "desc", "content")
 
 	err := db.DeleteSkill(created.ID)
 	if err != nil {
@@ -204,30 +188,13 @@ func TestDeleteSkill(t *testing.T) {
 	}
 }
 
-func TestGetPrivateChatSkillByName(t *testing.T) {
-	db := setupSkillTestDB(t)
-	defer db.Close()
-
-	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
-	db.CreateSkill(user.ID, nil, "Groceries", "desc", "content")
-
-	// Case-insensitive lookup
-	skill, err := db.GetPrivateChatSkillByName(user.ID, "groceries")
-	if err != nil {
-		t.Fatalf("get by name failed: %v", err)
-	}
-	if skill.Name != "Groceries" {
-		t.Errorf("expected name 'Groceries', got %q", skill.Name)
-	}
-}
-
 func TestGetTopicSkillByName(t *testing.T) {
 	db := setupSkillTestDB(t)
 	defer db.Close()
 
 	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
 	topic, _ := db.CreateTopic("General", user.ID)
-	db.CreateSkill(user.ID, &topic.ID, "Notes", "desc", "content")
+	db.CreateSkill(user.ID, topic.ID, "Notes", "desc", "content")
 
 	skill, err := db.GetTopicSkillByName(topic.ID, "notes")
 	if err != nil {
@@ -244,7 +211,7 @@ func TestSkillsCascadeDeleteOnTopicDelete(t *testing.T) {
 
 	user, _ := db.CreateUserFull("alice", "hash", "Alice", "user")
 	topic, _ := db.CreateTopic("General", user.ID)
-	db.CreateSkill(user.ID, &topic.ID, "notes", "desc", "content")
+	db.CreateSkill(user.ID, topic.ID, "notes", "desc", "content")
 
 	// Soft-delete the topic — skills should remain (soft delete doesn't trigger CASCADE)
 	// But we should test the cascade on the FK
