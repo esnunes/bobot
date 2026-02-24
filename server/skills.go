@@ -91,13 +91,9 @@ func (s *Server) handleSkillFormPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if skill.TopicID != 0 {
-			topicID = skill.TopicID
-		}
-
 		s.render(w, "skill_form", PageData{
 			Title:   "Edit Skill",
-			TopicID: topicID,
+			TopicID: skill.TopicID,
 			Skill: &SkillView{
 				ID:          skill.ID,
 				Name:        skill.Name,
@@ -201,10 +197,7 @@ func (s *Server) handleUpdateSkillForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirectPath := "/skills"
-	if skill.TopicID != 0 {
-		redirectPath = fmt.Sprintf("/skills?topic_id=%d", skill.TopicID)
-	}
+	redirectPath := fmt.Sprintf("/skills?topic_id=%d", skill.TopicID)
 
 	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+redirectPath+`"}}`)
 	w.WriteHeader(http.StatusNoContent)
@@ -239,10 +232,7 @@ func (s *Server) handleDeleteSkillForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirectPath := "/skills"
-	if skill.TopicID != 0 {
-		redirectPath = fmt.Sprintf("/skills?topic_id=%d", skill.TopicID)
-	}
+	redirectPath := fmt.Sprintf("/skills?topic_id=%d", skill.TopicID)
 
 	w.Header().Set("HX-Trigger", `{"bobot:redirect": {"path": "`+redirectPath+`"}}`)
 	w.WriteHeader(http.StatusNoContent)
@@ -265,25 +255,13 @@ func (s *Server) canManageTopicSkills(userData auth.UserData, topicID int64) err
 
 // canManageSkill checks if a user can update/delete a specific skill.
 func (s *Server) canManageSkill(userData auth.UserData, skill *db.SkillRow) error {
-	if skill.TopicID != 0 {
-		return s.canManageTopicSkills(userData, skill.TopicID)
-	}
-	if skill.UserID != userData.UserID {
-		return fmt.Errorf("forbidden")
-	}
-	return nil
+	return s.canManageTopicSkills(userData, skill.TopicID)
 }
 
 // canViewSkill checks if a user can view a specific skill.
 func (s *Server) canViewSkill(userData auth.UserData, skill *db.SkillRow) error {
-	if skill.TopicID != 0 {
-		isMember, err := s.db.IsTopicMember(skill.TopicID, userData.UserID)
-		if err != nil || !isMember {
-			return fmt.Errorf("forbidden")
-		}
-		return nil
-	}
-	if skill.UserID != userData.UserID {
+	isMember, err := s.db.IsTopicMember(skill.TopicID, userData.UserID)
+	if err != nil || !isMember {
 		return fmt.Errorf("forbidden")
 	}
 	return nil

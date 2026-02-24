@@ -108,7 +108,8 @@ func TestSkillFormPageEdit(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	skill, _ := coreDB.CreateSkill(user.ID, 0, "groceries", "desc", "my content")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
+	skill, _ := coreDB.CreateSkill(user.ID, bobotTopic.ID, "groceries", "desc", "my content")
 
 	req := httptest.NewRequest("GET", "/skills/"+strconv.FormatInt(skill.ID, 10)+"/edit", nil)
 	req.SetPathValue("id", strconv.FormatInt(skill.ID, 10))
@@ -197,7 +198,8 @@ func TestUpdateSkillForm(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	skill, _ := coreDB.CreateSkill(user.ID, 0, "groceries", "old", "old content")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
+	skill, _ := coreDB.CreateSkill(user.ID, bobotTopic.ID, "groceries", "old", "old content")
 
 	form := url.Values{}
 	form.Set("description", "new desc")
@@ -226,7 +228,8 @@ func TestDeleteSkillForm(t *testing.T) {
 	defer cleanup()
 
 	user, _ := coreDB.CreateUser("alice", "hash")
-	skill, _ := coreDB.CreateSkill(user.ID, 0, "groceries", "desc", "content")
+	bobotTopic, _ := coreDB.CreateBobotTopic(user.ID)
+	skill, _ := coreDB.CreateSkill(user.ID, bobotTopic.ID, "groceries", "desc", "content")
 
 	req := httptest.NewRequest("DELETE", "/skills/"+strconv.FormatInt(skill.ID, 10), nil)
 	req.SetPathValue("id", strconv.FormatInt(skill.ID, 10))

@@ -170,14 +170,11 @@ func (t *TopicTool) resolveTopic(name string, topicID int64) (*db.Topic, error) 
 		}
 		return topic, err
 	}
-	if topicID != 0 {
-		topic, err := t.db.GetTopicByID(topicID)
-		if err == db.ErrNotFound {
-			return nil, fmt.Errorf("topic not found")
-		}
-		return topic, err
+	topic, err := t.db.GetTopicByID(topicID)
+	if err == db.ErrNotFound {
+		return nil, fmt.Errorf("topic not found")
 	}
-	return nil, fmt.Errorf("topic name is required when not in a topic chat")
+	return topic, err
 }
 
 func (t *TopicTool) deleteTopic(userID int64, name string, topicID int64) (string, error) {

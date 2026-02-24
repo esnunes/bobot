@@ -430,8 +430,8 @@ func TestTopicTool_NoTopicContext(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when no topic context and no name")
 	}
-	if !strings.Contains(err.Error(), "required") {
-		t.Errorf("expected 'required' in error, got: %v", err)
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
 	}
 }
 
