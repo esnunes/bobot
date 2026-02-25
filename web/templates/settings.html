@@ -53,24 +53,28 @@
         <details class="context-section" open>
             <summary class="context-section-title">Topic Tools</summary>
             <div class="settings-section-content">
-                <div class="settings-row">
-                    <span class="settings-row-label">Skills</span>
-                    {{if .Skills}}
-                    <span class="settings-row-secondary">{{range $i, $s := .Skills}}{{if $i}}, {{end}}{{.Name}}{{end}}</span>
-                    {{else}}
-                    <span class="settings-row-secondary settings-row-empty">None</span>
-                    {{end}}
-                    <button class="settings-row-action" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">Manage Skills</button>
-                </div>
-                <div class="settings-row">
-                    <span class="settings-row-label">Schedules</span>
-                    {{if .Schedules}}
-                    <span class="settings-row-secondary">{{range $i, $s := .Schedules}}{{if $i}}, {{end}}{{if .Name}}{{.Name}}{{else}}{{.CronExpr}}{{end}}{{if not .Enabled}} (disabled){{end}}{{end}}</span>
-                    {{else}}
-                    <span class="settings-row-secondary settings-row-empty">None</span>
-                    {{end}}
-                    <button class="settings-row-action" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">Manage Schedules</button>
-                </div>
+                <button class="settings-nav-item" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">
+                    <div class="settings-nav-info">
+                        <span class="settings-nav-label">Skills</span>
+                        {{if .Skills}}
+                        <span class="settings-nav-detail">{{range $i, $s := .Skills}}{{if $i}}, {{end}}{{.Name}}{{end}}</span>
+                        {{else}}
+                        <span class="settings-nav-detail settings-row-empty">None</span>
+                        {{end}}
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                <button class="settings-nav-item" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">
+                    <div class="settings-nav-info">
+                        <span class="settings-nav-label">Schedules</span>
+                        {{if .Schedules}}
+                        <span class="settings-nav-detail">{{range $i, $s := .Schedules}}{{if $i}}, {{end}}{{if .Name}}{{.Name}}{{else}}{{.CronExpr}}{{end}}{{if not .Enabled}} (disabled){{end}}{{end}}</span>
+                        {{else}}
+                        <span class="settings-nav-detail settings-row-empty">None</span>
+                        {{end}}
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
             </div>
         </details>
 
@@ -78,9 +82,9 @@
             <summary class="context-section-title settings-danger-title">Danger Zone</summary>
             <div class="settings-section-content">
                 {{if eq .OwnerID .CurrentUserID}}
-                <button id="delete-btn" class="danger-btn">Delete Topic</button>
+                <button id="delete-btn" class="settings-danger-action">Delete Topic</button>
                 {{else}}
-                <button id="leave-btn" class="danger-btn">Leave Topic</button>
+                <button id="leave-btn" class="settings-danger-action">Leave Topic</button>
                 {{end}}
             </div>
         </details>
@@ -110,16 +114,24 @@
                     </button>
                 </div>
 
-                {{if .IsAdmin}}
-                <button class="settings-nav-item" hx-get="/admin" hx-target="body">
-                    <span>Admin</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-                </button>
-                {{end}}
-
-                <button id="logout-btn" class="danger-btn" hx-post="/logout" hx-on::before-request="htmx.trigger(document.body, 'bobot:logout')">Logout</button>
+                <button id="logout-btn" class="settings-danger-action" hx-post="/logout" hx-on::before-request="htmx.trigger(document.body, 'bobot:logout')">Logout</button>
             </div>
         </details>
+
+        {{if .IsAdmin}}
+        <details class="context-section" open>
+            <summary class="context-section-title">Administration</summary>
+            <div class="settings-section-content">
+                <button class="settings-nav-item" hx-get="/admin" hx-target="body">
+                    <div class="settings-nav-info">
+                        <span class="settings-nav-label">Admin Dashboard</span>
+                        <span class="settings-nav-detail">Manage users, contexts, and system settings</span>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+            </div>
+        </details>
+        {{end}}
     </main>
 </div>
 
