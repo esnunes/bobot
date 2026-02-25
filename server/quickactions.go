@@ -81,16 +81,12 @@ func (s *Server) handleQuickActionFormPage(w http.ResponseWriter, r *http.Reques
 		}
 
 		qa, err := s.db.GetQuickActionByID(qaID)
-		if err == db.ErrNotFound {
+		if err != nil {
 			http.Error(w, "quick action not found", http.StatusNotFound)
 			return
 		}
-		if err != nil {
-			http.Error(w, "failed to load quick action", http.StatusInternalServerError)
-			return
-		}
 
-		if err := s.canViewQuickAction(userData, qa); err != nil {
+		if err := s.canViewQuickAction(userData, qa.TopicID); err != nil {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
@@ -108,7 +104,14 @@ func (s *Server) handleQuickActionFormPage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// New quick action form
+	// New quick action form — require management permission
+	if topicID != 0 {
+		if err := s.canManageTopicQuickActions(userData, topicID); err != nil {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
+
 	s.render(w, "quick_action_form", PageData{
 		Title:   "New Quick Action",
 		TopicID: topicID,
@@ -123,29 +126,12 @@ func (s *Server) handleCreateQuickActionForm(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	label := strings.TrimSpace(r.FormValue("label"))
-	if label == "" {
-		http.Error(w, "label required", http.StatusBadRequest)
+	label, message, mode, err := validateQuickActionFields(
+		r.FormValue("label"), r.FormValue("message"), r.FormValue("mode"),
+	)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-	if len(label) > 100 {
-		http.Error(w, "label must be 100 characters or less", http.StatusBadRequest)
-		return
-	}
-
-	message := strings.TrimSpace(r.FormValue("message"))
-	if message == "" {
-		http.Error(w, "message required", http.StatusBadRequest)
-		return
-	}
-	if len(message) > 2000 {
-		http.Error(w, "message must be 2000 characters or less", http.StatusBadRequest)
-		return
-	}
-
-	mode := r.FormValue("mode")
-	if mode != "send" && mode != "fill" {
-		mode = "send"
 	}
 
 	topicIDStr := r.FormValue("topic_id")
@@ -194,7 +180,7 @@ func (s *Server) handleUpdateQuickActionForm(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := s.canManageQuickAction(userData, qa); err != nil {
+	if err := s.canManageQuickAction(userData, qa.TopicID); err != nil {
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
@@ -204,29 +190,12 @@ func (s *Server) handleUpdateQuickActionForm(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	label := strings.TrimSpace(r.FormValue("label"))
-	if label == "" {
-		http.Error(w, "label required", http.StatusBadRequest)
+	label, message, mode, valErr := validateQuickActionFields(
+		r.FormValue("label"), r.FormValue("message"), r.FormValue("mode"),
+	)
+	if valErr != nil {
+		http.Error(w, valErr.Error(), http.StatusBadRequest)
 		return
-	}
-	if len(label) > 100 {
-		http.Error(w, "label must be 100 characters or less", http.StatusBadRequest)
-		return
-	}
-
-	message := strings.TrimSpace(r.FormValue("message"))
-	if message == "" {
-		http.Error(w, "message required", http.StatusBadRequest)
-		return
-	}
-	if len(message) > 2000 {
-		http.Error(w, "message must be 2000 characters or less", http.StatusBadRequest)
-		return
-	}
-
-	mode := r.FormValue("mode")
-	if mode != "send" && mode != "fill" {
-		mode = "send"
 	}
 
 	if err := s.db.UpdateQuickAction(qaID, label, message, mode); err != nil {
@@ -262,7 +231,7 @@ func (s *Server) handleDeleteQuickActionForm(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := s.canManageQuickAction(userData, qa); err != nil {
+	if err := s.canManageQuickAction(userData, qa.TopicID); err != nil {
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
@@ -277,26 +246,41 @@ func (s *Server) handleDeleteQuickActionForm(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) canManageTopicQuickActions(userData auth.UserData, topicID int64) error {
-	if userData.Role == "admin" {
-		return nil
+func validateQuickActionFields(label, message, mode string) (string, string, string, error) {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return "", "", "", fmt.Errorf("label required")
 	}
+	if len(label) > 100 {
+		return "", "", "", fmt.Errorf("label must be 100 characters or less")
+	}
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return "", "", "", fmt.Errorf("message required")
+	}
+	if len(message) > 2000 {
+		return "", "", "", fmt.Errorf("message must be 2000 characters or less")
+	}
+	if mode != "send" && mode != "fill" {
+		mode = "send"
+	}
+	return label, message, mode, nil
+}
+
+func (s *Server) canManageTopicQuickActions(userData auth.UserData, topicID int64) error {
 	topic, err := s.db.GetTopicByID(topicID)
 	if err != nil {
 		return fmt.Errorf("topic not found")
 	}
-	if topic.OwnerID != userData.UserID {
-		return fmt.Errorf("only the topic owner or admins can manage quick actions")
-	}
-	return nil
+	return auth.CanManageTopicResource(userData.Role, userData.UserID, topic.OwnerID)
 }
 
-func (s *Server) canManageQuickAction(userData auth.UserData, qa *db.QuickActionRow) error {
-	return s.canManageTopicQuickActions(userData, qa.TopicID)
+func (s *Server) canManageQuickAction(userData auth.UserData, topicID int64) error {
+	return s.canManageTopicQuickActions(userData, topicID)
 }
 
-func (s *Server) canViewQuickAction(userData auth.UserData, qa *db.QuickActionRow) error {
-	isMember, err := s.db.IsTopicMember(qa.TopicID, userData.UserID)
+func (s *Server) canViewQuickAction(userData auth.UserData, topicID int64) error {
+	isMember, err := s.db.IsTopicMember(topicID, userData.UserID)
 	if err != nil || !isMember {
 		return fmt.Errorf("forbidden")
 	}

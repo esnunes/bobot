@@ -513,7 +513,7 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	canManageQA := userData.Role == "admin" || topic.OwnerID == userData.UserID
+	canManageQA := auth.CanManageTopicResource(userData.Role, userData.UserID, topic.OwnerID) == nil
 
 	jsonData, _ := json.Marshal(map[string]any{
 		"current_user_id":          userData.UserID,

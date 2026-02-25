@@ -97,17 +97,11 @@ func (s *SkillTool) Execute(ctx context.Context, input map[string]any) (string, 
 }
 
 func (s *SkillTool) canManageTopicSkills(userID int64, role string, topicID int64) error {
-	if role == "admin" {
-		return nil
-	}
 	topic, err := s.db.GetTopicByID(topicID)
 	if err != nil {
 		return fmt.Errorf("topic not found")
 	}
-	if topic.OwnerID != userID {
-		return fmt.Errorf("only the topic owner or admins can manage topic skills")
-	}
-	return nil
+	return auth.CanManageTopicResource(role, userID, topic.OwnerID)
 }
 
 func (s *SkillTool) create(userData auth.UserData, chatData auth.ChatData, name, description, content string) (string, error) {

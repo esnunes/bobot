@@ -37,7 +37,11 @@ func (q *QuickActionTool) Schema() any {
 			},
 			"label": map[string]any{
 				"type":        "string",
-				"description": "Short button label for the quick action (e.g. 'Turn on AC'). Used to identify the action for update/delete.",
+				"description": "Short button label for the quick action (e.g. 'Turn on AC'). Used to identify the action for update/delete. Label matching is case-insensitive.",
+			},
+			"new_label": map[string]any{
+				"type":        "string",
+				"description": "New label when renaming a quick action (only used with update command).",
 			},
 			"message": map[string]any{
 				"type":        "string",
@@ -80,6 +84,7 @@ func (q *QuickActionTool) Execute(ctx context.Context, input map[string]any) (st
 	}
 
 	label, _ := input["label"].(string)
+	newLabel, _ := input["new_label"].(string)
 	message, _ := input["message"].(string)
 	mode, _ := input["mode"].(string)
 
@@ -87,28 +92,22 @@ func (q *QuickActionTool) Execute(ctx context.Context, input map[string]any) (st
 	case "create":
 		return q.create(userData, chatData, label, message, mode)
 	case "update":
-		return q.update(userData, chatData, label, message, mode)
+		return q.update(userData, chatData, label, newLabel, message, mode)
 	case "delete":
 		return q.deleteQA(userData, chatData, label)
 	case "list":
-		return q.list(chatData)
+		return q.list(userData, chatData)
 	default:
 		return "", fmt.Errorf("unknown command: %s", command)
 	}
 }
 
 func (q *QuickActionTool) canManage(userID int64, role string, topicID int64) error {
-	if role == "admin" {
-		return nil
-	}
 	topic, err := q.db.GetTopicByID(topicID)
 	if err != nil {
 		return fmt.Errorf("topic not found")
 	}
-	if topic.OwnerID != userID {
-		return fmt.Errorf("only the topic owner or admins can manage quick actions")
-	}
-	return nil
+	return auth.CanManageTopicResource(role, userID, topic.OwnerID)
 }
 
 func (q *QuickActionTool) create(userData auth.UserData, chatData auth.ChatData, label, message, mode string) (string, error) {
@@ -153,7 +152,7 @@ func (q *QuickActionTool) create(userData auth.UserData, chatData auth.ChatData,
 	return fmt.Sprintf("Quick action %q created (mode: %s).", qa.Label, qa.Mode), nil
 }
 
-func (q *QuickActionTool) update(userData auth.UserData, chatData auth.ChatData, label, message, mode string) (string, error) {
+func (q *QuickActionTool) update(userData auth.UserData, chatData auth.ChatData, label, newLabel, message, mode string) (string, error) {
 	label = strings.TrimSpace(label)
 	if label == "" {
 		return "", fmt.Errorf("missing label. Usage: /quickaction update <label>")
@@ -170,7 +169,13 @@ func (q *QuickActionTool) update(userData auth.UserData, chatData auth.ChatData,
 	}
 
 	// Keep existing values if not provided
-	newLabel := label
+	newLabel = strings.TrimSpace(newLabel)
+	if newLabel == "" {
+		newLabel = qa.Label
+	}
+	if len(newLabel) > 100 {
+		return "", fmt.Errorf("label must be 100 characters or less")
+	}
 	newMessage := message
 	newMode := mode
 	if newMessage == "" {
@@ -187,10 +192,13 @@ func (q *QuickActionTool) update(userData auth.UserData, chatData auth.ChatData,
 	}
 
 	if err := q.db.UpdateQuickAction(qa.ID, newLabel, newMessage, newMode); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint") {
+			return "", fmt.Errorf("a quick action labeled %q already exists in this topic", newLabel)
+		}
 		return "", fmt.Errorf("failed to update quick action: %w", err)
 	}
 
-	return fmt.Sprintf("Quick action %q updated.", label), nil
+	return fmt.Sprintf("Quick action %q updated.", newLabel), nil
 }
 
 func (q *QuickActionTool) deleteQA(userData auth.UserData, chatData auth.ChatData, label string) (string, error) {
@@ -216,7 +224,12 @@ func (q *QuickActionTool) deleteQA(userData auth.UserData, chatData auth.ChatDat
 	return fmt.Sprintf("Quick action %q deleted.", label), nil
 }
 
-func (q *QuickActionTool) list(chatData auth.ChatData) (string, error) {
+func (q *QuickActionTool) list(userData auth.UserData, chatData auth.ChatData) (string, error) {
+	isMember, err := q.db.IsTopicMember(chatData.TopicID, userData.UserID)
+	if err != nil || !isMember {
+		return "", fmt.Errorf("you are not a member of this topic")
+	}
+
 	actions, err := q.db.GetTopicQuickActions(chatData.TopicID)
 	if err != nil {
 		return "", fmt.Errorf("failed to list quick actions: %w", err)
@@ -243,8 +256,8 @@ func (q *QuickActionTool) resolve(topicID int64, label string) (*db.QuickActionR
 }
 
 func (q *QuickActionTool) warnIfTooMany(topicID int64) {
-	actions, err := q.db.GetTopicQuickActions(topicID)
-	if err == nil && len(actions) > 20 {
-		slog.Warn("topic exceeds 20 quick actions", "topicID", topicID, "count", len(actions))
+	count, err := q.db.CountTopicQuickActions(topicID)
+	if err == nil && count > 20 {
+		slog.Warn("topic exceeds 20 quick actions", "topicID", topicID, "count", count)
 	}
 }

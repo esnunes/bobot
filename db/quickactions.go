@@ -55,7 +55,7 @@ func (c *CoreDB) GetQuickActionByID(id int64) (*QuickActionRow, error) {
 
 func (c *CoreDB) GetTopicQuickActions(topicID int64) ([]QuickActionRow, error) {
 	rows, err := c.db.Query(
-		"SELECT id, label, message, mode, user_id, topic_id, created_at, updated_at FROM quick_actions WHERE topic_id = ? ORDER BY created_at ASC",
+		"SELECT id, label, message, mode, user_id, topic_id, created_at, updated_at FROM quick_actions WHERE topic_id = ? ORDER BY created_at ASC LIMIT 50",
 		topicID,
 	)
 	if err != nil {
@@ -63,6 +63,12 @@ func (c *CoreDB) GetTopicQuickActions(topicID int64) ([]QuickActionRow, error) {
 	}
 	defer rows.Close()
 	return scanQuickActions(rows)
+}
+
+func (c *CoreDB) CountTopicQuickActions(topicID int64) (int, error) {
+	var count int
+	err := c.db.QueryRow("SELECT COUNT(*) FROM quick_actions WHERE topic_id = ?", topicID).Scan(&count)
+	return count, err
 }
 
 func (c *CoreDB) GetTopicQuickActionByLabel(topicID int64, label string) (*QuickActionRow, error) {
