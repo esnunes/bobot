@@ -1473,19 +1473,40 @@ header {
   gap: var(--space-2);
 }
 
-.settings-info-row {
+.settings-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 2px;
   padding: var(--space-1) 0;
 }
 
-.settings-info-label {
-  font-size: var(--font-sizes-1);
-  text-transform: uppercase;
-  color: var(--colors-text-secondary);
+.settings-row-label {
+  font-size: var(--font-sizes-2);
   font-weight: var(--font-weights-medium);
-  letter-spacing: 0.05em;
+}
+
+.settings-row-secondary {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-text-secondary);
+}
+
+.settings-row-empty {
+  font-style: italic;
+}
+
+.settings-row-action {
+  align-self: flex-start;
+  font-size: var(--font-sizes-1);
+  color: var(--colors-accent);
+  background: none;
+  border: none;
+  padding: var(--space-1) 0 0;
+  cursor: pointer;
+  font-weight: var(--font-weights-medium);
+}
+
+.settings-row-action:hover {
+  text-decoration: underline;
 }
 
 .settings-toggle-row {
@@ -1560,53 +1581,6 @@ header {
   cursor: not-allowed;
 }
 
-.settings-tool-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.settings-tool-label {
-  font-size: var(--font-sizes-1);
-  text-transform: uppercase;
-  color: var(--colors-text-secondary);
-  font-weight: var(--font-weights-medium);
-  letter-spacing: 0.05em;
-}
-
-.settings-tool-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.settings-tool-item {
-  font-size: var(--font-sizes-1);
-  background: var(--colors-background);
-  padding: 2px var(--space-1);
-  border-radius: var(--radii-sm);
-}
-
-.settings-tool-empty {
-  font-size: var(--font-sizes-1);
-  color: var(--colors-text-secondary);
-  font-style: italic;
-}
-
-.settings-tool-manage {
-  align-self: flex-start;
-  font-size: var(--font-sizes-1);
-  color: var(--colors-accent);
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font-weight: var(--font-weights-medium);
-}
-
-.settings-tool-manage:hover {
-  text-decoration: underline;
-}
 
 .settings-separator {
   border: none;
@@ -1688,6 +1662,3 @@ header {
   width: 100%;
 }
 
-.settings-list .members-list {
-  padding-top: 0;
-}

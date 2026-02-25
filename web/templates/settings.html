@@ -15,18 +15,13 @@
         <details class="context-section" open>
             <summary class="context-section-title">Topic Details</summary>
             <div class="settings-section-content">
-                <div class="settings-info-row">
-                    <span class="settings-info-label">Name</span>
-                    <span>{{.TopicName}}</span>
+                <div class="settings-row">
+                    <span class="settings-row-label">Name</span>
+                    <span class="settings-row-secondary">{{.TopicName}}</span>
                 </div>
-                <div class="settings-info-row">
-                    <span class="settings-info-label">Members</span>
-                    <span>{{len .Members}}</span>
-                </div>
-                <div class="members-list">
-                    {{range .Members}}
-                    <div class="member">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}</div>
-                    {{end}}
+                <div class="settings-row">
+                    <span class="settings-row-label">Members</span>
+                    <span class="settings-row-secondary">{{range $i, $m := .Members}}{{if $i}}, {{end}}{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}{{end}}</span>
                 </div>
             </div>
         </details>
@@ -58,27 +53,23 @@
         <details class="context-section" open>
             <summary class="context-section-title">Topic Tools</summary>
             <div class="settings-section-content">
-                <div class="settings-tool-group">
-                    <span class="settings-tool-label">Skills</span>
+                <div class="settings-row">
+                    <span class="settings-row-label">Skills</span>
                     {{if .Skills}}
-                    <div class="settings-tool-list">
-                        {{range .Skills}}<span class="settings-tool-item">{{.Name}}</span>{{end}}
-                    </div>
+                    <span class="settings-row-secondary">{{range $i, $s := .Skills}}{{if $i}}, {{end}}{{.Name}}{{end}}</span>
                     {{else}}
-                    <span class="settings-tool-empty">No skills</span>
+                    <span class="settings-row-secondary settings-row-empty">None</span>
                     {{end}}
-                    <button class="settings-tool-manage" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">Manage Skills</button>
+                    <button class="settings-row-action" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">Manage Skills</button>
                 </div>
-                <div class="settings-tool-group">
-                    <span class="settings-tool-label">Schedules</span>
+                <div class="settings-row">
+                    <span class="settings-row-label">Schedules</span>
                     {{if .Schedules}}
-                    <div class="settings-tool-list">
-                        {{range .Schedules}}<span class="settings-tool-item">{{if .Name}}{{.Name}}{{else}}{{.CronExpr}}{{end}}{{if not .Enabled}} (disabled){{end}}</span>{{end}}
-                    </div>
+                    <span class="settings-row-secondary">{{range $i, $s := .Schedules}}{{if $i}}, {{end}}{{if .Name}}{{.Name}}{{else}}{{.CronExpr}}{{end}}{{if not .Enabled}} (disabled){{end}}{{end}}</span>
                     {{else}}
-                    <span class="settings-tool-empty">No schedules</span>
+                    <span class="settings-row-secondary settings-row-empty">None</span>
                     {{end}}
-                    <button class="settings-tool-manage" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">Manage Schedules</button>
+                    <button class="settings-row-action" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">Manage Schedules</button>
                 </div>
             </div>
         </details>
@@ -101,7 +92,7 @@
             <summary class="context-section-title">Account</summary>
             <div class="settings-section-content">
                 <form class="settings-display-name-form" id="display-name-form">
-                    <label class="settings-info-label" for="display-name-input">Display name</label>
+                    <label class="settings-row-label" for="display-name-input">Display name</label>
                     <div class="settings-display-name-row">
                         <input type="text" id="display-name-input" name="display_name" value="{{.DisplayName}}" autocomplete="off" maxlength="100">
                         <button type="submit" class="settings-save-btn">Save</button>
