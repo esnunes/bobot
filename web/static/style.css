@@ -1670,18 +1670,20 @@ header {
 .settings-danger-action {
   width: 100%;
   padding: var(--space-2);
-  background: none;
-  border: none;
+  background: var(--colors-background);
+  border: var(--borders-thin);
   border-radius: var(--radii-md);
   font-size: var(--font-sizes-2);
   font-family: var(--fonts-body);
   font-weight: var(--font-weights-medium);
   color: var(--colors-danger);
   cursor: pointer;
-  text-align: left;
+  text-align: center;
 }
 
 .settings-danger-action:hover {
-  background: var(--colors-background);
+  background: var(--colors-danger);
+  color: white;
+  border-color: var(--colors-danger);
 }
 
