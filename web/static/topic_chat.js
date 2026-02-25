@@ -1,3 +1,12 @@
+var QUICK_ACTIONS = [
+    { label: 'Turn on AC', message: '@bobot turn on the AC in the living room', mode: 'send' },
+    { label: 'Turn off lights', message: '@bobot turn off all the lights in the house', mode: 'send' },
+    { label: 'Check weather', message: "@bobot what's the weather like today?", mode: 'send' },
+    { label: 'Set a reminder', message: '@bobot remind me to ', mode: 'fill' },
+    { label: 'Morning routine', message: '@bobot start my morning routine', mode: 'send' },
+    { label: 'Grocery list', message: '@bobot add to my grocery list: ', mode: 'fill' },
+];
+
 window.TopicChatClient = class TopicChatClient {
     constructor(topicId) {
         // Clean up any previous page client
@@ -11,6 +20,10 @@ window.TopicChatClient = class TopicChatClient {
         this.form = document.getElementById('chat-form');
         this.input = document.getElementById('message-input');
         this.mentionBotBtn = document.getElementById('mention-bot-btn');
+        this.quickActionsBtn = document.getElementById('quick-actions-btn');
+        this.quickActionsOverlay = document.getElementById('quick-actions-overlay');
+        this.quickActionsClose = document.getElementById('quick-actions-close');
+        this.quickActionsList = document.getElementById('quick-actions-list');
         this.isLoadingHistory = false;
         this.oldestMessageId = null;
         this.hasMoreHistory = true;
@@ -27,6 +40,7 @@ window.TopicChatClient = class TopicChatClient {
         this.wsContainer.connect();
         this.loadInitialMessages();
         this.setupEventListeners();
+        this.setupQuickActions();
         this.scrollToBottom();
     }
 
@@ -115,6 +129,10 @@ window.TopicChatClient = class TopicChatClient {
             document.removeEventListener('bobot:unread-changed', this.handleUnreadChanged);
             this.handleUnreadChanged = null;
         }
+        if (this.handleQuickActionsKeydown) {
+            document.removeEventListener('keydown', this.handleQuickActionsKeydown);
+            this.handleQuickActionsKeydown = null;
+        }
     }
 
     mentionBot() {
@@ -201,6 +219,89 @@ window.TopicChatClient = class TopicChatClient {
 
     scrollToBottom() {
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+    }
+
+    setupQuickActions() {
+        if (!this.quickActionsBtn || !this.quickActionsOverlay) return;
+
+        // Render action items
+        QUICK_ACTIONS.forEach(function(action) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'quick-action-item';
+            btn.setAttribute('role', 'button');
+
+            var labelEl = document.createElement('span');
+            labelEl.className = 'quick-action-label';
+            labelEl.textContent = action.label;
+
+            if (action.mode === 'fill') {
+                var icon = document.createElement('svg');
+                icon.setAttribute('width', '14');
+                icon.setAttribute('height', '14');
+                icon.setAttribute('viewBox', '0 0 24 24');
+                icon.setAttribute('fill', 'none');
+                icon.setAttribute('stroke', 'currentColor');
+                icon.setAttribute('stroke-width', '2');
+                icon.setAttribute('stroke-linecap', 'round');
+                icon.setAttribute('stroke-linejoin', 'round');
+                icon.className = 'quick-action-mode-icon';
+                icon.innerHTML = '<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>';
+                labelEl.appendChild(icon);
+            }
+
+            var previewEl = document.createElement('span');
+            previewEl.className = 'quick-action-preview';
+            previewEl.textContent = action.message;
+
+            btn.appendChild(labelEl);
+            btn.appendChild(previewEl);
+
+            btn.addEventListener('click', function() {
+                this.handleQuickAction(action);
+            }.bind(this));
+
+            this.quickActionsList.appendChild(btn);
+        }.bind(this));
+
+        // Open overlay
+        this.quickActionsBtn.addEventListener('click', function() {
+            this.openQuickActions();
+        }.bind(this));
+
+        // Close via X button
+        this.quickActionsClose.addEventListener('click', function() {
+            this.closeQuickActions();
+        }.bind(this));
+
+        // Escape key
+        this.handleQuickActionsKeydown = function(e) {
+            if (e.key === 'Escape' && !this.quickActionsOverlay.classList.contains('hidden')) {
+                this.closeQuickActions();
+            }
+        }.bind(this);
+        document.addEventListener('keydown', this.handleQuickActionsKeydown);
+    }
+
+    openQuickActions() {
+        this.quickActionsOverlay.classList.remove('hidden');
+        this.quickActionsClose.focus();
+    }
+
+    closeQuickActions() {
+        this.quickActionsOverlay.classList.add('hidden');
+        this.quickActionsBtn.focus();
+    }
+
+    handleQuickAction(action) {
+        if (action.mode === 'fill') {
+            this.input.value = action.message;
+            this.closeQuickActions();
+            this.input.focus();
+        } else {
+            this.wsContainer.send({ content: action.message, topic_id: this.topicId });
+            this.closeQuickActions();
+        }
     }
 
     async loadMoreHistory() {
