@@ -1,12 +1,3 @@
-var QUICK_ACTIONS = [
-    { label: 'Turn on AC', message: '@bobot turn on the AC in the living room', mode: 'send' },
-    { label: 'Turn off lights', message: '@bobot turn off all the lights in the house', mode: 'send' },
-    { label: 'Check weather', message: "@bobot what's the weather like today?", mode: 'send' },
-    { label: 'Set a reminder', message: '@bobot remind me to ', mode: 'fill' },
-    { label: 'Morning routine', message: '@bobot start my morning routine', mode: 'send' },
-    { label: 'Grocery list', message: '@bobot add to my grocery list: ', mode: 'fill' },
-];
-
 window.TopicChatClient = class TopicChatClient {
     constructor(topicId) {
         // Clean up any previous page client
@@ -51,6 +42,8 @@ window.TopicChatClient = class TopicChatClient {
         var data = JSON.parse(dataEl.textContent);
         this.currentUserId = data.current_user_id;
         this.autoRespond = !!data.auto_respond;
+        this.quickActions = data.quick_actions || [];
+        this.canManageQuickActions = !!data.can_manage_quick_actions;
 
         var messages = data.messages || [];
         messages.forEach(function(msg) {
@@ -228,30 +221,41 @@ window.TopicChatClient = class TopicChatClient {
     setupQuickActions() {
         if (!this.quickActionsBtn || !this.quickActionsOverlay) return;
 
-        // Render action items
-        QUICK_ACTIONS.forEach((action) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'quick-action-item';
-
-            const labelEl = document.createElement('span');
-            labelEl.className = 'quick-action-label';
-            labelEl.textContent = action.label;
-
-            if (action.mode === 'fill') {
-                labelEl.insertAdjacentHTML('beforeend', '<svg class="quick-action-mode-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>');
+        // Render action items or empty state
+        if (this.quickActions.length === 0) {
+            const emptyEl = document.createElement('div');
+            emptyEl.className = 'empty';
+            if (this.canManageQuickActions) {
+                emptyEl.textContent = 'No quick actions yet. Create one in Settings.';
+            } else {
+                emptyEl.textContent = 'No quick actions yet.';
             }
+            this.quickActionsList.appendChild(emptyEl);
+        } else {
+            this.quickActions.forEach((action) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'quick-action-item';
 
-            const previewEl = document.createElement('span');
-            previewEl.className = 'quick-action-preview';
-            previewEl.textContent = action.message;
+                const labelEl = document.createElement('span');
+                labelEl.className = 'quick-action-label';
+                labelEl.textContent = action.label;
 
-            btn.appendChild(labelEl);
-            btn.appendChild(previewEl);
-            btn.addEventListener('click', () => this.handleQuickAction(action));
+                if (action.mode === 'fill') {
+                    labelEl.insertAdjacentHTML('beforeend', '<svg class="quick-action-mode-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>');
+                }
 
-            this.quickActionsList.appendChild(btn);
-        });
+                const previewEl = document.createElement('span');
+                previewEl.className = 'quick-action-preview';
+                previewEl.textContent = action.message;
+
+                btn.appendChild(labelEl);
+                btn.appendChild(previewEl);
+                btn.addEventListener('click', () => this.handleQuickAction(action));
+
+                this.quickActionsList.appendChild(btn);
+            });
+        }
 
         this.quickActionsBtn.addEventListener('click', () => this.openQuickActions());
         this.quickActionsClose.addEventListener('click', () => this.closeQuickActions());

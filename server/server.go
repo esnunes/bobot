@@ -121,6 +121,14 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /schedules/{id}", s.sessionMiddleware(s.handleUpdateScheduleForm))
 	s.router.HandleFunc("DELETE /schedules/{id}", s.sessionMiddleware(s.handleDeleteScheduleForm))
 
+	// Quick action routes (require auth)
+	s.router.HandleFunc("GET /quickactions", s.sessionMiddleware(s.handleQuickActionsPage))
+	s.router.HandleFunc("GET /quickactions/new", s.sessionMiddleware(s.handleQuickActionFormPage))
+	s.router.HandleFunc("GET /quickactions/{id}/edit", s.sessionMiddleware(s.handleQuickActionFormPage))
+	s.router.HandleFunc("POST /quickactions", s.sessionMiddleware(s.handleCreateQuickActionForm))
+	s.router.HandleFunc("POST /quickactions/{id}", s.sessionMiddleware(s.handleUpdateQuickActionForm))
+	s.router.HandleFunc("DELETE /quickactions/{id}", s.sessionMiddleware(s.handleDeleteQuickActionForm))
+
 	// Admin routes (require auth + admin role)
 	s.router.HandleFunc("GET /admin", s.sessionMiddleware(s.adminMiddleware(s.handleAdminPage)))
 	s.router.HandleFunc("GET /admin/users/{id}", s.sessionMiddleware(s.adminMiddleware(s.handleAdminUserPage)))

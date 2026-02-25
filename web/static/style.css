@@ -1771,3 +1771,19 @@ header {
   color: var(--colors-text-secondary);
 }
 
+/* Radio group for quick action mode */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: var(--font-sizes-2);
+}
+

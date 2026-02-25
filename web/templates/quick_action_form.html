@@ -1,0 +1,53 @@
+{{define "content"}}
+<div class="skill-form-container" data-page="quick-action-form">
+    <header>
+        <button hx-get="/quickactions?topic_id={{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <h1>{{if .QuickAction}}Edit Quick Action{{else}}New Quick Action{{end}}</h1>
+        <div></div>
+    </header>
+
+    <main class="skill-form-body">
+        {{if .QuickAction}}
+        <form hx-post="/quickactions/{{.QuickAction.ID}}" hx-target="body" class="skill-form">
+        {{else}}
+        <form hx-post="/quickactions" hx-target="body" class="skill-form">
+        {{end}}
+            <input type="hidden" name="topic_id" value="{{.TopicID}}">
+
+            <label for="qa-label">Label</label>
+            <input type="text" id="qa-label" name="label" placeholder="e.g. Turn on AC" required maxlength="100" {{if .QuickAction}}value="{{.QuickAction.Label}}"{{else}}autofocus{{end}}>
+
+            <label for="qa-message">Message</label>
+            <textarea id="qa-message" name="message" placeholder="e.g. @bobot turn on the AC in the living room" required maxlength="2000" rows="4">{{if .QuickAction}}{{.QuickAction.Message}}{{end}}</textarea>
+
+            <label>Mode</label>
+            <div class="radio-group">
+                <label class="radio-label">
+                    <input type="radio" name="mode" value="send" {{if or (not .QuickAction) (eq .QuickAction.Mode "send")}}checked{{end}}>
+                    <span>Send immediately</span>
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="mode" value="fill" {{if and .QuickAction (eq .QuickAction.Mode "fill")}}checked{{end}}>
+                    <span>Fill input for editing</span>
+                </label>
+            </div>
+
+            <div class="skill-form-actions">
+                {{if .QuickAction}}
+                <button type="button" class="danger-btn" hx-delete="/quickactions/{{.QuickAction.ID}}" hx-confirm="Delete quick action '{{.QuickAction.Label}}'?" hx-target="body">Delete</button>
+                <div class="skill-form-actions-right">
+                    <button type="button" hx-get="/quickactions?topic_id={{.TopicID}}" hx-target="body">Cancel</button>
+                    <button type="submit" class="primary-btn">Save</button>
+                </div>
+                {{else}}
+                <div></div>
+                <div class="skill-form-actions-right">
+                    <button type="button" hx-get="/quickactions?topic_id={{.TopicID}}" hx-target="body">Cancel</button>
+                    <button type="submit" class="primary-btn">Create</button>
+                </div>
+                {{end}}
+            </div>
+        </form>
+    </main>
+</div>
+{{end}}
