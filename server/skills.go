@@ -240,17 +240,11 @@ func (s *Server) handleDeleteSkillForm(w http.ResponseWriter, r *http.Request) {
 
 // canManageTopicSkills checks if a user can create/modify topic skills.
 func (s *Server) canManageTopicSkills(userData auth.UserData, topicID int64) error {
-	if userData.Role == "admin" {
-		return nil
-	}
 	topic, err := s.db.GetTopicByID(topicID)
 	if err != nil {
 		return fmt.Errorf("topic not found")
 	}
-	if topic.OwnerID != userData.UserID {
-		return fmt.Errorf("only the topic owner or admins can manage topic skills")
-	}
-	return nil
+	return auth.CanManageTopicResource(userData.Role, userData.UserID, topic.OwnerID)
 }
 
 // canManageSkill checks if a user can update/delete a specific skill.

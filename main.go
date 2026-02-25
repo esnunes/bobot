@@ -27,6 +27,7 @@ import (
 	"github.com/esnunes/bobot/tools/schedule"
 	"github.com/esnunes/bobot/tools/skill"
 	"github.com/esnunes/bobot/tools/task"
+	"github.com/esnunes/bobot/tools/quickaction"
 	"github.com/esnunes/bobot/tools/thinq"
 	"github.com/esnunes/bobot/tools/topic"
 	"github.com/esnunes/bobot/tools/user"
@@ -112,6 +113,7 @@ func main() {
 	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
 	registry.Register(topic.NewTopicTool(coreDB))
 	registry.Register(skill.NewSkillTool(coreDB))
+	registry.Register(quickaction.NewQuickActionTool(coreDB))
 	registry.Register(schedule.NewRemindTool(scheduleDB))
 	registry.Register(schedule.NewCronTool(scheduleDB))
 

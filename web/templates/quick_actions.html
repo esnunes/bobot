@@ -1,0 +1,25 @@
+{{define "content"}}
+<div class="skills-container" data-page="quick-actions">
+    <header>
+        <button hx-get="/settings?topic_id={{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <h1>Quick Actions{{if .TopicName}} - {{.TopicName}}{{end}}</h1>
+        <div></div>
+    </header>
+
+    <main class="skills-list">
+        {{if .QuickActions}}
+            {{range .QuickActions}}
+            <button hx-get="/quickactions/{{.ID}}/edit" hx-target="body" class="skill-item">
+                <span class="skill-name">{{.Label}}</span>
+                <span class="skill-description">{{.Message}}</span>
+            </button>
+            {{end}}
+        {{else}}
+            <div class="empty">No quick actions yet.</div>
+        {{end}}
+        {{if .IsAdmin}}
+        <button hx-get="/quickactions/new?topic_id={{.TopicID}}" hx-target="body" class="card-action">+ Create new quick action</button>
+        {{end}}
+    </main>
+</div>
+{{end}}

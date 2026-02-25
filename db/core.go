@@ -459,6 +459,32 @@ func (c *CoreDB) migrate() error {
 		return err
 	}
 
+	// Create quick_actions table
+	_, err = c.db.Exec(`
+		CREATE TABLE IF NOT EXISTS quick_actions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			label TEXT NOT NULL,
+			message TEXT NOT NULL,
+			mode TEXT NOT NULL DEFAULT 'send',
+			user_id INTEGER NOT NULL REFERENCES users(id),
+			topic_id INTEGER NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Unique label per topic (case-insensitive)
+	_, err = c.db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_quick_actions_topic_label
+		ON quick_actions(topic_id, LOWER(label))
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

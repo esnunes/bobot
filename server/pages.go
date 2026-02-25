@@ -45,6 +45,13 @@ type SkillView struct {
 	Content     string
 }
 
+type QuickActionView struct {
+	ID      int64
+	Label   string
+	Message string
+	Mode    string
+}
+
 type ScheduleView struct {
 	ID            int64
 	Name          string
@@ -158,6 +165,8 @@ type PageData struct {
 	Skill           *SkillView
 	Schedules       []ScheduleView
 	Schedule        *ScheduleView
+	QuickActions    []QuickActionView
+	QuickAction     *QuickActionView
 	VAPIDPublicKey  string
 	NavigateTo      string
 	PageDataJSON    template.JS
@@ -271,13 +280,25 @@ func (s *Server) loadTemplates() error {
 	}
 	s.templates["admin_context"] = adminContextTmpl
 
+	quickActionsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/quick_actions.html")
+	if err != nil {
+		return err
+	}
+	s.templates["quick_actions"] = quickActionsTmpl
+
+	quickActionFormTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/quick_action_form.html")
+	if err != nil {
+		return err
+	}
+	s.templates["quick_action_form"] = quickActionFormTmpl
+
 	return nil
 }
 
 // validateNavigatePath returns a safe navigation path.
 // Only /chat and /chats/{id} are allowed; anything else defaults to /chat.
 func validateNavigatePath(path string) string {
-	if path == "/chat" || path == "/settings" || strings.HasPrefix(path, "/settings?") || path == "/schedules" || strings.HasPrefix(path, "/schedules?") || path == "/admin" || strings.HasPrefix(path, "/admin/") || navigatePathRe.MatchString(path) {
+	if path == "/chat" || path == "/settings" || strings.HasPrefix(path, "/settings?") || path == "/schedules" || strings.HasPrefix(path, "/schedules?") || path == "/quickactions" || strings.HasPrefix(path, "/quickactions?") || path == "/admin" || strings.HasPrefix(path, "/admin/") || navigatePathRe.MatchString(path) {
 		return path
 	}
 	return "/chat"
@@ -476,10 +497,30 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		jsonMessages = append(jsonMessages, jm)
 	}
 
+	// Load quick actions for chat overlay
+	qaRows, _ := s.db.GetTopicQuickActions(topicID)
+	type quickActionJSON struct {
+		Label   string `json:"label"`
+		Message string `json:"message"`
+		Mode    string `json:"mode"`
+	}
+	jsonQuickActions := make([]quickActionJSON, 0, len(qaRows))
+	for _, qa := range qaRows {
+		jsonQuickActions = append(jsonQuickActions, quickActionJSON{
+			Label:   qa.Label,
+			Message: qa.Message,
+			Mode:    qa.Mode,
+		})
+	}
+
+	canManageQA := auth.CanManageTopicResource(userData.Role, userData.UserID, topic.OwnerID) == nil
+
 	jsonData, _ := json.Marshal(map[string]any{
-		"current_user_id": userData.UserID,
-		"messages":        jsonMessages,
-		"auto_respond":    topic.AutoRespond,
+		"current_user_id":          userData.UserID,
+		"messages":                 jsonMessages,
+		"auto_respond":             topic.AutoRespond,
+		"quick_actions":            jsonQuickActions,
+		"can_manage_quick_actions": canManageQA,
 	})
 
 	s.markChatReadImplicit(userData.UserID, topicID)
@@ -593,8 +634,19 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 		data.AutoRead = autoRead
 		data.AutoRespond = topic.AutoRespond
 		data.IsBobotTopic = topic.Name == "bobot"
+		// Load quick actions for inline preview
+		qaRows, _ := s.db.GetTopicQuickActions(topicID)
+		qaViews := make([]QuickActionView, 0, len(qaRows))
+		for _, qa := range qaRows {
+			qaViews = append(qaViews, QuickActionView{
+				ID:    qa.ID,
+				Label: qa.Label,
+			})
+		}
+
 		data.Skills = skillViews
 		data.Schedules = scheduleViews
+		data.QuickActions = qaViews
 	}
 
 	unreads, _ := s.db.GetUnreadChats(userData.UserID)

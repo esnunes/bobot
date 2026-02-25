@@ -15,10 +15,9 @@
             <input type="text" id="message-input" placeholder="Message..." autocomplete="off">
             <button type="submit" class="input-action" aria-label="Send"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
         </form>
-        {{if .IsAdmin}}<button type="button" id="quick-actions-btn" class="input-action" aria-label="Quick actions"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>{{end}}
+        <button type="button" id="quick-actions-btn" class="input-action" aria-label="Quick actions"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
     </footer>
 
-    {{if .IsAdmin}}
     <div id="quick-actions-overlay" class="quick-actions-overlay hidden" role="dialog" aria-modal="true" aria-label="Quick Actions">
         <header class="quick-actions-header">
             <h2>Quick Actions</h2>
@@ -26,7 +25,6 @@
         </header>
         <div class="quick-actions-list" id="quick-actions-list"></div>
     </div>
-    {{end}}
 </div>
 
 <script type="application/json" data-page-data>{{.PageDataJSON}}</script>
