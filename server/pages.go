@@ -592,7 +592,7 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 		data.PushMuted = pushMuted
 		data.AutoRead = autoRead
 		data.AutoRespond = topic.AutoRespond
-		data.IsBobotTopic = topic.Name == "bobot" && topic.OwnerID == userData.UserID
+		data.IsBobotTopic = topic.Name == "bobot"
 		data.Skills = skillViews
 		data.Schedules = scheduleViews
 	}
