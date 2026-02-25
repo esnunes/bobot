@@ -133,6 +133,10 @@ window.TopicChatClient = class TopicChatClient {
             document.removeEventListener('keydown', this.handleQuickActionsKeydown);
             this.handleQuickActionsKeydown = null;
         }
+        if (this.handleBeforeSwap) {
+            document.removeEventListener('htmx:beforeSwap', this.handleBeforeSwap);
+            this.handleBeforeSwap = null;
+        }
     }
 
     mentionBot() {
@@ -225,62 +229,44 @@ window.TopicChatClient = class TopicChatClient {
         if (!this.quickActionsBtn || !this.quickActionsOverlay) return;
 
         // Render action items
-        QUICK_ACTIONS.forEach(function(action) {
-            var btn = document.createElement('button');
+        QUICK_ACTIONS.forEach((action) => {
+            const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'quick-action-item';
-            btn.setAttribute('role', 'button');
 
-            var labelEl = document.createElement('span');
+            const labelEl = document.createElement('span');
             labelEl.className = 'quick-action-label';
             labelEl.textContent = action.label;
 
             if (action.mode === 'fill') {
-                var icon = document.createElement('svg');
-                icon.setAttribute('width', '14');
-                icon.setAttribute('height', '14');
-                icon.setAttribute('viewBox', '0 0 24 24');
-                icon.setAttribute('fill', 'none');
-                icon.setAttribute('stroke', 'currentColor');
-                icon.setAttribute('stroke-width', '2');
-                icon.setAttribute('stroke-linecap', 'round');
-                icon.setAttribute('stroke-linejoin', 'round');
-                icon.className = 'quick-action-mode-icon';
-                icon.innerHTML = '<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>';
-                labelEl.appendChild(icon);
+                labelEl.insertAdjacentHTML('beforeend', '<svg class="quick-action-mode-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>');
             }
 
-            var previewEl = document.createElement('span');
+            const previewEl = document.createElement('span');
             previewEl.className = 'quick-action-preview';
             previewEl.textContent = action.message;
 
             btn.appendChild(labelEl);
             btn.appendChild(previewEl);
-
-            btn.addEventListener('click', function() {
-                this.handleQuickAction(action);
-            }.bind(this));
+            btn.addEventListener('click', () => this.handleQuickAction(action));
 
             this.quickActionsList.appendChild(btn);
-        }.bind(this));
+        });
 
-        // Open overlay
-        this.quickActionsBtn.addEventListener('click', function() {
-            this.openQuickActions();
-        }.bind(this));
+        this.quickActionsBtn.addEventListener('click', () => this.openQuickActions());
+        this.quickActionsClose.addEventListener('click', () => this.closeQuickActions());
 
-        // Close via X button
-        this.quickActionsClose.addEventListener('click', function() {
-            this.closeQuickActions();
-        }.bind(this));
-
-        // Escape key
-        this.handleQuickActionsKeydown = function(e) {
+        // Escape key to close overlay
+        this.handleQuickActionsKeydown = (e) => {
             if (e.key === 'Escape' && !this.quickActionsOverlay.classList.contains('hidden')) {
                 this.closeQuickActions();
             }
-        }.bind(this);
+        };
         document.addEventListener('keydown', this.handleQuickActionsKeydown);
+
+        // Clean up on HTMX body swap (prevents listener leak when navigating away)
+        this.handleBeforeSwap = () => this.cleanup();
+        document.addEventListener('htmx:beforeSwap', this.handleBeforeSwap, { once: true });
     }
 
     openQuickActions() {
@@ -294,13 +280,12 @@ window.TopicChatClient = class TopicChatClient {
     }
 
     handleQuickAction(action) {
+        this.closeQuickActions();
         if (action.mode === 'fill') {
             this.input.value = action.message;
-            this.closeQuickActions();
             this.input.focus();
         } else {
             this.wsContainer.send({ content: action.message, topic_id: this.topicId });
-            this.closeQuickActions();
         }
     }
 
