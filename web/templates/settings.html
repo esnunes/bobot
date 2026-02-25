@@ -29,6 +29,17 @@
         <details class="context-section" open>
             <summary class="context-section-title">Topic Settings</summary>
             <div class="settings-section-content">
+                {{if and (not .IsBobotTopic) (or (eq .OwnerID .CurrentUserID) .IsAdmin)}}
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-info">
+                        <span class="settings-toggle-label">Auto-respond</span>
+                        <span class="settings-toggle-description">Bot responds to all messages without needing @bobot</span>
+                    </div>
+                    <button class="settings-toggle-btn" role="switch" aria-checked="{{.AutoRespond}}" data-auto-respond-toggle data-topic-id="{{.TopicID}}" data-auto-respond="{{.AutoRespond}}">
+                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                    </button>
+                </div>
+                {{end}}
                 <div class="settings-toggle-row" data-mute-toggle data-topic-id="{{.TopicID}}" data-muted="{{.PushMuted}}" style="display:none">
                     <div class="settings-toggle-info">
                         <span class="settings-toggle-label">Mute topic</span>

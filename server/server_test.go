@@ -617,3 +617,127 @@ func TestHandleLogout_WithAllParam_CreatesRevocation(t *testing.T) {
 		t.Error("Expected revocation to be created")
 	}
 }
+
+func TestToggleAutoRespond_OwnerCanEnable(t *testing.T) {
+	s := setupTestServer(t)
+
+	hash, _ := auth.HashPassword("password")
+	owner, _ := s.db.CreateUserFull("owner", hash, "Owner", "user")
+	topic, _ := s.db.CreateTopic("test-topic", owner.ID)
+	s.db.AddTopicMember(topic.ID, owner.ID)
+
+	token, _ := s.session.CreateToken(owner.ID, "user")
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/topics/%d/auto-respond", topic.ID), nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: token})
+	rr := httptest.NewRecorder()
+
+	s.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Errorf("Status = %d, want 204", rr.Code)
+	}
+
+	updated, _ := s.db.GetTopicByID(topic.ID)
+	if !updated.AutoRespond {
+		t.Error("expected auto_respond to be true")
+	}
+}
+
+func TestToggleAutoRespond_OwnerCanDisable(t *testing.T) {
+	s := setupTestServer(t)
+
+	hash, _ := auth.HashPassword("password")
+	owner, _ := s.db.CreateUserFull("owner", hash, "Owner", "user")
+	topic, _ := s.db.CreateTopic("test-topic", owner.ID)
+	s.db.AddTopicMember(topic.ID, owner.ID)
+	s.db.SetTopicAutoRespond(topic.ID, true)
+
+	token, _ := s.session.CreateToken(owner.ID, "user")
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/topics/%d/auto-respond", topic.ID), nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: token})
+	rr := httptest.NewRecorder()
+
+	s.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Errorf("Status = %d, want 204", rr.Code)
+	}
+
+	updated, _ := s.db.GetTopicByID(topic.ID)
+	if updated.AutoRespond {
+		t.Error("expected auto_respond to be false")
+	}
+}
+
+func TestToggleAutoRespond_AdminCanToggle(t *testing.T) {
+	s := setupTestServer(t)
+
+	hash, _ := auth.HashPassword("password")
+	owner, _ := s.db.CreateUserFull("owner", hash, "Owner", "user")
+	admin, _ := s.db.CreateUserFull("admin", hash, "Admin", "admin")
+	topic, _ := s.db.CreateTopic("test-topic", owner.ID)
+	s.db.AddTopicMember(topic.ID, owner.ID)
+
+	token, _ := s.session.CreateToken(admin.ID, "admin")
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/topics/%d/auto-respond", topic.ID), nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: token})
+	rr := httptest.NewRecorder()
+
+	s.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Errorf("Status = %d, want 204", rr.Code)
+	}
+
+	updated, _ := s.db.GetTopicByID(topic.ID)
+	if !updated.AutoRespond {
+		t.Error("expected auto_respond to be true")
+	}
+}
+
+func TestToggleAutoRespond_MemberForbidden(t *testing.T) {
+	s := setupTestServer(t)
+
+	hash, _ := auth.HashPassword("password")
+	owner, _ := s.db.CreateUserFull("owner", hash, "Owner", "user")
+	member, _ := s.db.CreateUserFull("member", hash, "Member", "user")
+	topic, _ := s.db.CreateTopic("test-topic", owner.ID)
+	s.db.AddTopicMember(topic.ID, owner.ID)
+	s.db.AddTopicMember(topic.ID, member.ID)
+
+	token, _ := s.session.CreateToken(member.ID, "user")
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/topics/%d/auto-respond", topic.ID), nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: token})
+	rr := httptest.NewRecorder()
+
+	s.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("Status = %d, want 403", rr.Code)
+	}
+}
+
+func TestToggleAutoRespond_BobotTopicCannotDisable(t *testing.T) {
+	s := setupTestServer(t)
+
+	hash, _ := auth.HashPassword("password")
+	owner, _ := s.db.CreateUserFull("owner", hash, "Owner", "user")
+	bobotTopic, _ := s.db.CreateBobotTopic(owner.ID)
+
+	token, _ := s.session.CreateToken(owner.ID, "user")
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/topics/%d/auto-respond", bobotTopic.ID), nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: token})
+	rr := httptest.NewRecorder()
+
+	s.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("Status = %d, want 403", rr.Code)
+	}
+
+	// Verify it's still enabled
+	updated, _ := s.db.GetTopicByID(bobotTopic.ID)
+	if !updated.AutoRespond {
+		t.Error("expected bobot topic auto_respond to remain true")
+	}
+}

@@ -74,6 +74,26 @@
         });
     }
 
+    // Auto-respond toggle
+    var autoRespondBtn = container.querySelector('[data-auto-respond-toggle]');
+    if (autoRespondBtn) {
+        autoRespondBtn.addEventListener('click', function() {
+            var isAutoRespond = autoRespondBtn.getAttribute('data-auto-respond') === 'true';
+            var method = isAutoRespond ? 'DELETE' : 'POST';
+            autoRespondBtn.disabled = true;
+            fetch('/api/topics/' + topicId + '/auto-respond', { method: method })
+                .then(function(resp) {
+                    if (resp.ok) {
+                        var newState = !isAutoRespond;
+                        autoRespondBtn.setAttribute('data-auto-respond', String(newState));
+                        autoRespondBtn.setAttribute('aria-checked', String(newState));
+                    }
+                })
+                .catch(function(err) { console.error('Auto-respond toggle failed:', err); })
+                .finally(function() { autoRespondBtn.disabled = false; });
+        });
+    }
+
     // Delete topic
     var deleteBtn = document.getElementById('delete-btn');
     if (deleteBtn && topicId) {

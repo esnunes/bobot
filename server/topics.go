@@ -280,6 +280,42 @@ func (s *Server) handleToggleTopicAutoRead(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) handleToggleTopicAutoRespond(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	topicID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid topic id", http.StatusBadRequest)
+		return
+	}
+
+	topic, err := s.db.GetTopicByID(topicID)
+	if err != nil {
+		http.Error(w, "topic not found", http.StatusNotFound)
+		return
+	}
+
+	// Only owner or admin can toggle auto-respond
+	if topic.OwnerID != userData.UserID && userData.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Prevent disabling auto-respond on bobot topics
+	if r.Method == http.MethodDelete && topic.Name == "bobot" {
+		http.Error(w, "cannot disable auto-respond on bobot topic", http.StatusForbidden)
+		return
+	}
+
+	enabled := r.Method == http.MethodPost
+	if err := s.db.SetTopicAutoRespond(topicID, enabled); err != nil {
+		http.Error(w, "failed to update auto-respond", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleTopicMessageHistory(w http.ResponseWriter, r *http.Request) {
 	userData := auth.UserDataFromContext(r.Context())
 

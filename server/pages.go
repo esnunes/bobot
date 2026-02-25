@@ -170,6 +170,7 @@ type PageData struct {
 	PushMuted       bool
 	AutoRead        bool
 	AutoRespond     bool
+	IsBobotTopic    bool
 	DisplayName     string
 }
 
@@ -590,6 +591,8 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 		data.Members = members
 		data.PushMuted = pushMuted
 		data.AutoRead = autoRead
+		data.AutoRespond = topic.AutoRespond
+		data.IsBobotTopic = topic.Name == "bobot"
 		data.Skills = skillViews
 		data.Schedules = scheduleViews
 	}
