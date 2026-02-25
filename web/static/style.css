@@ -427,60 +427,6 @@ header {
 }
 
 /* ============================================
-   MENU OVERLAY
-   ============================================ */
-.menu-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--colors-overlay);
-  display: flex;
-  justify-content: flex-end;
-  z-index: var(--z-indices-menu);
-}
-
-.menu {
-  background-color: var(--colors-surface);
-  width: var(--sizes-menu-width);
-  padding: calc(var(--space-3) + env(safe-area-inset-top)) calc(var(--space-3) + env(safe-area-inset-right)) calc(var(--space-3) + env(safe-area-inset-bottom)) var(--space-3);
-  box-shadow: var(--shadows-high);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.menu-item {
-  padding: var(--space-2);
-  color: var(--colors-text);
-  border-radius: var(--radii-md);
-  cursor: pointer;
-  font-size: var(--font-sizes-2);
-  transition: background-color var(--transitions-fast);
-  text-align: left;
-  background: none;
-  border: none;
-  width: 100%;
-}
-
-.menu-item:hover {
-  background-color: var(--colors-background);
-}
-
-.menu button:not(.menu-item) {
-  width: 100%;
-  padding: var(--space-2);
-  border: none;
-  border-radius: var(--radii-md);
-  font-family: var(--fonts-body);
-  font-size: var(--font-sizes-2);
-  font-weight: var(--font-weights-medium);
-  cursor: pointer;
-  transition: background-color var(--transitions-fast);
-}
-
-/* ============================================
    TYPING INDICATOR
    ============================================ */
 .typing-indicator {
@@ -1494,3 +1440,250 @@ header {
   font-size: var(--font-sizes-1);
   color: var(--colors-text-secondary);
 }
+
+/* ─── Settings Page ─── */
+
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--colors-background);
+}
+
+.settings-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+
+.settings-list > * {
+  flex-shrink: 0;
+}
+
+.settings-section-content {
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1) 0;
+}
+
+.settings-row-label {
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+}
+
+.settings-row-secondary {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-text-secondary);
+}
+
+.settings-row-empty {
+  font-style: italic;
+}
+
+
+.settings-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.settings-toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-toggle-label {
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+}
+
+.settings-toggle-description {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-text-secondary);
+}
+
+.settings-toggle-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.settings-toggle-track {
+  display: block;
+  width: 44px;
+  height: 24px;
+  border-radius: var(--radii-pill);
+  background: var(--colors-surface);
+  border: 2px solid var(--colors-text-secondary);
+  position: relative;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.settings-toggle-thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--colors-text-secondary);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.settings-toggle-btn[aria-checked="true"] .settings-toggle-track {
+  background: var(--colors-accent);
+  border-color: var(--colors-accent);
+}
+
+.settings-toggle-btn[aria-checked="true"] .settings-toggle-thumb {
+  background: white;
+  transform: translateX(20px);
+}
+
+.settings-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+.settings-separator {
+  border: none;
+  border-top: 1px dashed var(--colors-text-secondary);
+  margin: var(--space-1) 0;
+  opacity: 0.3;
+}
+
+.settings-danger-title {
+  color: var(--colors-danger);
+}
+
+.settings-display-name-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-display-name-row {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.settings-display-name-row input {
+  flex: 1;
+  height: var(--sizes-input-height);
+  padding: 0 var(--space-2);
+  border: var(--borders-thin);
+  border-radius: var(--radii-md);
+  font-size: var(--font-sizes-2);
+  font-family: var(--fonts-body);
+  background: var(--colors-background);
+}
+
+.settings-save-btn {
+  height: var(--sizes-input-height);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radii-pill);
+  background: var(--colors-accent);
+  color: white;
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+  cursor: pointer;
+}
+
+.settings-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-saved-msg {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-success, #40a02b);
+  font-weight: var(--font-weights-medium);
+  transition: opacity 0.3s;
+}
+
+.settings-nav-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: var(--space-2);
+  background: var(--colors-background);
+  border: none;
+  border-radius: var(--radii-md);
+  font-size: var(--font-sizes-2);
+  cursor: pointer;
+  text-align: left;
+  gap: var(--space-2);
+}
+
+.settings-nav-item:hover {
+  background: var(--colors-surface);
+}
+
+.settings-nav-item svg {
+  flex-shrink: 0;
+  color: var(--colors-text-secondary);
+}
+
+.settings-nav-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-nav-label {
+  font-weight: var(--font-weights-medium);
+}
+
+.settings-nav-detail {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-text-secondary);
+}
+
+.settings-danger-action {
+  width: 100%;
+  padding: var(--space-2);
+  background: var(--colors-background);
+  border: var(--borders-thin);
+  border-radius: var(--radii-md);
+  font-size: var(--font-sizes-2);
+  font-family: var(--fonts-body);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-danger);
+  cursor: pointer;
+  text-align: center;
+}
+
+.settings-danger-action:hover {
+  background: var(--colors-danger);
+  color: white;
+  border-color: var(--colors-danger);
+}
+

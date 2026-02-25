@@ -3,7 +3,7 @@
     <header>
         <button hx-get="/chats" hx-target="body" aria-label="Chats"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>{{if .HasOtherUnreads}}<span class="unread-dot"></span>{{end}}</button>
         <h1 id="topic-name">{{.TopicName}}</h1>
-        <button id="menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+        <button hx-get="/settings?topic_id={{.TopicID}}" hx-target="body" aria-label="Settings"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </header>
 
     <main class="chat-messages" id="messages">
@@ -16,30 +16,6 @@
             <button type="submit" class="input-action" aria-label="Send"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
         </form>
     </footer>
-</div>
-
-<div id="menu-overlay" class="menu-overlay hidden">
-    <div class="menu">
-        <div id="members-list" class="members-list">
-            <strong>Members:</strong>
-            {{range .Members}}
-            <div class="member">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}</div>
-            {{end}}
-        </div>
-        <hr>
-        <button class="menu-item" data-push-toggle style="display:none">Enable notifications</button>
-        <button class="menu-item" data-mute-toggle data-topic-id="{{.TopicID}}" data-muted="{{.PushMuted}}" style="display:none">{{if .PushMuted}}Unmute topic{{else}}Mute topic{{end}}</button>
-        <button class="menu-item" data-auto-read-toggle data-topic-id="{{.TopicID}}" data-auto-read="{{.AutoRead}}">{{if .AutoRead}}Disable auto-read{{else}}Enable auto-read{{end}}</button>
-        {{if .IsAdmin}}<button class="menu-item" hx-get="/admin" hx-target="body">Admin</button>{{end}}
-        <button class="menu-item" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">Skills</button>
-        <button class="menu-item" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">Schedules</button>
-        <hr>
-        {{if eq .OwnerID .CurrentUserID}}
-        <button id="delete-btn" class="danger-btn">Delete Topic</button>
-        {{else}}
-        <button id="leave-btn" class="danger-btn">Leave Topic</button>
-        {{end}}
-    </div>
 </div>
 
 <script type="application/json" data-page-data>{{.PageDataJSON}}</script>

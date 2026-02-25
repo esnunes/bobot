@@ -1474,6 +1474,12 @@ func (c *CoreDB) GetUnreadChats(userID int64) (map[int64]bool, error) {
 	return unreads, rows.Err()
 }
 
+// UpdateUserDisplayName updates the display name for a user.
+func (c *CoreDB) UpdateUserDisplayName(userID int64, displayName string) error {
+	_, err := c.db.Exec("UPDATE users SET display_name = ? WHERE id = ?", displayName, userID)
+	return err
+}
+
 // GetLatestTopicMessageID returns the ID of the most recent message in a topic.
 func (c *CoreDB) GetLatestTopicMessageID(topicID int64) (int64, error) {
 	var id int64

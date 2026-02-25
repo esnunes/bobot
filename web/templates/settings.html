@@ -1,0 +1,139 @@
+{{define "content"}}
+<div class="settings-container" data-page="settings"{{if .TopicID}} data-topic-id="{{.TopicID}}" data-owner-id="{{.OwnerID}}" data-current-user-id="{{.CurrentUserID}}"{{end}}>
+    <header>
+        {{if .TopicID}}
+        <button hx-get="/chats/{{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{else}}
+        <button hx-get="/chats" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        {{end}}
+        <h1>Settings</h1>
+        <div></div>
+    </header>
+
+    <main class="settings-list">
+        {{if .TopicID}}
+        <details class="context-section" open>
+            <summary class="context-section-title">Topic Details</summary>
+            <div class="settings-section-content">
+                <div class="settings-row">
+                    <span class="settings-row-label">Name</span>
+                    <span class="settings-row-secondary">{{.TopicName}}</span>
+                </div>
+                <div class="settings-row">
+                    <span class="settings-row-label">Members</span>
+                    <span class="settings-row-secondary">{{range $i, $m := .Members}}{{if $i}}, {{end}}{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}{{end}}</span>
+                </div>
+            </div>
+        </details>
+
+        <details class="context-section" open>
+            <summary class="context-section-title">Topic Settings</summary>
+            <div class="settings-section-content">
+                <div class="settings-toggle-row" data-mute-toggle data-topic-id="{{.TopicID}}" data-muted="{{.PushMuted}}" style="display:none">
+                    <div class="settings-toggle-info">
+                        <span class="settings-toggle-label">Mute topic</span>
+                        <span class="settings-toggle-description">Silence push notifications for this topic</span>
+                    </div>
+                    <button class="settings-toggle-btn" role="switch" aria-checked="{{.PushMuted}}">
+                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                    </button>
+                </div>
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-info">
+                        <span class="settings-toggle-label">Auto-read</span>
+                        <span class="settings-toggle-description">Automatically mark messages as read when you open this topic</span>
+                    </div>
+                    <button class="settings-toggle-btn" role="switch" aria-checked="{{.AutoRead}}" data-auto-read-toggle data-topic-id="{{.TopicID}}" data-auto-read="{{.AutoRead}}">
+                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                    </button>
+                </div>
+            </div>
+        </details>
+
+        <details class="context-section" open>
+            <summary class="context-section-title">Topic Tools</summary>
+            <div class="settings-section-content">
+                <button class="settings-nav-item" hx-get="/skills?topic_id={{.TopicID}}" hx-target="body">
+                    <div class="settings-nav-info">
+                        <span class="settings-nav-label">Skills</span>
+                        {{if .Skills}}
+                        <span class="settings-nav-detail">{{range $i, $s := .Skills}}{{if $i}}, {{end}}{{.Name}}{{end}}</span>
+                        {{else}}
+                        <span class="settings-nav-detail settings-row-empty">None</span>
+                        {{end}}
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                <button class="settings-nav-item" hx-get="/schedules?topic_id={{.TopicID}}" hx-target="body">
+                    <div class="settings-nav-info">
+                        <span class="settings-nav-label">Schedules</span>
+                        {{if .Schedules}}
+                        <span class="settings-nav-detail">{{range $i, $s := .Schedules}}{{if $i}}, {{end}}{{if .Name}}{{.Name}}{{else}}{{.CronExpr}}{{end}}{{if not .Enabled}} (disabled){{end}}{{end}}</span>
+                        {{else}}
+                        <span class="settings-nav-detail settings-row-empty">None</span>
+                        {{end}}
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+            </div>
+        </details>
+
+        <details class="context-section" open>
+            <summary class="context-section-title settings-danger-title">Danger Zone</summary>
+            <div class="settings-section-content">
+                {{if eq .OwnerID .CurrentUserID}}
+                <button id="delete-btn" class="settings-danger-action">Delete Topic</button>
+                {{else}}
+                <button id="leave-btn" class="settings-danger-action">Leave Topic</button>
+                {{end}}
+            </div>
+        </details>
+
+        <hr class="settings-separator">
+        {{end}}
+
+        <details class="context-section" open>
+            <summary class="context-section-title">Account</summary>
+            <div class="settings-section-content">
+                <form class="settings-display-name-form" id="display-name-form">
+                    <label class="settings-row-label" for="display-name-input">Display name</label>
+                    <div class="settings-display-name-row">
+                        <input type="text" id="display-name-input" name="display_name" value="{{.DisplayName}}" autocomplete="off" maxlength="100">
+                        <button type="submit" class="settings-save-btn">Save</button>
+                    </div>
+                    <span class="settings-saved-msg" id="display-name-saved" style="display:none">Saved</span>
+                </form>
+
+                <div class="settings-toggle-row" data-push-toggle style="display:none">
+                    <div class="settings-toggle-info">
+                        <span class="settings-toggle-label">Push Notifications</span>
+                        <span class="settings-toggle-description">Enable push notifications for this device</span>
+                    </div>
+                    <button class="settings-toggle-btn" role="switch" aria-checked="false">
+                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                    </button>
+                </div>
+
+                <button id="logout-btn" class="settings-danger-action" hx-post="/logout" hx-on::before-request="htmx.trigger(document.body, 'bobot:logout')">Logout</button>
+            </div>
+        </details>
+
+        {{if .IsAdmin}}
+        <details class="context-section" open>
+            <summary class="context-section-title">Administration</summary>
+            <div class="settings-section-content">
+                <button class="settings-nav-item" hx-get="/admin" hx-target="body">
+                    <div class="settings-nav-info">
+                        <span class="settings-nav-label">Admin Dashboard</span>
+                        <span class="settings-nav-detail">Manage users, contexts, and system settings</span>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+            </div>
+        </details>
+        {{end}}
+    </main>
+</div>
+
+<script src="/static/settings.js"></script>
+{{end}}

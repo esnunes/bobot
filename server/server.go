@@ -137,6 +137,8 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /chat", s.sessionMiddleware(s.handleChatPage))
 	s.router.HandleFunc("GET /chats", s.sessionMiddleware(s.handleChatsPage))
 	s.router.HandleFunc("GET /chats/{id}", s.sessionMiddleware(s.handleTopicChatPage))
+	s.router.HandleFunc("GET /settings", s.sessionMiddleware(s.handleSettingsPage))
+	s.router.HandleFunc("POST /api/user/display-name", s.sessionMiddleware(s.handleUpdateDisplayName))
 
 	// Service worker (must be served at root scope)
 	s.router.HandleFunc("GET /sw.js", func(w http.ResponseWriter, r *http.Request) {
