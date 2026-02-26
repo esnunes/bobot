@@ -170,13 +170,19 @@ button {
    PRIVACY POLICY PAGE
    ============================================ */
 .privacy-container {
-  max-width: 640px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
   padding: var(--space-4) var(--space-3);
   height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.privacy-container > * {
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
 }
 
 .privacy-container h1 {
