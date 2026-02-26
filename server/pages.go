@@ -275,11 +275,11 @@ func validateNavigatePath(path string) string {
 }
 
 func (s *Server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
-	// Check for existing session — 302 redirect if authenticated
+	// Authenticated users get the HTMX-based navigation template
 	if cookie, err := r.Cookie("session"); err == nil {
 		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
 			navigateTo := validateNavigatePath(r.URL.Query().Get("navigate"))
-			http.Redirect(w, r, navigateTo, http.StatusFound)
+			s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: navigateTo})
 			return
 		}
 	}
