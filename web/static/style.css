@@ -1729,6 +1729,164 @@ header {
 }
 
 /* ============================================
+   CALENDAR SETTINGS ROW
+   ============================================ */
+.settings-calendar-row {
+  cursor: default;
+}
+
+.settings-calendar-row:hover {
+  background: var(--colors-background);
+}
+
+.settings-connect-btn {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radii-pill);
+  background: var(--colors-accent);
+  color: white;
+  font-size: var(--font-sizes-1);
+  font-family: var(--fonts-body);
+  font-weight: var(--font-weights-medium);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: background var(--transitions-fast);
+}
+
+.settings-connect-btn:hover {
+  background: var(--colors-accent-hover);
+}
+
+.settings-disconnect-btn {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 var(--space-2);
+  border: var(--borders-thin);
+  border-color: var(--colors-danger);
+  border-radius: var(--radii-pill);
+  background: transparent;
+  color: var(--colors-danger);
+  font-size: var(--font-sizes-1);
+  font-family: var(--fonts-body);
+  font-weight: var(--font-weights-medium);
+  cursor: pointer;
+  transition: background var(--transitions-fast), color var(--transitions-fast);
+}
+
+.settings-disconnect-btn:hover {
+  background: var(--colors-danger);
+  color: white;
+}
+
+/* ============================================
+   CALENDAR PICK
+   ============================================ */
+.calendar-pick-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.calendar-pick-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--colors-background);
+  border: 2px solid transparent;
+  border-radius: var(--radii-md);
+  cursor: pointer;
+  transition: border-color var(--transitions-fast), box-shadow var(--transitions-fast);
+}
+
+.calendar-pick-option:hover {
+  box-shadow: var(--shadows-low);
+}
+
+.calendar-pick-option.calendar-pick-selected {
+  border-color: var(--colors-accent);
+  box-shadow: 0 0 0 1px var(--colors-accent-light);
+}
+
+.calendar-pick-option input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--colors-border-strong);
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  transition: border-color var(--transitions-fast);
+}
+
+.calendar-pick-option input[type="radio"]:checked {
+  border-color: var(--colors-accent);
+}
+
+.calendar-pick-option input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--colors-accent);
+}
+
+.calendar-pick-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.calendar-pick-name {
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-text);
+}
+
+.calendar-pick-badge {
+  font-size: var(--font-sizes-0);
+  font-weight: var(--font-weights-normal);
+  color: var(--colors-accent);
+  background: var(--colors-accent-light);
+  padding: 1px 6px;
+  border-radius: var(--radii-pill);
+}
+
+.calendar-pick-tz {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-text-secondary);
+}
+
+.calendar-pick-submit {
+  width: 100%;
+  height: var(--sizes-button-height);
+  margin-top: var(--space-1);
+  border: none;
+  border-radius: var(--radii-pill);
+  background: var(--colors-accent);
+  color: white;
+  font-size: var(--font-sizes-2);
+  font-family: var(--fonts-body);
+  font-weight: var(--font-weights-medium);
+  cursor: pointer;
+  transition: background var(--transitions-fast);
+}
+
+.calendar-pick-submit:hover {
+  background: var(--colors-accent-hover);
+}
+
+/* ============================================
    QUICK ACTIONS OVERLAY
    ============================================ */
 .quick-actions-overlay {

@@ -97,6 +97,23 @@
                     </div>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                 </button>
+                {{if .GoogleCalendarEnabled}}
+                <div class="settings-nav-item settings-calendar-row">
+                    <div class="settings-nav-info">
+                        <span class="settings-nav-label">{{t .Lang "settings.google_calendar"}}</span>
+                        {{if .CalendarConnected}}
+                        <span class="settings-nav-detail">{{.CalendarName}}</span>
+                        {{else}}
+                        <span class="settings-nav-detail settings-row-empty">{{t .Lang "settings.not_connected"}}</span>
+                        {{end}}
+                    </div>
+                    {{if and (or (eq .OwnerID .CurrentUserID) .IsAdmin) .CalendarConnected}}
+                    <button class="settings-disconnect-btn" data-calendar-disconnect data-topic-id="{{.TopicID}}">{{t .Lang "settings.disconnect_google_calendar"}}</button>
+                    {{else if and (or (eq .OwnerID .CurrentUserID) .IsAdmin) (not .CalendarConnected)}}
+                    <a href="/api/calendar/auth?topic_id={{.TopicID}}" class="settings-connect-btn">{{t .Lang "settings.connect_google_calendar"}}</a>
+                    {{end}}
+                </div>
+                {{end}}
             </div>
         </details>
 

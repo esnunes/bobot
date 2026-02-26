@@ -114,6 +114,25 @@
         });
     }
 
+    // Calendar disconnect
+    var calDisconnectBtn = container.querySelector('[data-calendar-disconnect]');
+    if (calDisconnectBtn) {
+        calDisconnectBtn.addEventListener('click', function() {
+            var calTopicId = calDisconnectBtn.getAttribute('data-topic-id');
+            calDisconnectBtn.disabled = true;
+            fetch('/api/calendar?topic_id=' + calTopicId, { method: 'DELETE' })
+                .then(function(resp) {
+                    if (resp.ok) {
+                        htmx.ajax('GET', '/settings?topic_id=' + calTopicId, { target: 'body', swap: 'innerHTML' });
+                    } else {
+                        console.error('Failed to disconnect calendar:', resp.status);
+                    }
+                })
+                .catch(function(err) { console.error('Calendar disconnect failed:', err); })
+                .finally(function() { calDisconnectBtn.disabled = false; });
+        });
+    }
+
     // Leave topic
     var leaveBtn = document.getElementById('leave-btn');
     if (leaveBtn && topicId && currentUserId) {

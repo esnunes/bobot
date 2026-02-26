@@ -28,6 +28,7 @@ import (
 	"github.com/esnunes/bobot/tools/skill"
 	"github.com/esnunes/bobot/tools/task"
 	"github.com/esnunes/bobot/tools/quickaction"
+	"github.com/esnunes/bobot/tools/calendar"
 	"github.com/esnunes/bobot/tools/thinq"
 	"github.com/esnunes/bobot/tools/topic"
 	"github.com/esnunes/bobot/tools/user"
@@ -128,6 +129,18 @@ func main() {
 		registry.Register(thinq.NewThinqTool(thinqClient, thinqDB))
 	}
 
+	// Initialize Google Calendar tool (optional, only if configured)
+	var calendarTool *calendar.CalendarTool
+	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		calendarDB, err := calendar.NewCalendarDB(filepath.Join(cfg.DataDir, "tool_calendar.db"))
+		if err != nil {
+			log.Fatalf("Failed to initialize calendar database: %v", err)
+		}
+		defer calendarDB.Close()
+		calendarTool = calendar.NewCalendarTool(calendarDB, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.BaseURL)
+		registry.Register(calendarTool)
+	}
+
 	// Initialize web search tool (optional, only if configured)
 	if cfg.BraveSearchAPIKey != "" {
 		registry.Register(websearch.NewTool(cfg.BraveSearchAPIKey))
@@ -167,7 +180,7 @@ func main() {
 	pipeline := server.NewChatPipeline(coreDB, engine, connections, pushSender, cfg)
 
 	// Initialize HTTP server
-	srv := server.NewWithAssistant(cfg, coreDB, engine, registry, pipeline, scheduleDB)
+	srv := server.NewWithAssistant(cfg, coreDB, engine, registry, pipeline, scheduleDB, calendarTool)
 
 	// Create scheduler
 	sched := scheduler.New(scheduleDB, coreDB, pipeline, cfg.Schedule.Timeout)

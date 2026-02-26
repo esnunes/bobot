@@ -1,0 +1,58 @@
+{{define "content"}}
+<div class="settings-container" data-page="calendar-pick">
+    <header>
+        <button hx-get="/settings?topic_id={{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <h1>{{t .Lang "calendar.pick_title"}}</h1>
+        <div></div>
+    </header>
+
+    <main class="settings-list">
+        <details class="context-section" open>
+            <summary class="context-section-title">{{t .Lang "calendar.pick_description"}}</summary>
+            <div class="settings-section-content">
+                <form method="POST" action="/calendar/pick" class="calendar-pick-form">
+                    <input type="hidden" name="topic_id" value="{{.TopicID}}">
+
+                    {{range .CalendarsPick}}
+                    <label class="calendar-pick-option{{if .Primary}} calendar-pick-selected{{end}}">
+                        <input type="radio" name="calendar_id" value="{{.ID}}" {{if .Primary}}checked{{end}}>
+                        <input type="hidden" name="calendar_name" value="{{.Name}}" disabled>
+                        <input type="hidden" name="timezone" value="{{.Timezone}}" disabled>
+                        <div class="calendar-pick-info">
+                            <span class="calendar-pick-name">{{.Name}}{{if .Primary}} <span class="calendar-pick-badge">primary</span>{{end}}</span>
+                            <span class="calendar-pick-tz">{{.Timezone}}</span>
+                        </div>
+                    </label>
+                    {{end}}
+
+                    <button type="submit" class="calendar-pick-submit">{{t .Lang "calendar.pick_submit"}}</button>
+                </form>
+            </div>
+        </details>
+    </main>
+</div>
+
+<script>
+(function() {
+    var options = document.querySelectorAll('.calendar-pick-option');
+    var radios = document.querySelectorAll('.calendar-pick-option input[type="radio"]');
+
+    function updateSelection() {
+        // Reset all
+        options.forEach(function(opt) { opt.classList.remove('calendar-pick-selected'); });
+        document.querySelectorAll('.calendar-pick-option input[type="hidden"]').forEach(function(h) { h.disabled = true; });
+        // Activate selected
+        radios.forEach(function(radio) {
+            if (radio.checked) {
+                var label = radio.closest('.calendar-pick-option');
+                label.classList.add('calendar-pick-selected');
+                label.querySelectorAll('input[type="hidden"]').forEach(function(h) { h.disabled = false; });
+            }
+        });
+    }
+
+    radios.forEach(function(radio) { radio.addEventListener('change', updateSelection); });
+    updateSelection();
+})();
+</script>
+{{end}}

@@ -53,6 +53,13 @@ type QuickActionView struct {
 	Mode    string
 }
 
+type CalendarPickView struct {
+	ID       string
+	Name     string
+	Timezone string
+	Primary  bool
+}
+
 type ScheduleView struct {
 	ID            int64
 	Name          string
@@ -181,10 +188,14 @@ type PageData struct {
 	PushMuted       bool
 	AutoRead        bool
 	AutoRespond     bool
-	IsBobotTopic       bool
-	DisplayName        string
-	SupportedLanguages []string
-	UserLanguage       string
+	IsBobotTopic           bool
+	DisplayName            string
+	SupportedLanguages     []string
+	UserLanguage           string
+	GoogleCalendarEnabled  bool
+	CalendarConnected      bool
+	CalendarName           string
+	CalendarsPick          []CalendarPickView
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
@@ -238,6 +249,7 @@ func (s *Server) loadTemplates() error {
 		"admin_context":     "templates/admin_context.html",
 		"quick_actions":     "templates/quick_actions.html",
 		"quick_action_form": "templates/quick_action_form.html",
+		"calendar_pick":     "templates/calendar_pick.html",
 	}
 
 	for name, contentFile := range templateDefs {
@@ -606,6 +618,16 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 		data.Skills = skillViews
 		data.Schedules = scheduleViews
 		data.QuickActions = qaViews
+
+		// Load calendar status
+		if s.calendarTool != nil {
+			data.GoogleCalendarEnabled = true
+			cal, _ := s.calendarTool.DB().GetTopicCalendar(topicID)
+			if cal != nil {
+				data.CalendarConnected = true
+				data.CalendarName = cal.CalendarName
+			}
+		}
 	}
 
 	unreads, _ := s.db.GetUnreadChats(userData.UserID)

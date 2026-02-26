@@ -14,29 +14,31 @@ import (
 	"github.com/esnunes/bobot/db"
 	"github.com/esnunes/bobot/push"
 	"github.com/esnunes/bobot/tools"
+	"github.com/esnunes/bobot/tools/calendar"
 	"github.com/esnunes/bobot/tools/schedule"
 	"github.com/esnunes/bobot/web"
 )
 
 type Server struct {
-	cfg         *config.Config
-	db          *db.CoreDB
-	scheduleDB  *schedule.ScheduleDB
-	session     *auth.SessionService
-	engine      *assistant.Engine
-	registry    *tools.Registry
-	connections *ConnectionRegistry
-	pushSender  *push.PushSender
-	pipeline    *ChatPipeline
-	router      *http.ServeMux
-	templates   map[string]*template.Template
+	cfg          *config.Config
+	db           *db.CoreDB
+	scheduleDB   *schedule.ScheduleDB
+	calendarTool *calendar.CalendarTool
+	session      *auth.SessionService
+	engine       *assistant.Engine
+	registry     *tools.Registry
+	connections  *ConnectionRegistry
+	pushSender   *push.PushSender
+	pipeline     *ChatPipeline
+	router       *http.ServeMux
+	templates    map[string]*template.Template
 }
 
 func New(cfg *config.Config, coreDB *db.CoreDB) *Server {
-	return NewWithAssistant(cfg, coreDB, nil, nil, nil, nil)
+	return NewWithAssistant(cfg, coreDB, nil, nil, nil, nil, nil)
 }
 
-func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.Engine, registry *tools.Registry, pipeline *ChatPipeline, scheduleDB *schedule.ScheduleDB) *Server {
+func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.Engine, registry *tools.Registry, pipeline *ChatPipeline, scheduleDB *schedule.ScheduleDB, calendarTool *calendar.CalendarTool) *Server {
 	session := auth.NewSessionService(
 		cfg.JWT.Secret,
 		cfg.Session.Duration,
@@ -45,15 +47,16 @@ func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.E
 	)
 
 	s := &Server{
-		cfg:        cfg,
-		db:         coreDB,
-		scheduleDB: scheduleDB,
-		session:    session,
-		engine:     engine,
-		registry:   registry,
-		pipeline:   pipeline,
-		router:     http.NewServeMux(),
-		templates:  make(map[string]*template.Template),
+		cfg:          cfg,
+		db:           coreDB,
+		scheduleDB:   scheduleDB,
+		calendarTool: calendarTool,
+		session:      session,
+		engine:       engine,
+		registry:     registry,
+		pipeline:     pipeline,
+		router:       http.NewServeMux(),
+		templates:    make(map[string]*template.Template),
 	}
 
 	// Create ConnectionRegistry (shared with pipeline if provided)
@@ -128,6 +131,13 @@ func (s *Server) routes() {
 	s.router.HandleFunc("POST /quickactions", s.sessionMiddleware(s.handleCreateQuickActionForm))
 	s.router.HandleFunc("POST /quickactions/{id}", s.sessionMiddleware(s.handleUpdateQuickActionForm))
 	s.router.HandleFunc("DELETE /quickactions/{id}", s.sessionMiddleware(s.handleDeleteQuickActionForm))
+
+	// Calendar OAuth routes (require auth)
+	s.router.HandleFunc("GET /api/calendar/auth", s.sessionMiddleware(s.handleCalendarAuth))
+	s.router.HandleFunc("GET /api/calendar/callback", s.sessionMiddleware(s.handleCalendarCallback))
+	s.router.HandleFunc("GET /calendar/pick", s.sessionMiddleware(s.handleCalendarPickPage))
+	s.router.HandleFunc("POST /calendar/pick", s.sessionMiddleware(s.handleCalendarPickSubmit))
+	s.router.HandleFunc("DELETE /api/calendar", s.sessionMiddleware(s.handleCalendarDisconnect))
 
 	// Admin routes (require auth + admin role)
 	s.router.HandleFunc("GET /admin", s.sessionMiddleware(s.adminMiddleware(s.handleAdminPage)))
