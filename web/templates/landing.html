@@ -23,7 +23,7 @@
     </div>
 
     <div class="landing-actions">
-        <a href="/login" class="landing-btn landing-btn-primary">{{t .Lang "landing.login"}}</a>
+        <a href="/login" hx-get="/login" hx-target="body" hx-swap="innerHTML" class="landing-btn landing-btn-primary">{{t .Lang "landing.login"}}</a>
         <a href="/privacy" class="landing-btn landing-btn-secondary">{{t .Lang "landing.privacy_link"}}</a>
     </div>
 </div>
