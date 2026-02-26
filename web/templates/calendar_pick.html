@@ -1,0 +1,47 @@
+{{define "content"}}
+<div class="settings-container" data-page="calendar-pick">
+    <header>
+        <button hx-get="/settings?topic_id={{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <h1>{{t .Lang "calendar.pick_title"}}</h1>
+        <div></div>
+    </header>
+
+    <main class="settings-list">
+        <p class="calendar-pick-desc">{{t .Lang "calendar.pick_description"}}</p>
+
+        <form method="POST" action="/calendar/pick" class="calendar-pick-form">
+            <input type="hidden" name="topic_id" value="{{.TopicID}}">
+
+            {{range .CalendarsPick}}
+            <label class="calendar-pick-option">
+                <input type="radio" name="calendar_id" value="{{.ID}}" {{if .Primary}}checked{{end}}>
+                <input type="hidden" name="calendar_name" value="{{.Name}}" disabled>
+                <input type="hidden" name="timezone" value="{{.Timezone}}" disabled>
+                <div class="calendar-pick-info">
+                    <span class="calendar-pick-name">{{.Name}}{{if .Primary}} (primary){{end}}</span>
+                    <span class="calendar-pick-tz">{{.Timezone}}</span>
+                </div>
+            </label>
+            {{end}}
+
+            <button type="submit" class="calendar-pick-submit">{{t .Lang "calendar.pick_submit"}}</button>
+        </form>
+    </main>
+</div>
+
+<script>
+// Enable/disable hidden fields based on radio selection
+document.querySelectorAll('.calendar-pick-option input[type="radio"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+        // Disable all hidden inputs
+        document.querySelectorAll('.calendar-pick-option input[type="hidden"]').forEach(function(h) { h.disabled = true; });
+        // Enable the ones in the selected option
+        var label = this.closest('.calendar-pick-option');
+        label.querySelectorAll('input[type="hidden"]').forEach(function(h) { h.disabled = false; });
+    });
+});
+// Trigger change on the initially checked radio
+var checked = document.querySelector('.calendar-pick-option input[type="radio"]:checked');
+if (checked) checked.dispatchEvent(new Event('change'));
+</script>
+{{end}}

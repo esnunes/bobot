@@ -81,6 +81,10 @@
   "settings.confirm_leave_topic": "Tem certeza que deseja sair deste t\u00f3pico?",
   "settings.error_delete_topic": "Falha ao excluir t\u00f3pico",
   "settings.error_leave_topic": "Falha ao sair do t\u00f3pico",
+  "settings.google_calendar": "Google Calendar",
+  "settings.not_connected": "N\u00e3o conectado",
+  "settings.connect_google_calendar": "Conectar",
+  "settings.disconnect_google_calendar": "Desconectar",
 
   "skills.title": "Habilidades",
   "skills.title_topic": "Habilidades - %s",
@@ -185,6 +189,10 @@
   "admin_context.no_messages": "Nenhuma mensagem na janela de contexto.",
   "admin_context.tools": "Ferramentas",
   "admin_context.no_tools": "Nenhuma ferramenta.",
+
+  "calendar.pick_title": "Selecionar Calend\u00e1rio",
+  "calendar.pick_description": "Escolha qual Google Calendar usar para este t\u00f3pico.",
+  "calendar.pick_submit": "Selecionar",
 
   "push.blocked": "Notifica\u00e7\u00f5es est\u00e3o bloqueadas. Ative-as nas configura\u00e7\u00f5es do navegador.",
 

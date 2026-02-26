@@ -53,7 +53,7 @@ func setupChatTestServer(t *testing.T) (*Server, string) {
 	registry := tools.NewRegistry()
 	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{}, nil)
 
-	srv := NewWithAssistant(cfg, coreDB, engine, registry, nil, nil)
+	srv := NewWithAssistant(cfg, coreDB, engine, registry, nil, nil, nil)
 
 	// Create test user with bobot topic and get session token
 	hash, _ := auth.HashPassword("testpass")
@@ -151,7 +151,7 @@ func TestChatWebSocket_SlashCommand(t *testing.T) {
 	registry.Register(user.NewUserTool(coreDB, cfg.BaseURL))
 	engine := assistant.NewEngine(&mockLLMProvider{}, registry, nil, &mockContextProvider{}, nil)
 
-	srv := NewWithAssistant(cfg, coreDB, engine, registry, nil, nil)
+	srv := NewWithAssistant(cfg, coreDB, engine, registry, nil, nil, nil)
 
 	// Create admin user with bobot topic and get token with role
 	hash, _ := auth.HashPassword("testpass")

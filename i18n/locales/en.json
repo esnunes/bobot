@@ -81,6 +81,10 @@
   "settings.confirm_leave_topic": "Are you sure you want to leave this topic?",
   "settings.error_delete_topic": "Failed to delete topic",
   "settings.error_leave_topic": "Failed to leave topic",
+  "settings.google_calendar": "Google Calendar",
+  "settings.not_connected": "Not connected",
+  "settings.connect_google_calendar": "Connect",
+  "settings.disconnect_google_calendar": "Disconnect",
 
   "skills.title": "Skills",
   "skills.title_topic": "Skills - %s",
@@ -185,6 +189,10 @@
   "admin_context.no_messages": "No messages in context window.",
   "admin_context.tools": "Tools",
   "admin_context.no_tools": "No tools.",
+
+  "calendar.pick_title": "Select Calendar",
+  "calendar.pick_description": "Choose which Google Calendar to use for this topic.",
+  "calendar.pick_submit": "Select",
 
   "push.blocked": "Notifications are blocked. Please enable them in your browser settings.",
 

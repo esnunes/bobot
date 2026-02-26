@@ -18,9 +18,11 @@ type Config struct {
 	Sync     SyncConfig
 	VAPID    VAPIDConfig
 	Schedule ScheduleConfig
-	DataDir           string
-	BaseURL           string
-	BraveSearchAPIKey string
+	DataDir            string
+	BaseURL            string
+	BraveSearchAPIKey  string
+	GoogleClientID     string
+	GoogleClientSecret string
 }
 
 type VAPIDConfig struct {
@@ -106,9 +108,11 @@ func Load() (*Config, error) {
 			PrivateKey: os.Getenv("BOBOT_VAPID_PRIVATE_KEY"),
 			Subject:    os.Getenv("BOBOT_VAPID_SUBJECT"),
 		},
-		DataDir:           getEnvOrDefault("BOBOT_DATA_DIR", "./data"),
-		BaseURL:           getEnvOrDefault("BOBOT_BASE_URL", "http://localhost:8080"),
-		BraveSearchAPIKey: os.Getenv("BRAVE_SEARCH_API_KEY"),
+		DataDir:            getEnvOrDefault("BOBOT_DATA_DIR", "./data"),
+		BaseURL:            getEnvOrDefault("BOBOT_BASE_URL", "http://localhost:8080"),
+		BraveSearchAPIKey:  os.Getenv("BRAVE_SEARCH_API_KEY"),
+		GoogleClientID:     os.Getenv("BOBOT_GOOGLE_CLIENT_ID"),
+		GoogleClientSecret: os.Getenv("BOBOT_GOOGLE_CLIENT_SECRET"),
 	}
 
 	if err := cfg.validate(); err != nil {
