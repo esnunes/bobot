@@ -90,9 +90,28 @@ Generate keys with `bobot generate-vapid-keys`.
 | Variable | Description |
 |---|---|
 | `BRAVE_SEARCH_API_KEY` | Brave Search API key for web search tool |
+| `BOBOT_GOOGLE_CLIENT_ID` | Google OAuth2 client ID for Calendar integration |
+| `BOBOT_GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret for Calendar integration |
 | `THINQ_TOKEN` | LG ThinQ API token |
 | `THINQ_COUNTRY` | ThinQ country code |
 | `THINQ_CLIENT_ID` | ThinQ client ID |
+
+#### Google Calendar setup
+
+To enable the Google Calendar tool, create OAuth2 credentials in the Google Cloud Console:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) and create a project (or select an existing one).
+2. Enable the **Google Calendar API** under **APIs & Services > Library**.
+3. Configure the **OAuth consent screen** under **APIs & Services > OAuth consent screen**:
+   - Choose **External** user type (or **Internal** if using Google Workspace).
+   - Fill in the app name and support email.
+   - Add the scopes `https://www.googleapis.com/auth/calendar.events` and `https://www.googleapis.com/auth/calendar.calendarlist.readonly`.
+4. Create credentials under **APIs & Services > Credentials > Create Credentials > OAuth client ID**:
+   - Application type: **Web application**.
+   - Add `<your-base-url>/api/calendar/callback` as an **Authorized redirect URI** (e.g. `http://localhost:8080/api/calendar/callback`).
+5. Copy the **Client ID** and **Client Secret** into `BOBOT_GOOGLE_CLIENT_ID` and `BOBOT_GOOGLE_CLIENT_SECRET`.
+
+Once configured, topic owners can connect a Google Calendar from the topic settings page.
 
 ## CLI commands
 
@@ -133,6 +152,7 @@ The assistant has access to these tools during conversations:
 | `remind` | Create one-shot reminders that fire at a specific time |
 | `cron` | Manage recurring scheduled prompts on a cron schedule |
 | `web_search` | Search the web via Brave Search (when configured) |
+| `calendar` | Manage Google Calendar events (when configured) |
 | `thinq` | Control LG ThinQ smart home devices (when configured) |
 
 ## Ideas
