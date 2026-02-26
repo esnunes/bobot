@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -163,6 +164,7 @@ type PageData struct {
 	Title           string
 	Error           string
 	Code            string
+	Public          bool
 	TopicID         int64
 	Topics          []TopicView
 	Messages        []MessageView
@@ -234,6 +236,8 @@ func (s *Server) loadTemplates() error {
 	}
 
 	templateDefs := map[string]string{
+		"landing":           "templates/landing.html",
+		"privacy":           "templates/privacy.html",
 		"login":             "templates/login.html",
 		"signup":            "templates/signup.html",
 		"chats":             "templates/chats.html",
@@ -272,26 +276,49 @@ func validateNavigatePath(path string) string {
 	return "/chat"
 }
 
+func (s *Server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
+	// Check for existing session — 302 redirect if authenticated
+	if cookie, err := r.Cookie("session"); err == nil {
+		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
+			navigateTo := validateNavigatePath(r.URL.Query().Get("navigate"))
+			http.Redirect(w, r, navigateTo, http.StatusFound)
+			return
+		}
+	}
+
+	// Forward ?navigate= to /login for unauthenticated users
+	if nav := r.URL.Query().Get("navigate"); nav != "" {
+		http.Redirect(w, r, "/login?navigate="+url.QueryEscape(nav), http.StatusFound)
+		return
+	}
+
+	s.render(w, r, "landing", PageData{Title: "Home", Public: true})
+}
+
+func (s *Server) handlePrivacyPage(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, "privacy", PageData{Title: "Privacy Policy", Public: true})
+}
+
 func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	nav := validateNavigatePath(r.URL.Query().Get("navigate"))
 
 	// Check if already authenticated
 	if cookie, err := r.Cookie("session"); err == nil {
 		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
-			s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
+			s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav, Public: true})
 			return
 		}
 	}
 
 	// GET request - show login form
 	if r.Method == http.MethodGet {
-		s.render(w, r, "login", PageData{Title: "Login", NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", NavigateTo: nav, Public: true})
 		return
 	}
 
 	// POST request - handle login
 	if err := r.ParseForm(); err != nil {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(i18n.MatchLanguage(r.Header.Get("Accept-Language")), "login.error.invalid_request"), NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(i18n.MatchLanguage(r.Header.Get("Accept-Language")), "login.error.invalid_request"), NavigateTo: nav, Public: true})
 		return
 	}
 
@@ -304,28 +331,28 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 
 	user, err := s.db.GetUserByUsername(username)
 	if err != nil {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav, Public: true})
 		return
 	}
 
 	if !auth.CheckPassword(password, user.PasswordHash) {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav, Public: true})
 		return
 	}
 
 	if user.Blocked {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.account_blocked"), NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.account_blocked"), NavigateTo: nav, Public: true})
 		return
 	}
 
 	token, err := s.session.CreateToken(user.ID, user.Role, user.Language)
 	if err != nil {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.internal"), NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.internal"), NavigateTo: nav, Public: true})
 		return
 	}
 
 	s.setSessionCookie(w, token)
-	s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
+	s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav, Public: true})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -343,7 +370,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	s.clearSessionCookie(w)
 
-	w.Header().Set("HX-Location", "/")
+	w.Header().Set("HX-Location", "/login")
 	w.WriteHeader(http.StatusNoContent)
 }
 

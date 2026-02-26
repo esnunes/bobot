@@ -149,8 +149,10 @@ func (s *Server) routes() {
 	s.router.HandleFunc("DELETE /api/push/subscribe", s.sessionMiddleware(s.handlePushUnsubscribe))
 
 	// Page routes
-	s.router.HandleFunc("GET /{$}", s.handleLoginPage)
-	s.router.HandleFunc("POST /{$}", s.handleLoginPage)
+	s.router.HandleFunc("GET /{$}", s.handleLandingPage)
+	s.router.HandleFunc("GET /login", s.handleLoginPage)
+	s.router.HandleFunc("POST /login", s.handleLoginPage)
+	s.router.HandleFunc("GET /privacy", s.handlePrivacyPage)
 	s.router.HandleFunc("POST /logout", s.handleLogout)
 	s.router.HandleFunc("GET /signup", s.handleSignupPage)
 	s.router.HandleFunc("POST /signup", s.handleSignupPage)

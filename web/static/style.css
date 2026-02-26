@@ -35,6 +35,198 @@ button {
 }
 
 /* ============================================
+   LANDING PAGE
+   ============================================ */
+.landing-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100dvh;
+  padding: var(--space-4) var(--space-3);
+  gap: var(--space-4);
+  overflow-y: auto;
+}
+
+.landing-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+}
+
+.landing-hero img {
+  width: 20dvh;
+  max-width: 200px;
+}
+
+.landing-hero h1 {
+  font-size: var(--font-sizes-5);
+  font-weight: var(--font-weights-semibold);
+  color: var(--colors-text);
+}
+
+.landing-subtitle {
+  font-size: var(--font-sizes-3);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-accent);
+}
+
+.landing-description {
+  font-size: var(--font-sizes-2);
+  color: var(--colors-text-secondary);
+  max-width: 480px;
+  line-height: var(--line-heights-relaxed);
+}
+
+.landing-features {
+  width: 100%;
+  max-width: 480px;
+}
+
+.landing-features ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.landing-features li {
+  padding: var(--space-1) var(--space-2);
+  background: var(--colors-surface);
+  border-radius: var(--radii-md);
+  font-size: var(--font-sizes-2);
+  color: var(--colors-text);
+}
+
+.landing-features li::before {
+  content: "\2713\00a0";
+  color: var(--colors-accent);
+  font-weight: var(--font-weights-semibold);
+}
+
+.landing-data {
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+}
+
+.landing-data h2 {
+  font-size: var(--font-sizes-3);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-text);
+  margin-bottom: var(--space-1);
+}
+
+.landing-data p {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-text-secondary);
+  line-height: var(--line-heights-relaxed);
+}
+
+.landing-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 320px;
+}
+
+.landing-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--sizes-button-height);
+  border-radius: var(--radii-pill);
+  font-family: var(--fonts-body);
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+  text-decoration: none;
+  transition: background-color var(--transitions-fast);
+}
+
+.landing-btn-primary {
+  background-color: var(--colors-accent);
+  color: var(--colors-background);
+}
+
+.landing-btn-primary:hover {
+  background-color: var(--colors-accent-hover);
+}
+
+.landing-btn-secondary {
+  background-color: var(--colors-surface);
+  color: var(--colors-text-secondary);
+  border: var(--borders-thin);
+}
+
+.landing-btn-secondary:hover {
+  color: var(--colors-text);
+}
+
+/* ============================================
+   PRIVACY POLICY PAGE
+   ============================================ */
+.privacy-container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3);
+  overflow-y: auto;
+  height: 100dvh;
+}
+
+.privacy-container h1 {
+  font-size: var(--font-sizes-5);
+  font-weight: var(--font-weights-semibold);
+  color: var(--colors-text);
+  margin-bottom: var(--space-3);
+}
+
+.privacy-container h2 {
+  font-size: var(--font-sizes-3);
+  font-weight: var(--font-weights-medium);
+  color: var(--colors-text);
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.privacy-container p {
+  font-size: var(--font-sizes-2);
+  color: var(--colors-text-secondary);
+  line-height: var(--line-heights-relaxed);
+  margin-bottom: var(--space-2);
+}
+
+.privacy-container ul {
+  list-style: disc;
+  padding-left: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.privacy-container li {
+  font-size: var(--font-sizes-2);
+  color: var(--colors-text-secondary);
+  line-height: var(--line-heights-relaxed);
+  margin-bottom: var(--space-1);
+}
+
+.privacy-back {
+  margin-top: var(--space-4);
+  padding-top: var(--space-2);
+  border-top: var(--borders-thin);
+}
+
+.privacy-back a {
+  color: var(--colors-accent);
+  text-decoration: none;
+  font-size: var(--font-sizes-2);
+}
+
+.privacy-back a:hover {
+  text-decoration: underline;
+}
+
+/* ============================================
    LOGIN / SIGNUP PAGE
    ============================================ */
 .login-container {
