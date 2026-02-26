@@ -34,7 +34,7 @@
 
             // Auth error - redirect to login
             if (event.code === 1008 || event.code === 4001) {
-                window.location.href = '/';
+                window.location.href = '/login';
                 return;
             }
 

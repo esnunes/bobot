@@ -52,7 +52,7 @@ func TestServer_Login_Success(t *testing.T) {
 	srv.db.CreateUserFull("testuser", hash, "Test User", "user")
 
 	form := "username=testuser&password=testpass"
-	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req := httptest.NewRequest("POST", "/login", strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
@@ -91,7 +91,7 @@ func TestHandleLogin_SetsSessionCookie(t *testing.T) {
 	s.db.CreateUserFull("testuser", hash, "Test", "user")
 
 	form := "username=testuser&password=password123"
-	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req := httptest.NewRequest("POST", "/login", strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
@@ -126,7 +126,7 @@ func TestServer_Login_InvalidCredentials(t *testing.T) {
 	srv.db.CreateUserFull("testuser", hash, "Test User", "user")
 
 	form := "username=testuser&password=wrongpass"
-	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req := httptest.NewRequest("POST", "/login", strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
@@ -147,7 +147,7 @@ func TestServer_Login_UserNotFound(t *testing.T) {
 	srv := setupTestServer(t)
 
 	form := "username=nouser&password=pass"
-	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req := httptest.NewRequest("POST", "/login", strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
@@ -178,7 +178,7 @@ func TestLogin_BlockedUser(t *testing.T) {
 
 	// Try to login
 	form := "username=blocked&password=password"
-	req := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	req := httptest.NewRequest("POST", "/login", strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 
@@ -209,13 +209,14 @@ func TestSignup_ValidInvite(t *testing.T) {
 
 	srv.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	// Verify HX-Redirect header
-	if loc := w.Header().Get("HX-Redirect"); loc != "/" {
-		t.Errorf("expected HX-Redirect '/', got %q", loc)
+	// Verify authenticated template is rendered (navigates to /chat)
+	body := w.Body.String()
+	if !strings.Contains(body, "authenticated-container") {
+		t.Errorf("expected authenticated template, got %s", body)
 	}
 
 	// Verify user was created
@@ -541,8 +542,8 @@ func TestHandleSignup_SetsSessionCookie(t *testing.T) {
 
 	s.router.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusNoContent {
-		t.Errorf("Status = %d, want 204, body: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusOK {
+		t.Errorf("Status = %d, want 200, body: %s", rr.Code, rr.Body.String())
 	}
 
 	// Check for session cookie
@@ -588,8 +589,8 @@ func TestHandleLogout_ClearsCookie(t *testing.T) {
 	}
 
 	// Check HX-Location header
-	if rr.Header().Get("HX-Location") != "/" {
-		t.Errorf("HX-Location = %q, want /", rr.Header().Get("HX-Location"))
+	if rr.Header().Get("HX-Location") != "/login" {
+		t.Errorf("HX-Location = %q, want /login", rr.Header().Get("HX-Location"))
 	}
 }
 

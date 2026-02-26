@@ -234,6 +234,8 @@ func (s *Server) loadTemplates() error {
 	}
 
 	templateDefs := map[string]string{
+		"landing":           "templates/landing.html",
+		"privacy":           "templates/privacy.html",
 		"login":             "templates/login.html",
 		"signup":            "templates/signup.html",
 		"chats":             "templates/chats.html",
@@ -270,6 +272,23 @@ func validateNavigatePath(path string) string {
 		return path
 	}
 	return "/chat"
+}
+
+func (s *Server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
+	// Authenticated users get the HTMX-based navigation template
+	if cookie, err := r.Cookie("session"); err == nil {
+		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
+			navigateTo := validateNavigatePath(r.URL.Query().Get("navigate"))
+			s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: navigateTo})
+			return
+		}
+	}
+
+	s.render(w, r, "landing", PageData{Title: "Home"})
+}
+
+func (s *Server) handlePrivacyPage(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, "privacy", PageData{Title: "Privacy Policy"})
 }
 
 func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
@@ -343,7 +362,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	s.clearSessionCookie(w)
 
-	w.Header().Set("HX-Location", "/")
+	w.Header().Set("HX-Location", "/login")
 	w.WriteHeader(http.StatusNoContent)
 }
 

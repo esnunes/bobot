@@ -1,0 +1,30 @@
+{{define "content"}}
+<div class="landing-container">
+    <div class="landing-hero">
+        <img src="/static/logo.png" alt="bobot" />
+        <h1>{{t .Lang "landing.title"}}</h1>
+        <p class="landing-subtitle">{{t .Lang "landing.subtitle"}}</p>
+        <p class="landing-description">{{t .Lang "landing.description"}}</p>
+    </div>
+
+    <div class="landing-features">
+        <ul>
+            <li>{{t .Lang "landing.feature_chat"}}</li>
+            <li>{{t .Lang "landing.feature_tasks"}}</li>
+            <li>{{t .Lang "landing.feature_scheduling"}}</li>
+            <li>{{t .Lang "landing.feature_calendar"}}</li>
+            <li>{{t .Lang "landing.feature_smart_home"}}</li>
+        </ul>
+    </div>
+
+    <div class="landing-data">
+        <h2>{{t .Lang "landing.data_title"}}</h2>
+        <p>{{t .Lang "landing.data_description"}}</p>
+    </div>
+
+    <div class="landing-actions">
+        <a href="/login" hx-get="/login" hx-target="body" hx-swap="innerHTML" class="landing-btn landing-btn-primary">{{t .Lang "landing.login"}}</a>
+        <a href="/privacy" class="landing-btn landing-btn-secondary">{{t .Lang "landing.privacy_link"}}</a>
+    </div>
+</div>
+{{end}}

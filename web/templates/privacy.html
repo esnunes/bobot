@@ -1,0 +1,41 @@
+{{define "content"}}
+<div class="privacy-container">
+    <h1>{{t .Lang "privacy.title"}}</h1>
+    <p>{{t .Lang "privacy.intro"}}</p>
+
+    <h2>{{t .Lang "privacy.data_collected_title"}}</h2>
+    <ul>
+        <li>{{t .Lang "privacy.data_collected_account"}}</li>
+        <li>{{t .Lang "privacy.data_collected_messages"}}</li>
+        <li>{{t .Lang "privacy.data_collected_tasks"}}</li>
+        <li>{{t .Lang "privacy.data_collected_calendar"}}</li>
+    </ul>
+
+    <h2>{{t .Lang "privacy.google_title"}}</h2>
+    <p>{{t .Lang "privacy.google_description"}}</p>
+    <ul>
+        <li>{{t .Lang "privacy.google_scope_events"}}</li>
+        <li>{{t .Lang "privacy.google_scope_calendars"}}</li>
+    </ul>
+
+    <h2>{{t .Lang "privacy.how_used_title"}}</h2>
+    <ul>
+        <li>{{t .Lang "privacy.how_used_chat"}}</li>
+        <li>{{t .Lang "privacy.how_used_calendar"}}</li>
+        <li>{{t .Lang "privacy.how_used_tasks"}}</li>
+    </ul>
+
+    <h2>{{t .Lang "privacy.storage_title"}}</h2>
+    <p>{{t .Lang "privacy.storage_description"}}</p>
+
+    <h2>{{t .Lang "privacy.sharing_title"}}</h2>
+    <p>{{t .Lang "privacy.sharing_description"}}</p>
+
+    <h2>{{t .Lang "privacy.contact_title"}}</h2>
+    <p>{{t .Lang "privacy.contact_description"}}</p>
+
+    <div class="privacy-back">
+        <a href="/">&#8592; {{t .Lang "landing.title"}}</a>
+    </div>
+</div>
+{{end}}

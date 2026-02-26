@@ -15,7 +15,7 @@ self.addEventListener("push", function (event) {
     body: payload.body || "",
     icon: "/static/icon-192x192.png",
     tag: payload.tag || "bobot",
-    data: { url: payload.url || "/" },
+    data: { url: payload.url || "/chat" },
   };
 
   event.waitUntil(
@@ -26,7 +26,7 @@ self.addEventListener("push", function (event) {
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
 
-  var url = (event.notification.data && event.notification.data.url) || "/";
+  var url = (event.notification.data && event.notification.data.url) || "/chat";
 
   event.waitUntil(
     self.clients
@@ -42,7 +42,7 @@ self.addEventListener("notificationclick", function (event) {
           }
         }
         // No existing window — open a new one with query param
-        return self.clients.openWindow("/?navigate=" + encodeURIComponent(url));
+        return self.clients.openWindow("/login?navigate=" + encodeURIComponent(url));
       })
   );
 });
