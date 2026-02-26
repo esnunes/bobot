@@ -41,10 +41,12 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 100dvh;
+  height: 100dvh;
   padding: var(--space-4) var(--space-3);
   gap: var(--space-4);
+  overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .landing-hero {
@@ -171,8 +173,10 @@ button {
   max-width: 640px;
   margin: 0 auto;
   padding: var(--space-4) var(--space-3);
-  overflow-y: auto;
   height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .privacy-container h1 {
