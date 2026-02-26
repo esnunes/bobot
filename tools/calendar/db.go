@@ -3,6 +3,7 @@ package calendar
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -37,7 +38,7 @@ type OAuthState struct {
 }
 
 func NewCalendarDB(dbPath string) (*CalendarDB, error) {
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0700); err != nil {
 		return nil, err
 	}
 
@@ -128,7 +129,7 @@ func (c *CalendarDB) SaveToken(token TokenRecord) error {
 		INSERT INTO tokens (topic_id, user_id, access_token, refresh_token, token_expiry, updated_at)
 		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(topic_id) DO UPDATE SET
-			user_id = excluded.user_id,
+			user_id = CASE WHEN excluded.user_id = 0 THEN tokens.user_id ELSE excluded.user_id END,
 			access_token = excluded.access_token,
 			refresh_token = excluded.refresh_token,
 			token_expiry = excluded.token_expiry,
@@ -199,8 +200,12 @@ func (c *CalendarDB) Disconnect(topicID int64) error {
 	}
 	defer tx.Rollback()
 
-	tx.Exec("DELETE FROM tokens WHERE topic_id = ?", topicID)
-	tx.Exec("DELETE FROM topic_calendars WHERE topic_id = ?", topicID)
+	if _, err := tx.Exec("DELETE FROM tokens WHERE topic_id = ?", topicID); err != nil {
+		return fmt.Errorf("deleting token: %w", err)
+	}
+	if _, err := tx.Exec("DELETE FROM topic_calendars WHERE topic_id = ?", topicID); err != nil {
+		return fmt.Errorf("deleting calendar: %w", err)
+	}
 
 	return tx.Commit()
 }

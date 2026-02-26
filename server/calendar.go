@@ -63,10 +63,17 @@ func (s *Server) handleCalendarCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	topicID, err := s.calendarTool.OAuth().ExchangeCode(code, state)
+	topicID, stateUserID, err := s.calendarTool.OAuth().ExchangeCode(r.Context(), code, state)
 	if err != nil {
 		slog.Error("calendar: OAuth exchange failed", "error", err)
 		http.Error(w, "OAuth authorization failed", http.StatusBadRequest)
+		return
+	}
+
+	// Verify the session user matches the user who initiated the OAuth flow
+	userData := auth.UserDataFromContext(r.Context())
+	if userData.UserID != stateUserID {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -217,10 +224,12 @@ func (s *Server) handleCalendarDisconnect(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Best-effort revocation at Google (continues even if it fails)
 	if err := s.calendarTool.OAuth().RevokeToken(topicID); err != nil {
 		slog.Error("calendar: revoke failed (continuing with cleanup)", "error", err)
 	}
 
+	// Remove local token and calendar data
 	if err := s.calendarTool.DB().Disconnect(topicID); err != nil {
 		slog.Error("calendar: disconnect failed", "error", err)
 		http.Error(w, "failed to disconnect", http.StatusInternalServerError)

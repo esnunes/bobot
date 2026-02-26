@@ -3,6 +3,7 @@ package calendar
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -30,7 +31,7 @@ type EventInfo struct {
 	Start       string
 	End         string
 	AllDay      bool
-	HtmlLink    string
+	HTMLLink    string
 }
 
 // ListCalendars fetches the user's calendar list.
@@ -209,7 +210,7 @@ func FindEventByTitle(ctx context.Context, ts oauth2.TokenSource, calendarID, ti
 
 	var result []EventInfo
 	for _, item := range events.Items {
-		if strings.EqualFold(item.Summary, title) || strings.Contains(strings.ToLower(item.Summary), strings.ToLower(title)) {
+		if strings.Contains(strings.ToLower(item.Summary), strings.ToLower(title)) {
 			result = append(result, eventToInfo(item))
 		}
 	}
@@ -222,7 +223,7 @@ func eventToInfo(e *gcalendar.Event) EventInfo {
 		Title:       e.Summary,
 		Description: e.Description,
 		Location:    e.Location,
-		HtmlLink:    e.HtmlLink,
+		HTMLLink:    e.HtmlLink,
 	}
 
 	if e.Start != nil {
@@ -278,7 +279,7 @@ func mapAPIError(err error) error {
 	}
 
 	var apiErr *googleapi.Error
-	if !isGoogleAPIError(err, &apiErr) {
+	if !errors.As(err, &apiErr) {
 		return err
 	}
 
@@ -305,17 +306,3 @@ func mapAPIError(err error) error {
 	return err
 }
 
-func isGoogleAPIError(err error, target **googleapi.Error) bool {
-	for err != nil {
-		if apiErr, ok := err.(*googleapi.Error); ok {
-			*target = apiErr
-			return true
-		}
-		if unwrapper, ok := err.(interface{ Unwrap() error }); ok {
-			err = unwrapper.Unwrap()
-		} else {
-			return false
-		}
-	}
-	return false
-}

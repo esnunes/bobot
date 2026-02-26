@@ -2,14 +2,15 @@
 package calendar
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
-	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -70,22 +71,23 @@ func (o *OAuthConfig) GenerateAuthURL(userID, topicID int64) (string, error) {
 }
 
 // ExchangeCode exchanges an authorization code for tokens and stores them.
-func (o *OAuthConfig) ExchangeCode(code, state string) (int64, error) {
+// Returns (topicID, userID, error) so the caller can verify the session user.
+func (o *OAuthConfig) ExchangeCode(ctx context.Context, code, state string) (int64, int64, error) {
 	oauthState, err := o.db.GetAndDeleteOAuthState(state)
 	if err != nil {
-		return 0, fmt.Errorf("looking up state: %w", err)
+		return 0, 0, fmt.Errorf("looking up state: %w", err)
 	}
 	if oauthState == nil {
-		return 0, fmt.Errorf("invalid or expired OAuth state")
+		return 0, 0, fmt.Errorf("invalid or expired OAuth state")
 	}
 
 	token, err := o.config.Exchange(
-		oauth2.NoContext,
+		ctx,
 		code,
 		oauth2.VerifierOption(oauthState.Verifier),
 	)
 	if err != nil {
-		return 0, fmt.Errorf("exchanging code: %w", err)
+		return 0, 0, fmt.Errorf("exchanging code: %w", err)
 	}
 
 	if err := o.db.SaveToken(TokenRecord{
@@ -95,10 +97,10 @@ func (o *OAuthConfig) ExchangeCode(code, state string) (int64, error) {
 		RefreshToken: token.RefreshToken,
 		TokenExpiry:  token.Expiry,
 	}); err != nil {
-		return 0, fmt.Errorf("saving token: %w", err)
+		return 0, 0, fmt.Errorf("saving token: %w", err)
 	}
 
-	return oauthState.TopicID, nil
+	return oauthState.TopicID, oauthState.UserID, nil
 }
 
 // GetTokenSource returns an oauth2.TokenSource for the given topic.
@@ -120,7 +122,7 @@ func (o *OAuthConfig) GetTokenSource(topicID int64) (oauth2.TokenSource, error) 
 		Expiry:       record.TokenExpiry,
 	}
 
-	base := o.config.TokenSource(oauth2.NoContext, token)
+	base := o.config.TokenSource(context.Background(), token)
 
 	return &persistingTokenSource{
 		base:    base,
@@ -131,24 +133,34 @@ func (o *OAuthConfig) GetTokenSource(topicID int64) (oauth2.TokenSource, error) 
 	}, nil
 }
 
-// RevokeToken revokes the Google token and removes local data.
+// RevokeToken sends a best-effort revocation request to Google.
+// It does NOT remove local data; the caller should call DB().Disconnect() separately.
 func (o *OAuthConfig) RevokeToken(topicID int64) error {
 	record, err := o.db.GetToken(topicID)
 	if err != nil {
 		return fmt.Errorf("loading token: %w", err)
 	}
-	if record != nil {
-		// Best-effort revocation at Google
-		tokenToRevoke := record.RefreshToken
-		if tokenToRevoke == "" {
-			tokenToRevoke = record.AccessToken
-		}
-		http.PostForm("https://oauth2.googleapis.com/revoke", url.Values{
-			"token": {tokenToRevoke},
-		})
+	if record == nil {
+		return nil
 	}
 
-	return o.db.Disconnect(topicID)
+	tokenToRevoke := record.RefreshToken
+	if tokenToRevoke == "" {
+		tokenToRevoke = record.AccessToken
+	}
+	resp, err := http.PostForm("https://oauth2.googleapis.com/revoke", url.Values{
+		"token": {tokenToRevoke},
+	})
+	if err != nil {
+		slog.Warn("calendar: revocation request failed", "error", err)
+	} else {
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			slog.Warn("calendar: revocation returned non-200", "status", resp.StatusCode)
+		}
+	}
+
+	return nil
 }
 
 func (o *OAuthConfig) getTopicMutex(topicID int64) *sync.Mutex {
@@ -181,13 +193,14 @@ func (p *persistingTokenSource) Token() (*oauth2.Token, error) {
 
 	// Persist if token was refreshed
 	if token.AccessToken != p.current.AccessToken {
-		p.db.SaveToken(TokenRecord{
+		if err := p.db.SaveToken(TokenRecord{
 			TopicID:      p.topicID,
-			UserID:       0, // preserve existing
 			AccessToken:  token.AccessToken,
 			RefreshToken: token.RefreshToken,
 			TokenExpiry:  token.Expiry,
-		})
+		}); err != nil {
+			slog.Error("calendar: failed to persist refreshed token", "topic_id", p.topicID, "error", err)
+		}
 		p.current = token
 	}
 
@@ -200,35 +213,10 @@ func isTokenRevoked(err error) bool {
 	}
 	errStr := err.Error()
 	// Google returns "invalid_grant" when refresh token is revoked
-	return containsAny(errStr, "invalid_grant", "Token has been revoked", "Token has been expired")
-}
-
-func containsAny(s string, substrs ...string) bool {
-	for _, sub := range substrs {
-		if len(s) >= len(sub) {
-			for i := 0; i <= len(s)-len(sub); i++ {
-				if s[i:i+len(sub)] == sub {
-					return true
-				}
-			}
+	for _, sub := range []string{"invalid_grant", "Token has been revoked", "Token has been expired"} {
+		if strings.Contains(errStr, sub) {
+			return true
 		}
 	}
 	return false
-}
-
-// TokenExpiryBuffer is how much buffer to add before considering a token expired.
-var TokenExpiryBuffer = 5 * time.Minute
-
-// IsTokenExpired checks if a token is expired or about to expire.
-func IsTokenExpired(expiry time.Time) bool {
-	return time.Now().Add(TokenExpiryBuffer).After(expiry)
-}
-
-// ReadResponseBody reads and returns the body from an HTTP response.
-func ReadResponseBody(resp *http.Response) string {
-	if resp == nil {
-		return ""
-	}
-	body, _ := io.ReadAll(resp.Body)
-	return string(body)
 }
