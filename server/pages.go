@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -284,12 +283,6 @@ func (s *Server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, navigateTo, http.StatusFound)
 			return
 		}
-	}
-
-	// Forward ?navigate= to /login for unauthenticated users
-	if nav := r.URL.Query().Get("navigate"); nav != "" {
-		http.Redirect(w, r, "/login?navigate="+url.QueryEscape(nav), http.StatusFound)
-		return
 	}
 
 	s.render(w, r, "landing", PageData{Title: "Home", Public: true})
