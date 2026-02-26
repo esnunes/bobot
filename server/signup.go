@@ -20,8 +20,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 		if code == "" {
 			s.render(w, r, "signup", PageData{
 				Title:  "Sign Up",
-				Public: true,
-				Error:  i18n.T(lang, "signup.error.invite_required"),
+					Error:  i18n.T(lang, "signup.error.invite_required"),
 			})
 			return
 		}
@@ -31,15 +30,13 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 		if err != nil || invite.UsedBy != nil || invite.Revoked {
 			s.render(w, r, "signup", PageData{
 				Title:  "Sign Up",
-				Public: true,
-				Error:  i18n.T(lang, "signup.error.invite_invalid"),
+					Error:  i18n.T(lang, "signup.error.invite_invalid"),
 			})
 			return
 		}
 
 		s.render(w, r, "signup", PageData{
 			Title:  "Sign Up",
-			Public: true,
 			Code:   code,
 		})
 		return
@@ -47,7 +44,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 	// POST request - handle signup
 	if err := r.ParseForm(); err != nil {
-		s.render(w, r, "signup", PageData{Title: "Sign Up", Public: true, Error: i18n.T(lang, "signup.error.invalid_request")})
+		s.render(w, r, "signup", PageData{Title: "Sign Up", Error: i18n.T(lang, "signup.error.invalid_request")})
 		return
 	}
 
@@ -61,7 +58,6 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil || invite.UsedBy != nil || invite.Revoked {
 		s.render(w, r, "signup", PageData{
 			Title:  "Sign Up",
-			Public: true,
 			Error:  i18n.T(lang, "signup.error.invite_invalid"),
 			Code:   code,
 		})
@@ -72,7 +68,6 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	if errKey := validateUsername(username); errKey != "" {
 		s.render(w, r, "signup", PageData{
 			Title:  "Sign Up",
-			Public: true,
 			Error:  i18n.T(lang, errKey),
 			Code:   code,
 		})
@@ -83,7 +78,6 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	if errKey := validateDisplayName(displayName); errKey != "" {
 		s.render(w, r, "signup", PageData{
 			Title:  "Sign Up",
-			Public: true,
 			Error:  i18n.T(lang, errKey),
 			Code:   code,
 		})
@@ -94,7 +88,6 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	if errKey := validatePassword(password); errKey != "" {
 		s.render(w, r, "signup", PageData{
 			Title:  "Sign Up",
-			Public: true,
 			Error:  i18n.T(lang, errKey),
 			Code:   code,
 		})
@@ -106,7 +99,6 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.render(w, r, "signup", PageData{
 			Title:  "Sign Up",
-			Public: true,
 			Error:  i18n.T(lang, "signup.error.internal"),
 			Code:   code,
 		})
@@ -118,7 +110,6 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.render(w, r, "signup", PageData{
 			Title:  "Sign Up",
-			Public: true,
 			Error:  i18n.T(lang, "signup.error.username_taken"),
 			Code:   code,
 		})
@@ -145,7 +136,6 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	if err := s.db.UseInvite(code, user.ID); err != nil {
 		s.render(w, r, "signup", PageData{
 			Title:  "Sign Up",
-			Public: true,
 			Error:  i18n.T(lang, "signup.error.internal"),
 			Code:   code,
 		})
@@ -157,7 +147,6 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.render(w, r, "signup", PageData{
 			Title:  "Sign Up",
-			Public: true,
 			Error:  i18n.T(lang, "signup.error.internal"),
 			Code:   code,
 		})
@@ -165,7 +154,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.setSessionCookie(w, token)
-	s.render(w, r, "authenticated", PageData{Title: "Loading", Public: true})
+	s.render(w, r, "authenticated", PageData{Title: "Loading"})
 }
 
 var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)

@@ -19,18 +19,14 @@
     {{if .VAPIDPublicKey}}<meta name="vapid-key" content="{{.VAPIDPublicKey}}">{{end}}
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="/static/bobot.js" defer></script>
-    {{if not .Public}}
     <script src="/static/push.js" defer></script>
     <script src="/static/ws-manager.js" defer></script>
     <script src="/static/unread-state.js" defer></script>
-    {{end}}
 </head>
 <body hx-push-url="false">
-    {{if not .Public}}
     <div id="ws-connection" hx-preserve="true"></div>
     {{if .UnreadJSON}}<script type="application/json" data-unread-state>{{.UnreadJSON}}</script>{{end}}
     <script type="application/json" data-i18n>{"confirm":"{{t .Lang "chat.confirm"}}","reminder":"{{t .Lang "chat.reminder"}}","scheduled":"{{t .Lang "chat.scheduled"}}","push_blocked":"{{t .Lang "push.blocked"}}","confirm_delete_topic":"{{t .Lang "settings.confirm_delete_topic"}}","error_delete_topic":"{{t .Lang "settings.error_delete_topic"}}","confirm_leave_topic":"{{t .Lang "settings.confirm_leave_topic"}}","error_leave_topic":"{{t .Lang "settings.error_leave_topic"}}","qa_empty":"{{t .Lang "quick_actions.empty"}}","qa_empty_manage":"{{t .Lang "quick_actions.empty_manage"}}","saved":"{{t .Lang "settings.saved"}}"}</script>
-    {{end}}
     {{template "content" .}}
 </body>
 </html>

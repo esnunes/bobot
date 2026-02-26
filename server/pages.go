@@ -163,7 +163,6 @@ type PageData struct {
 	Title           string
 	Error           string
 	Code            string
-	Public          bool
 	TopicID         int64
 	Topics          []TopicView
 	Messages        []MessageView
@@ -285,11 +284,11 @@ func (s *Server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.render(w, r, "landing", PageData{Title: "Home", Public: true})
+	s.render(w, r, "landing", PageData{Title: "Home"})
 }
 
 func (s *Server) handlePrivacyPage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, "privacy", PageData{Title: "Privacy Policy", Public: true})
+	s.render(w, r, "privacy", PageData{Title: "Privacy Policy"})
 }
 
 func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
@@ -298,20 +297,20 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	// Check if already authenticated
 	if cookie, err := r.Cookie("session"); err == nil {
 		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
-			s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav, Public: true})
+			s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
 			return
 		}
 	}
 
 	// GET request - show login form
 	if r.Method == http.MethodGet {
-		s.render(w, r, "login", PageData{Title: "Login", NavigateTo: nav, Public: true})
+		s.render(w, r, "login", PageData{Title: "Login", NavigateTo: nav})
 		return
 	}
 
 	// POST request - handle login
 	if err := r.ParseForm(); err != nil {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(i18n.MatchLanguage(r.Header.Get("Accept-Language")), "login.error.invalid_request"), NavigateTo: nav, Public: true})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(i18n.MatchLanguage(r.Header.Get("Accept-Language")), "login.error.invalid_request"), NavigateTo: nav})
 		return
 	}
 
@@ -324,28 +323,28 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 
 	user, err := s.db.GetUserByUsername(username)
 	if err != nil {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav, Public: true})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav})
 		return
 	}
 
 	if !auth.CheckPassword(password, user.PasswordHash) {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav, Public: true})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav})
 		return
 	}
 
 	if user.Blocked {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.account_blocked"), NavigateTo: nav, Public: true})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.account_blocked"), NavigateTo: nav})
 		return
 	}
 
 	token, err := s.session.CreateToken(user.ID, user.Role, user.Language)
 	if err != nil {
-		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.internal"), NavigateTo: nav, Public: true})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.internal"), NavigateTo: nav})
 		return
 	}
 
 	s.setSessionCookie(w, token)
-	s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav, Public: true})
+	s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
