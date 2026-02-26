@@ -65,7 +65,7 @@ func (s *Server) handleSchedulesPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	s.render(w, "schedules", PageData{
+	s.render(w, r, "schedules", PageData{
 		Title:     "Schedules",
 		TopicID:   topicID,
 		TopicName: topicName,
@@ -112,7 +112,7 @@ func (s *Server) handleScheduleFormPage(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		s.render(w, "schedule_form", PageData{
+		s.render(w, r, "schedule_form", PageData{
 			Title:   "Edit Schedule",
 			TopicID: job.TopicID,
 			Schedule: &ScheduleView{
@@ -126,7 +126,7 @@ func (s *Server) handleScheduleFormPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.render(w, "schedule_form", PageData{
+	s.render(w, r, "schedule_form", PageData{
 		Title:   "New Schedule",
 		TopicID: topicID,
 	})
@@ -158,7 +158,7 @@ func (s *Server) handleCreateScheduleForm(w http.ResponseWriter, r *http.Request
 	// Validate cron expression
 	expr, err := schedule.Parse(cronExprStr)
 	if err != nil {
-		s.render(w, "schedule_form", PageData{
+		s.render(w, r, "schedule_form", PageData{
 			Title: "New Schedule",
 			Error: fmt.Sprintf("Invalid cron expression: %v", err),
 		})
@@ -241,7 +241,7 @@ func (s *Server) handleUpdateScheduleForm(w http.ResponseWriter, r *http.Request
 	// Validate cron expression
 	expr, err := schedule.Parse(cronExprStr)
 	if err != nil {
-		s.render(w, "schedule_form", PageData{
+		s.render(w, r, "schedule_form", PageData{
 			Title:   "Edit Schedule",
 			TopicID: job.TopicID,
 			Error:   fmt.Sprintf("Invalid cron expression: %v", err),

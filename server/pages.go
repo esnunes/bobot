@@ -11,6 +11,7 @@ import (
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
+	"github.com/esnunes/bobot/i18n"
 	"github.com/esnunes/bobot/web"
 )
 
@@ -151,6 +152,7 @@ type ToolView struct {
 }
 
 type PageData struct {
+	Lang            string
 	Title           string
 	Error           string
 	Code            string
@@ -179,12 +181,24 @@ type PageData struct {
 	PushMuted       bool
 	AutoRead        bool
 	AutoRespond     bool
-	IsBobotTopic    bool
-	DisplayName     string
+	IsBobotTopic       bool
+	DisplayName        string
+	SupportedLanguages []string
+	UserLanguage       string
 }
 
-func (s *Server) render(w http.ResponseWriter, name string, data PageData) {
+func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
 	data.VAPIDPublicKey = s.cfg.VAPID.PublicKey
+	if data.Lang == "" {
+		// Try to get language from auth context (authenticated pages)
+		userData := auth.UserDataFromContext(r.Context())
+		if userData.Language != "" {
+			data.Lang = userData.Language
+		} else {
+			// Fall back to Accept-Language header (unauthenticated pages)
+			data.Lang = i18n.MatchLanguage(r.Header.Get("Accept-Language"))
+		}
+	}
 	s.templates[name].Execute(w, data)
 }
 
@@ -202,95 +216,37 @@ func buildUnreadJSON(unreads map[int64]bool) template.JS {
 }
 
 func (s *Server) loadTemplates() error {
-	loginTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/login.html")
-	if err != nil {
-		return err
-	}
-	s.templates["login"] = loginTmpl
+	funcMap := i18n.FuncMap()
 
-	signupTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/signup.html")
-	if err != nil {
-		return err
+	parseTemplate := func(files ...string) (*template.Template, error) {
+		return template.New("layout.html").Funcs(funcMap).ParseFS(web.FS, files...)
 	}
-	s.templates["signup"] = signupTmpl
 
-	chatsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/chats.html")
-	if err != nil {
-		return err
+	templateDefs := map[string]string{
+		"login":             "templates/login.html",
+		"signup":            "templates/signup.html",
+		"chats":             "templates/chats.html",
+		"topic_chat":        "templates/topic_chat.html",
+		"authenticated":     "templates/authenticated.html",
+		"skills":            "templates/skills.html",
+		"skill_form":        "templates/skill_form.html",
+		"schedules":         "templates/schedules.html",
+		"schedule_form":     "templates/schedule_form.html",
+		"admin":             "templates/admin.html",
+		"admin_user":        "templates/admin_user.html",
+		"settings":          "templates/settings.html",
+		"admin_context":     "templates/admin_context.html",
+		"quick_actions":     "templates/quick_actions.html",
+		"quick_action_form": "templates/quick_action_form.html",
 	}
-	s.templates["chats"] = chatsTmpl
 
-	topicChatTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/topic_chat.html")
-	if err != nil {
-		return err
+	for name, contentFile := range templateDefs {
+		tmpl, err := parseTemplate("templates/layout.html", contentFile)
+		if err != nil {
+			return err
+		}
+		s.templates[name] = tmpl
 	}
-	s.templates["topic_chat"] = topicChatTmpl
-
-	authTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/authenticated.html")
-	if err != nil {
-		return err
-	}
-	s.templates["authenticated"] = authTmpl
-
-	skillsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/skills.html")
-	if err != nil {
-		return err
-	}
-	s.templates["skills"] = skillsTmpl
-
-	skillFormTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/skill_form.html")
-	if err != nil {
-		return err
-	}
-	s.templates["skill_form"] = skillFormTmpl
-
-	schedulesTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/schedules.html")
-	if err != nil {
-		return err
-	}
-	s.templates["schedules"] = schedulesTmpl
-
-	scheduleFormTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/schedule_form.html")
-	if err != nil {
-		return err
-	}
-	s.templates["schedule_form"] = scheduleFormTmpl
-
-	adminTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/admin.html")
-	if err != nil {
-		return err
-	}
-	s.templates["admin"] = adminTmpl
-
-	adminUserTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/admin_user.html")
-	if err != nil {
-		return err
-	}
-	s.templates["admin_user"] = adminUserTmpl
-
-	settingsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/settings.html")
-	if err != nil {
-		return err
-	}
-	s.templates["settings"] = settingsTmpl
-
-	adminContextTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/admin_context.html")
-	if err != nil {
-		return err
-	}
-	s.templates["admin_context"] = adminContextTmpl
-
-	quickActionsTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/quick_actions.html")
-	if err != nil {
-		return err
-	}
-	s.templates["quick_actions"] = quickActionsTmpl
-
-	quickActionFormTmpl, err := template.ParseFS(web.FS, "templates/layout.html", "templates/quick_action_form.html")
-	if err != nil {
-		return err
-	}
-	s.templates["quick_action_form"] = quickActionFormTmpl
 
 	return nil
 }
@@ -310,53 +266,54 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	// Check if already authenticated
 	if cookie, err := r.Cookie("session"); err == nil {
 		if _, err := s.session.DecryptToken(cookie.Value); err == nil {
-			s.render(w, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
+			s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
 			return
 		}
 	}
 
 	// GET request - show login form
 	if r.Method == http.MethodGet {
-		s.render(w, "login", PageData{Title: "Login", NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", NavigateTo: nav})
 		return
 	}
 
 	// POST request - handle login
 	if err := r.ParseForm(); err != nil {
-		s.render(w, "login", PageData{Title: "Login", Error: "Invalid request", NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(i18n.MatchLanguage(r.Header.Get("Accept-Language")), "login.error.invalid_request"), NavigateTo: nav})
 		return
 	}
 
 	// Read navigate from form hidden field (preserved from GET)
 	nav = validateNavigatePath(r.FormValue("navigate"))
+	lang := i18n.MatchLanguage(r.Header.Get("Accept-Language"))
 
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
 	user, err := s.db.GetUserByUsername(username)
 	if err != nil {
-		s.render(w, "login", PageData{Title: "Login", Error: "Invalid credentials", NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav})
 		return
 	}
 
 	if !auth.CheckPassword(password, user.PasswordHash) {
-		s.render(w, "login", PageData{Title: "Login", Error: "Invalid credentials", NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.invalid_credentials"), NavigateTo: nav})
 		return
 	}
 
 	if user.Blocked {
-		s.render(w, "login", PageData{Title: "Login", Error: "Account blocked", NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.account_blocked"), NavigateTo: nav})
 		return
 	}
 
-	token, err := s.session.CreateToken(user.ID, user.Role)
+	token, err := s.session.CreateToken(user.ID, user.Role, user.Language)
 	if err != nil {
-		s.render(w, "login", PageData{Title: "Login", Error: "Internal error", NavigateTo: nav})
+		s.render(w, r, "login", PageData{Title: "Login", Error: i18n.T(lang, "login.error.internal"), NavigateTo: nav})
 		return
 	}
 
 	s.setSessionCookie(w, token)
-	s.render(w, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
+	s.render(w, r, "authenticated", PageData{Title: "Loading", NavigateTo: nav})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -413,7 +370,7 @@ func (s *Server) handleChatsPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	s.render(w, "chats", PageData{
+	s.render(w, r, "chats", PageData{
 		Title:      "Chats",
 		Topics:     topicViews,
 		UnreadJSON: buildUnreadJSON(unreads),
@@ -531,7 +488,7 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 		otherUnreads--
 	}
 
-	s.render(w, "topic_chat", PageData{
+	s.render(w, r, "topic_chat", PageData{
 		Title:           "Topic Chat",
 		TopicID:         topicID,
 		TopicName:       topic.Name,
@@ -558,10 +515,12 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := PageData{
-		Title:         "Settings",
-		CurrentUserID: userData.UserID,
-		IsAdmin:       userData.Role == "admin",
-		DisplayName:   user.DisplayName,
+		Title:              "Settings",
+		CurrentUserID:      userData.UserID,
+		IsAdmin:            userData.Role == "admin",
+		DisplayName:        user.DisplayName,
+		SupportedLanguages: i18n.SupportedLanguages(),
+		UserLanguage:       user.Language,
 	}
 
 	// If topic_id is provided, load topic-specific data
@@ -652,7 +611,7 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 	unreads, _ := s.db.GetUnreadChats(userData.UserID)
 	data.UnreadJSON = buildUnreadJSON(unreads)
 
-	s.render(w, "settings", data)
+	s.render(w, r, "settings", data)
 }
 
 func (s *Server) handleUpdateDisplayName(w http.ResponseWriter, r *http.Request) {
@@ -674,5 +633,35 @@ func (s *Server) handleUpdateDisplayName(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleUpdateLanguage(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	lang := strings.TrimSpace(r.FormValue("language"))
+	if !i18n.IsSupported(lang) {
+		http.Error(w, "unsupported language", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.db.UpdateUserLanguage(userData.UserID, lang); err != nil {
+		http.Error(w, "failed to update language", http.StatusInternalServerError)
+		return
+	}
+
+	// Reissue session token with new language
+	newToken, err := s.session.CreateToken(userData.UserID, userData.Role, lang)
+	if err == nil {
+		s.setSessionCookie(w, newToken)
+	}
+
+	// Force full page reload to apply new language
+	w.Header().Set("HX-Redirect", r.Header.Get("HX-Current-URL"))
 	w.WriteHeader(http.StatusNoContent)
 }

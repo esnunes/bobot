@@ -18,6 +18,7 @@ var (
 type SessionToken struct {
 	UserID    int64     `json:"user_id"`
 	Role      string    `json:"role"`
+	Language  string    `json:"language,omitempty"`
 	IssuedAt  time.Time `json:"issued_at"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
@@ -40,13 +41,16 @@ func NewSessionService(secret string, duration, maxAge, refreshThreshold time.Du
 	}
 }
 
-func (s *SessionService) CreateToken(userID int64, role string) (string, error) {
+func (s *SessionService) CreateToken(userID int64, role string, lang ...string) (string, error) {
 	now := time.Now()
 	token := &SessionToken{
 		UserID:    userID,
 		Role:      role,
 		IssuedAt:  now,
 		ExpiresAt: now.Add(s.duration),
+	}
+	if len(lang) > 0 {
+		token.Language = lang[0]
 	}
 
 	plaintext, err := json.Marshal(token)

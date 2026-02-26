@@ -1,12 +1,12 @@
 {{define "content"}}
 <div class="login-container">
     <img src="/static/logo.png" />
-    <h1>Welcome to bobot</h1>
+    <h1>{{t .Lang "login.title"}}</h1>
     <form id="login-form" hx-post="/" hx-target="body" class="login-form">
         {{if .NavigateTo}}<input type="hidden" name="navigate" value="{{.NavigateTo}}">{{end}}
-        <input type="text" name="username" placeholder="Username" autocapitalize="none" required autofocus>
-        <input type="password" name="password" placeholder="Password" required>
-        <button type="submit">Login</button>
+        <input type="text" name="username" placeholder="{{t .Lang "login.username"}}" autocapitalize="none" required autofocus>
+        <input type="password" name="password" placeholder="{{t .Lang "login.password"}}" required>
+        <button type="submit">{{t .Lang "login.submit"}}</button>
     </form>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
 </div>

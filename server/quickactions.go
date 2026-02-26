@@ -47,7 +47,7 @@ func (s *Server) handleQuickActionsPage(w http.ResponseWriter, r *http.Request) 
 
 	canManage := userData.Role == "admin" || topic.OwnerID == userData.UserID
 
-	s.render(w, "quick_actions", PageData{
+	s.render(w, r, "quick_actions", PageData{
 		Title:        "Quick Actions",
 		TopicID:      topicID,
 		TopicName:    topic.Name,
@@ -91,7 +91,7 @@ func (s *Server) handleQuickActionFormPage(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		s.render(w, "quick_action_form", PageData{
+		s.render(w, r, "quick_action_form", PageData{
 			Title:   "Edit Quick Action",
 			TopicID: qa.TopicID,
 			QuickAction: &QuickActionView{
@@ -112,7 +112,7 @@ func (s *Server) handleQuickActionFormPage(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	s.render(w, "quick_action_form", PageData{
+	s.render(w, r, "quick_action_form", PageData{
 		Title:   "New Quick Action",
 		TopicID: topicID,
 	})

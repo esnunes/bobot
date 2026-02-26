@@ -30,6 +30,8 @@ window.MessageRenderer = {
     },
 
     processBobotTags(parentEl, sendFn, isHistory) {
+        var i18nEl = document.querySelector('script[data-i18n]');
+        var i18n = i18nEl ? JSON.parse(i18nEl.textContent) : {};
         var bobotEls = parentEl.querySelectorAll('bobot');
         bobotEls.forEach(function(el) {
             var label = el.getAttribute('label');
@@ -63,7 +65,7 @@ window.MessageRenderer = {
                         // First click: enter confirm state
                         MessageRenderer.resetConfirmingButtons();
                         btn.classList.add('bobot-action-btn--confirming');
-                        btn.textContent = 'Confirm?';
+                        btn.textContent = i18n.confirm || 'Confirm?';
                         return;
                     }
 
@@ -90,15 +92,17 @@ window.MessageRenderer = {
     },
 
     renderScheduledMessage(parsed) {
+        var i18nEl = document.querySelector('script[data-i18n]');
+        var i18n = i18nEl ? JSON.parse(i18nEl.textContent) : {};
         var wrapper = document.createElement('div');
         wrapper.className = 'message-scheduled message-scheduled--' + parsed.type;
 
         var labelEl = document.createElement('div');
         labelEl.className = 'message-scheduled-label';
         if (parsed.type === 'reminder') {
-            labelEl.textContent = '\uD83D\uDD14 Reminder';
+            labelEl.textContent = '\uD83D\uDD14 ' + (i18n.reminder || 'Reminder');
         } else {
-            labelEl.textContent = '\u23F0 Scheduled';
+            labelEl.textContent = '\u23F0 ' + (i18n.scheduled || 'Scheduled');
         }
         wrapper.appendChild(labelEl);
 

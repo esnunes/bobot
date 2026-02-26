@@ -12,6 +12,9 @@
 
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
+  var i18nEl = document.querySelector("script[data-i18n]");
+  var i18n = i18nEl ? JSON.parse(i18nEl.textContent) : {};
+
   // Register service worker
   navigator.serviceWorker
     .register("/sw.js")
@@ -79,7 +82,7 @@
       .catch(function (err) {
         if (Notification.permission === "denied") {
           alert(
-            "Notifications are blocked. Please enable them in your browser settings."
+            i18n.push_blocked || "Notifications are blocked. Please enable them in your browser settings."
           );
         }
         console.error("Push subscribe failed:", err);

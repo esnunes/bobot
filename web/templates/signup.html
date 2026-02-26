@@ -2,24 +2,24 @@
 <div class="login-container">
     <h1>bobot</h1>
     {{if .Code}}
-    <form id="signup-form" hx-post="/signup" hx-target="body" class="login-form">
+    <form id="signup-form" hx-post="/signup" hx-target="body" class="login-form" data-passwords-mismatch="{{t .Lang "signup.passwords_mismatch"}}">
         <input type="hidden" name="code" value="{{.Code}}">
-        <input type="text" name="username" placeholder="Username" autocapitalize="none" required autofocus
-               pattern="[a-zA-Z0-9_]+" minlength="3" title="Letters, numbers, and underscores only">
-        <input type="text" name="display_name" placeholder="Display Name" required>
-        <input type="password" name="password" placeholder="Password" required minlength="8">
-        <input type="password" name="confirm_password" placeholder="Confirm Password" required>
-        <button type="submit">Sign Up</button>
+        <input type="text" name="username" placeholder="{{t .Lang "signup.username"}}" autocapitalize="none" required autofocus
+               pattern="[a-zA-Z0-9_]+" minlength="3" title="{{t .Lang "signup.username_title"}}">
+        <input type="text" name="display_name" placeholder="{{t .Lang "signup.display_name"}}" required>
+        <input type="password" name="password" placeholder="{{t .Lang "signup.password"}}" required minlength="8">
+        <input type="password" name="confirm_password" placeholder="{{t .Lang "signup.confirm_password"}}" required>
+        <button type="submit">{{t .Lang "signup.submit"}}</button>
     </form>
     {{end}}
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
 </div>
 <script>
 document.getElementById('signup-form')?.addEventListener('htmx:confirm', function(e) {
-    const form = e.target;
+    var form = e.target;
     if (form.password.value !== form.confirm_password.value) {
         e.preventDefault();
-        alert('Passwords do not match');
+        alert(form.dataset.passwordsMismatch);
     }
 });
 </script>

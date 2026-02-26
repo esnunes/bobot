@@ -2,25 +2,25 @@
 <div class="admin-container" data-page="admin">
     <header>
         <button hx-get="/settings" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-        <h1>Admin</h1>
+        <h1>{{t .Lang "admin.title"}}</h1>
         <div></div>
     </header>
 
     <main class="admin-list">
-        <h2 class="admin-section-title">Users</h2>
+        <h2 class="admin-section-title">{{t .Lang "admin.users"}}</h2>
         {{if .AdminUsers}}
             {{range .AdminUsers}}
             <button hx-get="/admin/users/{{.ID}}" hx-target="body" class="admin-item">
                 <div class="admin-item-header">
                     <span class="admin-item-name">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}</span>
                     <span class="admin-badge {{.Role}}">{{.Role}}</span>
-                    {{if .Blocked}}<span class="admin-badge blocked">blocked</span>{{end}}
+                    {{if .Blocked}}<span class="admin-badge blocked">{{t $.Lang "admin.blocked"}}</span>{{end}}
                 </div>
-                <span class="admin-item-meta">Last active: {{.LastMessageAt}} &middot; Joined {{.CreatedAt}}</span>
+                <span class="admin-item-meta">{{t $.Lang "admin.last_active" .LastMessageAt}} &middot; {{t $.Lang "admin.joined" .CreatedAt}}</span>
             </button>
             {{end}}
         {{else}}
-            <div class="empty">No users found.</div>
+            <div class="empty">{{t .Lang "admin.no_users"}}</div>
         {{end}}
     </main>
 </div>

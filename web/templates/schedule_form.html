@@ -6,7 +6,7 @@
         {{else}}
         <button hx-get="/schedules" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
         {{end}}
-        <h1>{{if .Schedule}}Edit Schedule{{else}}New Schedule{{end}}</h1>
+        <h1>{{if .Schedule}}{{t .Lang "schedules.edit_title"}}{{else}}{{t .Lang "schedules.new_title"}}{{end}}</h1>
         <div></div>
     </header>
 
@@ -20,35 +20,35 @@
         {{end}}
             {{if .TopicID}}<input type="hidden" name="topic_id" value="{{.TopicID}}">{{end}}
 
-            <label for="schedule-name">Name (optional)</label>
-            <input type="text" id="schedule-name" name="name" placeholder="e.g. Daily task summary" maxlength="100" {{if .Schedule}}value="{{.Schedule.Name}}"{{else}}autofocus{{end}}>
+            <label for="schedule-name">{{t .Lang "schedules.name"}}</label>
+            <input type="text" id="schedule-name" name="name" placeholder="{{t .Lang "schedules.name_placeholder"}}" maxlength="100" {{if .Schedule}}value="{{.Schedule.Name}}"{{else}}autofocus{{end}}>
 
-            <label for="schedule-prompt">Prompt</label>
-            <textarea id="schedule-prompt" name="prompt" placeholder="The prompt to run on schedule..." rows="6" required>{{if .Schedule}}{{.Schedule.Prompt}}{{end}}</textarea>
+            <label for="schedule-prompt">{{t .Lang "schedules.prompt"}}</label>
+            <textarea id="schedule-prompt" name="prompt" placeholder="{{t .Lang "schedules.prompt_placeholder"}}" rows="6" required>{{if .Schedule}}{{.Schedule.Prompt}}{{end}}</textarea>
 
-            <label for="schedule-cron">Cron Expression (UTC)</label>
-            <input type="text" id="schedule-cron" name="cron_expr" placeholder="e.g. 0 9 * * 1-5 (weekdays at 9am UTC)" required {{if .Schedule}}value="{{.Schedule.CronExpr}}"{{end}}>
-            <small>Format: minute hour day-of-month month day-of-week</small>
+            <label for="schedule-cron">{{t .Lang "schedules.cron"}}</label>
+            <input type="text" id="schedule-cron" name="cron_expr" placeholder="{{t .Lang "schedules.cron_placeholder"}}" required {{if .Schedule}}value="{{.Schedule.CronExpr}}"{{end}}>
+            <small>{{t .Lang "schedules.cron_format"}}</small>
 
             {{if .Schedule}}
             <label class="checkbox-label">
                 <input type="checkbox" name="enabled" {{if .Schedule.Enabled}}checked{{end}}>
-                Enabled
+                {{t .Lang "schedules.enabled"}}
             </label>
             {{end}}
 
             <div class="skill-form-actions">
                 {{if .Schedule}}
-                <button type="button" class="danger-btn" hx-delete="/schedules/{{.Schedule.ID}}" hx-confirm="Delete this schedule?" hx-target="body">Delete</button>
+                <button type="button" class="danger-btn" hx-delete="/schedules/{{.Schedule.ID}}" hx-confirm="{{t .Lang "schedules.delete_confirm"}}" hx-target="body">{{t .Lang "schedules.delete"}}</button>
                 <div class="skill-form-actions-right">
-                    <button type="button" hx-get="/schedules{{if .TopicID}}?topic_id={{.TopicID}}{{end}}" hx-target="body">Cancel</button>
-                    <button type="submit" class="primary-btn">Save</button>
+                    <button type="button" hx-get="/schedules{{if .TopicID}}?topic_id={{.TopicID}}{{end}}" hx-target="body">{{t .Lang "schedules.cancel"}}</button>
+                    <button type="submit" class="primary-btn">{{t .Lang "schedules.save"}}</button>
                 </div>
                 {{else}}
                 <div></div>
                 <div class="skill-form-actions-right">
-                    <button type="button" hx-get="/schedules{{if .TopicID}}?topic_id={{.TopicID}}{{end}}" hx-target="body">Cancel</button>
-                    <button type="submit" class="primary-btn">Create</button>
+                    <button type="button" hx-get="/schedules{{if .TopicID}}?topic_id={{.TopicID}}{{end}}" hx-target="body">{{t .Lang "schedules.cancel"}}</button>
+                    <button type="submit" class="primary-btn">{{t .Lang "schedules.create_btn"}}</button>
                 </div>
                 {{end}}
             </div>

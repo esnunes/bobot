@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{.Lang}}">
 <head>
     <meta charset="UTF-8">
     <meta name="mobile-web-app-capable" content="yes">
@@ -26,6 +26,7 @@
 <body hx-push-url="false">
     <div id="ws-connection" hx-preserve="true"></div>
     {{if .UnreadJSON}}<script type="application/json" data-unread-state>{{.UnreadJSON}}</script>{{end}}
+    <script type="application/json" data-i18n>{"confirm":"{{t .Lang "chat.confirm"}}","reminder":"{{t .Lang "chat.reminder"}}","scheduled":"{{t .Lang "chat.scheduled"}}","push_blocked":"{{t .Lang "push.blocked"}}","confirm_delete_topic":"{{t .Lang "settings.confirm_delete_topic"}}","error_delete_topic":"{{t .Lang "settings.error_delete_topic"}}","confirm_leave_topic":"{{t .Lang "settings.confirm_leave_topic"}}","error_leave_topic":"{{t .Lang "settings.error_leave_topic"}}","qa_empty":"{{t .Lang "quick_actions.empty"}}","qa_empty_manage":"{{t .Lang "quick_actions.empty_manage"}}","saved":"{{t .Lang "settings.saved"}}"}</script>
     {{template "content" .}}
 </body>
 </html>

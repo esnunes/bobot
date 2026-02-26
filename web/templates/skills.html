@@ -6,7 +6,7 @@
         {{else}}
         <button hx-get="/settings" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
         {{end}}
-        <h1>{{if .TopicName}}Skills - {{.TopicName}}{{else}}Skills{{end}}</h1>
+        <h1>{{if .TopicName}}{{t .Lang "skills.title_topic" .TopicName}}{{else}}{{t .Lang "skills.title"}}{{end}}</h1>
         <div></div>
     </header>
 
@@ -19,12 +19,12 @@
             </button>
             {{end}}
         {{else}}
-            <div class="empty">No skills yet.</div>
+            <div class="empty">{{t .Lang "skills.empty"}}</div>
         {{end}}
         {{if .TopicID}}
-        <button hx-get="/skills/new?topic_id={{.TopicID}}" hx-target="body" class="card-action">+ Create new skill</button>
+        <button hx-get="/skills/new?topic_id={{.TopicID}}" hx-target="body" class="card-action">{{t .Lang "skills.create"}}</button>
         {{else}}
-        <button hx-get="/skills/new" hx-target="body" class="card-action">+ Create new skill</button>
+        <button hx-get="/skills/new" hx-target="body" class="card-action">{{t .Lang "skills.create"}}</button>
         {{end}}
     </main>
 </div>

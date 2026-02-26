@@ -221,14 +221,17 @@ window.TopicChatClient = class TopicChatClient {
     setupQuickActions() {
         if (!this.quickActionsBtn || !this.quickActionsOverlay) return;
 
+        var i18nEl = document.querySelector('script[data-i18n]');
+        var i18n = i18nEl ? JSON.parse(i18nEl.textContent) : {};
+
         // Render action items or empty state
         if (this.quickActions.length === 0) {
             const emptyEl = document.createElement('div');
             emptyEl.className = 'empty';
             if (this.canManageQuickActions) {
-                emptyEl.textContent = 'No quick actions yet. Create one in Settings.';
+                emptyEl.textContent = i18n.qa_empty_manage || 'No quick actions yet. Create one in Settings.';
             } else {
-                emptyEl.textContent = 'No quick actions yet.';
+                emptyEl.textContent = i18n.qa_empty || 'No quick actions yet.';
             }
             this.quickActionsList.appendChild(emptyEl);
         } else {

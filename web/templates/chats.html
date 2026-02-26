@@ -2,7 +2,7 @@
 <div class="chats-container" data-page="chats">
     <header>
         <div></div>
-        <h1>Chats</h1>
+        <h1>{{t .Lang "chats.title"}}</h1>
         <button hx-get="/settings" hx-target="body" aria-label="Settings"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </header>
 
@@ -13,23 +13,23 @@
                 <span class="topic-name">{{.Name}}</span>
                 <span class="topic-right">
                     {{if .HasUnread}}<span class="unread-dot"></span>{{end}}
-                    <span class="topic-members">{{.MemberCount}} member{{if ne .MemberCount 1}}s{{end}}</span>
+                    <span class="topic-members">{{.MemberCount}} {{if ne .MemberCount 1}}{{t $.Lang "chats.members_plural"}}{{else}}{{t $.Lang "chats.members"}}{{end}}</span>
                 </span>
             </button>
             {{end}}
         {{end}}
-        <button id="create-topic-btn" class="card-action">+ Create new topic</button>
+        <button id="create-topic-btn" class="card-action">{{t .Lang "chats.create_topic"}}</button>
     </main>
 </div>
 
 <div id="create-topic-modal" class="modal hidden">
     <div class="modal-content">
-        <h2>Create Topic</h2>
+        <h2>{{t .Lang "chats.create_modal_title"}}</h2>
         <form hx-post="/api/topics">
-            <input type="text" name="name" placeholder="Topic name" required maxlength="100" autofocus>
+            <input type="text" name="name" placeholder="{{t .Lang "chats.create_topic_name"}}" required maxlength="100" autofocus>
             <div class="modal-actions">
-                <button type="button" id="cancel-create">Cancel</button>
-                <button type="submit">Create</button>
+                <button type="button" id="cancel-create">{{t .Lang "chats.cancel"}}</button>
+                <button type="submit">{{t .Lang "chats.create"}}</button>
             </div>
         </form>
     </div>
@@ -37,7 +37,6 @@
 
 <script>
 (function() {
-    // Create topic modal
     const modal = document.getElementById('create-topic-modal');
     const nameInput = modal.querySelector('input[name="name"]');
 
@@ -58,7 +57,6 @@
         }
     });
 
-    // Unread dot management — subscribe to state changes
     document.addEventListener('bobot:unread-changed', function(e) {
         if (!document.querySelector('[data-page="chats"]')) return;
         var chatIds = e.detail.chatIds;
