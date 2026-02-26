@@ -1,0 +1,31 @@
+{{define "content"}}
+<div class="privacy-container">
+    <h1>{{t .Lang "tos.title"}}</h1>
+    <p><em>{{t .Lang "tos.last_updated"}}</em></p>
+    <p>{{t .Lang "tos.intro"}}</p>
+
+    <h2>{{t .Lang "tos.risk_title"}}</h2>
+    <p>{{t .Lang "tos.risk_description"}}</p>
+
+    <h2>{{t .Lang "tos.guarantees_title"}}</h2>
+    <p>{{t .Lang "tos.guarantees_description"}}</p>
+
+    <h2>{{t .Lang "tos.responsibility_title"}}</h2>
+    <p>{{t .Lang "tos.responsibility_description"}}</p>
+
+    <h2>{{t .Lang "tos.privacy_title"}}</h2>
+    <p>{{t .Lang "tos.privacy_description"}}</p>
+
+    <h2>{{t .Lang "tos.liability_title"}}</h2>
+    <p>{{t .Lang "tos.liability_description"}}</p>
+
+    <h2>{{t .Lang "tos.changes_title"}}</h2>
+    <p>{{t .Lang "tos.changes_description"}}</p>
+
+    <p>{{t .Lang "tos.disagree"}}</p>
+
+    <div class="privacy-back">
+        <a href="/">&#8592; {{t .Lang "landing.title"}}</a>
+    </div>
+</div>
+{{end}}

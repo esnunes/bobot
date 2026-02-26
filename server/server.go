@@ -153,6 +153,7 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /login", s.handleLoginPage)
 	s.router.HandleFunc("POST /login", s.handleLoginPage)
 	s.router.HandleFunc("GET /privacy", s.handlePrivacyPage)
+	s.router.HandleFunc("GET /tos", s.handleTosPage)
 	s.router.HandleFunc("POST /logout", s.handleLogout)
 	s.router.HandleFunc("GET /signup", s.handleSignupPage)
 	s.router.HandleFunc("POST /signup", s.handleSignupPage)
