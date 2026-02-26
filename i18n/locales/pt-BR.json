@@ -231,6 +231,25 @@
   "privacy.contact_title": "Contato",
   "privacy.contact_description": "Para d\u00favidas sobre esta pol\u00edtica de privacidade, entre em contato com o administrador da sua inst\u00e2ncia do bobot.",
 
+  "tos.title": "Termos de Servi\u00e7o",
+  "tos.last_updated": "\u00daltima atualiza\u00e7\u00e3o: 26 de fevereiro de 2026",
+  "tos.intro": "Ao usar o bobot (\"Servi\u00e7o\"), voc\u00ea concorda com o seguinte:",
+  "tos.risk_title": "1. Use por Sua Conta e Risco",
+  "tos.risk_description": "O Servi\u00e7o fornece respostas geradas por IA e pode estar incorreto ou incompleto. N\u00e3o dependa dele para decis\u00f5es m\u00e9dicas, legais, financeiras ou cr\u00edticas de seguran\u00e7a.",
+  "tos.guarantees_title": "2. Sem Garantias",
+  "tos.guarantees_description": "O Servi\u00e7o \u00e9 fornecido \"como est\u00e1\" sem garantias de qualquer tipo. N\u00e3o garantimos precis\u00e3o, disponibilidade ou adequa\u00e7\u00e3o para qualquer finalidade.",
+  "tos.responsibility_title": "3. Responsabilidade do Usu\u00e1rio",
+  "tos.responsibility_description": "Voc\u00ea concorda em n\u00e3o usar o Servi\u00e7o para atividades ilegais, prejudiciais, abusivas ou enganosas.",
+  "tos.privacy_title": "4. Privacidade",
+  "tos.privacy_description": "Suas mensagens podem ser armazenadas e usadas para operar e melhorar o Servi\u00e7o. N\u00e3o compartilhe informa\u00e7\u00f5es pessoais sens\u00edveis. Consulte nossa Pol\u00edtica de Privacidade para detalhes.",
+  "tos.liability_title": "5. Limita\u00e7\u00e3o de Responsabilidade",
+  "tos.liability_description": "Na m\u00e1xima extens\u00e3o permitida por lei, n\u00e3o somos respons\u00e1veis por quaisquer danos resultantes do seu uso do Servi\u00e7o.",
+  "tos.changes_title": "6. Altera\u00e7\u00f5es",
+  "tos.changes_description": "Podemos atualizar estes termos a qualquer momento. O uso continuado do Servi\u00e7o significa que voc\u00ea aceita os termos atualizados.",
+  "tos.disagree": "Se voc\u00ea n\u00e3o concorda com estes termos, n\u00e3o use o Servi\u00e7o.",
+
+  "landing.tos_link": "Termos de Servi\u00e7o",
+
   "lang.en": "English",
   "lang.pt-BR": "Portugu\u00eas (Brasil)"
 }

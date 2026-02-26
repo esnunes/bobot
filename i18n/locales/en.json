@@ -231,6 +231,25 @@
   "privacy.contact_title": "Contact",
   "privacy.contact_description": "For questions about this privacy policy, contact the administrator of your bobot instance.",
 
+  "tos.title": "Terms of Service",
+  "tos.last_updated": "Last updated: February 26, 2026",
+  "tos.intro": "By using bobot (\"Service\"), you agree to the following:",
+  "tos.risk_title": "1. Use at Your Own Risk",
+  "tos.risk_description": "The Service provides AI-generated responses and may be incorrect or incomplete. Do not rely on it for medical, legal, financial, or safety-critical decisions.",
+  "tos.guarantees_title": "2. No Guarantees",
+  "tos.guarantees_description": "The Service is provided \"as is\" without warranties of any kind. We do not guarantee accuracy, availability, or fitness for any purpose.",
+  "tos.responsibility_title": "3. User Responsibility",
+  "tos.responsibility_description": "You agree not to use the Service for illegal, harmful, abusive, or misleading activities.",
+  "tos.privacy_title": "4. Privacy",
+  "tos.privacy_description": "Your messages may be stored and used to operate and improve the Service. Do not share sensitive personal information. See our Privacy Policy for details.",
+  "tos.liability_title": "5. Limitation of Liability",
+  "tos.liability_description": "To the fullest extent permitted by law, we are not liable for any damages resulting from your use of the Service.",
+  "tos.changes_title": "6. Changes",
+  "tos.changes_description": "We may update these terms at any time. Continued use of the Service means you accept the updated terms.",
+  "tos.disagree": "If you do not agree with these terms, do not use the Service.",
+
+  "landing.tos_link": "Terms of Service",
+
   "lang.en": "English",
   "lang.pt-BR": "Portugu\u00eas (Brasil)"
 }

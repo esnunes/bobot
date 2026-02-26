@@ -236,6 +236,7 @@ func (s *Server) loadTemplates() error {
 	templateDefs := map[string]string{
 		"landing":           "templates/landing.html",
 		"privacy":           "templates/privacy.html",
+		"tos":               "templates/tos.html",
 		"login":             "templates/login.html",
 		"signup":            "templates/signup.html",
 		"chats":             "templates/chats.html",
@@ -289,6 +290,10 @@ func (s *Server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePrivacyPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "privacy", PageData{Title: "Privacy Policy"})
+}
+
+func (s *Server) handleTosPage(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, "tos", PageData{Title: "Terms of Service"})
 }
 
 func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
