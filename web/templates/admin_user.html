@@ -9,62 +9,62 @@
     <main class="admin-list">
         <div class="admin-user-info">
             <div class="admin-user-info-row">
-                <span class="admin-user-info-label">Username</span>
+                <span class="admin-user-info-label">{{t .Lang "admin_user.username"}}</span>
                 <span>{{.AdminUserDetail.Username}}</span>
             </div>
             <div class="admin-user-info-row">
-                <span class="admin-user-info-label">Role</span>
+                <span class="admin-user-info-label">{{t .Lang "admin_user.role"}}</span>
                 <span class="admin-badge {{.AdminUserDetail.Role}}">{{.AdminUserDetail.Role}}</span>
             </div>
             {{if .AdminUserDetail.Blocked}}
             <div class="admin-user-info-row">
-                <span class="admin-user-info-label">Status</span>
-                <span class="admin-badge blocked">blocked</span>
+                <span class="admin-user-info-label">{{t .Lang "admin_user.status"}}</span>
+                <span class="admin-badge blocked">{{t .Lang "admin.blocked"}}</span>
             </div>
             {{end}}
             <div class="admin-user-info-row">
-                <span class="admin-user-info-label">Joined</span>
+                <span class="admin-user-info-label">{{t .Lang "admin_user.joined"}}</span>
                 <span>{{.AdminUserDetail.CreatedAt}}</span>
             </div>
             <div class="admin-user-info-row">
-                <span class="admin-user-info-label">Last message</span>
+                <span class="admin-user-info-label">{{t .Lang "admin_user.last_message"}}</span>
                 <span>{{.AdminUserDetail.LastMessageAt}}</span>
             </div>
             <div class="admin-user-info-row">
-                <span class="admin-user-info-label">Messages</span>
+                <span class="admin-user-info-label">{{t .Lang "admin_user.messages"}}</span>
                 <span>{{.AdminUserDetail.MessageCount}}</span>
             </div>
         </div>
 
         <details class="context-section" open>
-            <summary class="context-section-title">Topics ({{len .AdminUserDetail.Topics}})</summary>
+            <summary class="context-section-title">{{t .Lang "admin_user.topics"}} ({{len .AdminUserDetail.Topics}})</summary>
             {{if .AdminUserDetail.Topics}}
                 {{range .AdminUserDetail.Topics}}
                 <button hx-get="/admin/topics/{{.ID}}/context?from={{$.AdminUserDetail.ID}}" hx-target="body" class="admin-item">
                     <div class="admin-item-header">
                         <span class="admin-item-name">{{.Name}}</span>
-                        {{if .IsOwner}}<span class="admin-badge admin">owner</span>{{else}}<span class="admin-badge user">member</span>{{end}}
-                        {{if .AutoRespond}}<span class="admin-badge assistant">auto</span>{{end}}
+                        {{if .IsOwner}}<span class="admin-badge admin">{{t $.Lang "admin_user.owner"}}</span>{{else}}<span class="admin-badge user">{{t $.Lang "admin_user.member"}}</span>{{end}}
+                        {{if .AutoRespond}}<span class="admin-badge assistant">{{t $.Lang "admin_user.auto"}}</span>{{end}}
                     </div>
-                    <span class="admin-item-meta">{{.MemberCount}} members &middot; Created {{.CreatedAt}}</span>
+                    <span class="admin-item-meta">{{t $.Lang "admin_user.members_count" .MemberCount}} &middot; {{t $.Lang "admin_user.created" .CreatedAt}}</span>
                 </button>
                 {{end}}
             {{else}}
-                <div class="empty">No topics.</div>
+                <div class="empty">{{t .Lang "admin_user.no_topics"}}</div>
             {{end}}
         </details>
 
         <details class="context-section">
-            <summary class="context-section-title">Profile</summary>
+            <summary class="context-section-title">{{t .Lang "admin_user.profile"}}</summary>
             {{if .AdminUserDetail.Profile}}
                 <pre class="context-pre"><code>{{.AdminUserDetail.Profile}}</code></pre>
             {{else}}
-                <div class="empty">No profile generated yet.</div>
+                <div class="empty">{{t .Lang "admin_user.no_profile"}}</div>
             {{end}}
         </details>
 
         <details class="context-section">
-            <summary class="context-section-title">Skills ({{len .AdminUserDetail.Skills}})</summary>
+            <summary class="context-section-title">{{t .Lang "admin_user.skills"}} ({{len .AdminUserDetail.Skills}})</summary>
             {{if .AdminUserDetail.Skills}}
                 {{range .AdminUserDetail.Skills}}
                 <div class="admin-item admin-item--static">
@@ -76,40 +76,40 @@
                 </div>
                 {{end}}
             {{else}}
-                <div class="empty">No skills.</div>
+                <div class="empty">{{t .Lang "admin_user.no_skills"}}</div>
             {{end}}
         </details>
 
         <details class="context-section">
-            <summary class="context-section-title">Push Subscriptions ({{len .AdminUserDetail.PushSubs}})</summary>
+            <summary class="context-section-title">{{t .Lang "admin_user.push_subs"}} ({{len .AdminUserDetail.PushSubs}})</summary>
             {{if .AdminUserDetail.PushSubs}}
                 {{range .AdminUserDetail.PushSubs}}
                 <div class="admin-item admin-item--static">
                     <div class="admin-item-header">
                         <span class="admin-item-name admin-item-name--mono">{{.Endpoint}}</span>
                     </div>
-                    <span class="admin-item-meta">Created {{.CreatedAt}}</span>
+                    <span class="admin-item-meta">{{t $.Lang "admin_user.created" .CreatedAt}}</span>
                 </div>
                 {{end}}
             {{else}}
-                <div class="empty">No push subscriptions.</div>
+                <div class="empty">{{t .Lang "admin_user.no_push_subs"}}</div>
             {{end}}
         </details>
 
         <details class="context-section">
-            <summary class="context-section-title">Read Status ({{len .AdminUserDetail.ReadStatus}})</summary>
+            <summary class="context-section-title">{{t .Lang "admin_user.read_status"}} ({{len .AdminUserDetail.ReadStatus}})</summary>
             {{if .AdminUserDetail.ReadStatus}}
                 {{range .AdminUserDetail.ReadStatus}}
                 <div class="admin-item admin-item--static">
                     <div class="admin-item-header">
                         <span class="admin-item-name">{{.TopicName}}</span>
-                        {{if .LastReadMessageID}}<span class="admin-item-meta">msg #{{.LastReadMessageID}}</span>{{end}}
+                        {{if .LastReadMessageID}}<span class="admin-item-meta">{{t $.Lang "admin_user.msg_id" .LastReadMessageID}}</span>{{end}}
                     </div>
                     <span class="admin-item-meta">{{.ReadAt}}</span>
                 </div>
                 {{end}}
             {{else}}
-                <div class="empty">No read data.</div>
+                <div class="empty">{{t .Lang "admin_user.no_read_data"}}</div>
             {{end}}
         </details>
     </main>

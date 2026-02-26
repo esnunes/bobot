@@ -1584,6 +1584,42 @@ header {
   color: var(--colors-danger);
 }
 
+.settings-language-form {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.settings-language-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 36px;
+  padding: 0 var(--space-4) 0 var(--space-2);
+  border: var(--borders-thin);
+  border-radius: var(--radii-md);
+  font-size: var(--font-sizes-1);
+  font-family: var(--fonts-body);
+  color: var(--colors-text);
+  background-color: var(--colors-background);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236c6f85' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+  transition: border-color var(--transitions-fast);
+}
+
+.settings-language-form select:hover {
+  border-color: var(--colors-border-strong);
+}
+
+.settings-language-form select:focus {
+  outline: none;
+  border-color: var(--colors-accent);
+  box-shadow: 0 0 0 2px var(--colors-accent-light);
+}
+
 .settings-display-name-form {
   display: flex;
   flex-direction: column;

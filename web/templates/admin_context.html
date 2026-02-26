@@ -8,12 +8,12 @@
 
     <div class="context-toolbar">
         <div class="context-summary">
-            <span>{{len .Context.Messages}} messages</span>
-            <span>{{.Context.TotalTokens}} / {{.Context.MaxTokens}} tokens</span>
+            <span>{{t .Lang "admin_context.messages_count" (len .Context.Messages)}}</span>
+            <span>{{t .Lang "admin_context.tokens" .Context.TotalTokens .Context.MaxTokens}}</span>
         </div>
         <div class="context-toggle">
-            <button class="context-toggle-btn active" data-view="structured">Structured</button>
-            <button class="context-toggle-btn" data-view="raw">Raw JSON</button>
+            <button class="context-toggle-btn active" data-view="structured">{{t .Lang "admin_context.structured"}}</button>
+            <button class="context-toggle-btn" data-view="raw">{{t .Lang "admin_context.raw_json"}}</button>
         </div>
     </div>
 
@@ -21,7 +21,7 @@
         <div id="structured-view">
             {{if .Context.Members}}
             <details class="context-section">
-                <summary class="context-section-title">Members ({{len .Context.Members}})</summary>
+                <summary class="context-section-title">{{t .Lang "admin_context.members"}} ({{len .Context.Members}})</summary>
                 {{range .Context.Members}}
                 <button hx-get="/admin/users/{{.UserID}}" hx-target="body" class="context-member">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}} <span class="admin-item-meta">@{{.Username}}</span></button>
                 {{end}}
@@ -29,12 +29,12 @@
             {{end}}
 
             <details class="context-section">
-                <summary class="context-section-title">System Prompt</summary>
+                <summary class="context-section-title">{{t .Lang "admin_context.system_prompt"}}</summary>
                 <pre class="context-pre"><code>{{.Context.SystemPrompt}}</code></pre>
             </details>
 
             <details class="context-section" open>
-                <summary class="context-section-title">Messages ({{len .Context.Messages}})</summary>
+                <summary class="context-section-title">{{t .Lang "admin_context.messages"}} ({{len .Context.Messages}})</summary>
                 {{if .Context.Messages}}
                     {{range .Context.Messages}}
                     <div class="context-message">
@@ -42,7 +42,7 @@
                             <span class="admin-badge {{.Role}}">{{.Role}}</span>
                             {{if .SenderName}}<span class="context-message-sender">{{.SenderName}}</span>{{end}}
                             <span class="context-message-timestamp">{{.Timestamp}}</span>
-                            <span class="context-message-tokens">{{.Tokens}} tokens</span>
+                            <span class="context-message-tokens">{{t $.Lang "admin_context.tokens_label" .Tokens}}</span>
                         </div>
                         {{if .Content}}
                         <div class="context-message-content" data-role="{{.Role}}">{{.Content}}</div>
@@ -53,7 +53,7 @@
                             {{if eq .Type "tool_use"}}
                             <div class="context-tool-block tool-use">
                                 <div class="context-tool-block-header">
-                                    <span class="context-tool-block-label">tool_use</span>
+                                    <span class="context-tool-block-label">{{t $.Lang "admin_context.tool_use"}}</span>
                                     <span class="context-tool-block-name">{{.ToolName}}</span>
                                     <span class="context-tool-block-id">{{.ToolID}}</span>
                                 </div>
@@ -62,7 +62,7 @@
                             {{else if eq .Type "tool_result"}}
                             <div class="context-tool-block tool-result">
                                 <div class="context-tool-block-header">
-                                    <span class="context-tool-block-label">tool_result</span>
+                                    <span class="context-tool-block-label">{{t $.Lang "admin_context.tool_result"}}</span>
                                     <span class="context-tool-block-id">{{.ToolID}}</span>
                                 </div>
                                 {{if .ResultStr}}<div class="context-tool-block-result">{{.ResultStr}}</div>{{end}}
@@ -73,7 +73,7 @@
                         {{end}}
                         {{if and .RawContent (ne .RawContent .Content) (not .ToolBlocks)}}
                         <details class="context-raw-detail">
-                            <summary>raw_content</summary>
+                            <summary>{{t $.Lang "admin_context.raw_content"}}</summary>
                             <pre class="context-pre"><code>{{.RawContent}}</code></pre>
                         </details>
                         {{end}}
@@ -83,12 +83,12 @@
                     {{end}}
                     {{end}}
                 {{else}}
-                    <div class="empty">No messages in context window.</div>
+                    <div class="empty">{{t .Lang "admin_context.no_messages"}}</div>
                 {{end}}
             </details>
 
             <details class="context-section">
-                <summary class="context-section-title">Tools ({{len .Context.Tools}})</summary>
+                <summary class="context-section-title">{{t .Lang "admin_context.tools"}} ({{len .Context.Tools}})</summary>
                 {{if .Context.Tools}}
                     {{range .Context.Tools}}
                     <div class="context-tool">
@@ -97,7 +97,7 @@
                     </div>
                     {{end}}
                 {{else}}
-                    <div class="empty">No tools.</div>
+                    <div class="empty">{{t .Lang "admin_context.no_tools"}}</div>
                 {{end}}
             </details>
         </div>

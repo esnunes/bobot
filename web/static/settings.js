@@ -5,6 +5,9 @@
 (function() {
     'use strict';
 
+    var i18nEl = document.querySelector('script[data-i18n]');
+    var i18n = i18nEl ? JSON.parse(i18nEl.textContent) : {};
+
     var container = document.querySelector('[data-page="settings"]');
     if (!container) return;
 
@@ -98,7 +101,7 @@
     var deleteBtn = document.getElementById('delete-btn');
     if (deleteBtn && topicId) {
         deleteBtn.addEventListener('click', function() {
-            if (!confirm('Are you sure you want to delete this topic? This cannot be undone.')) return;
+            if (!confirm(i18n.confirm_delete_topic || 'Are you sure you want to delete this topic?')) return;
             fetch('/api/topics/' + topicId, { method: 'DELETE' })
                 .then(function(resp) {
                     if (!resp.ok) throw new Error('Failed to delete topic');
@@ -106,7 +109,7 @@
                 })
                 .catch(function(err) {
                     console.error('Failed to delete topic:', err);
-                    alert('Failed to delete topic');
+                    alert(i18n.error_delete_topic || 'Failed to delete topic');
                 });
         });
     }
@@ -115,7 +118,7 @@
     var leaveBtn = document.getElementById('leave-btn');
     if (leaveBtn && topicId && currentUserId) {
         leaveBtn.addEventListener('click', function() {
-            if (!confirm('Are you sure you want to leave this topic?')) return;
+            if (!confirm(i18n.confirm_leave_topic || 'Are you sure you want to leave this topic?')) return;
             fetch('/api/topics/' + topicId + '/members/' + currentUserId, { method: 'DELETE' })
                 .then(function(resp) {
                     if (!resp.ok) throw new Error('Failed to leave topic');
@@ -123,7 +126,7 @@
                 })
                 .catch(function(err) {
                     console.error('Failed to leave topic:', err);
-                    alert('Failed to leave topic');
+                    alert(i18n.error_leave_topic || 'Failed to leave topic');
                 });
         });
     }

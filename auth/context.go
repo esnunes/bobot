@@ -6,8 +6,9 @@ import "context"
 type userDataKey struct{}
 
 type UserData struct {
-	UserID int64
-	Role   string
+	UserID   int64
+	Role     string
+	Language string
 }
 
 // ContextWithUserData returns a new context with the user data stored.

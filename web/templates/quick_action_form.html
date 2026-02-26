@@ -2,7 +2,7 @@
 <div class="skill-form-container" data-page="quick-action-form">
     <header>
         <button hx-get="/quickactions?topic_id={{.TopicID}}" hx-target="body" aria-label="Back"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-        <h1>{{if .QuickAction}}Edit Quick Action{{else}}New Quick Action{{end}}</h1>
+        <h1>{{if .QuickAction}}{{t .Lang "quick_actions.edit_title"}}{{else}}{{t .Lang "quick_actions.new_title"}}{{end}}</h1>
         <div></div>
     </header>
 
@@ -14,36 +14,36 @@
         {{end}}
             <input type="hidden" name="topic_id" value="{{.TopicID}}">
 
-            <label for="qa-label">Label</label>
-            <input type="text" id="qa-label" name="label" placeholder="e.g. Turn on AC" required maxlength="100" {{if .QuickAction}}value="{{.QuickAction.Label}}"{{else}}autofocus{{end}}>
+            <label for="qa-label">{{t .Lang "quick_actions.label"}}</label>
+            <input type="text" id="qa-label" name="label" placeholder="{{t .Lang "quick_actions.label_placeholder"}}" required maxlength="100" {{if .QuickAction}}value="{{.QuickAction.Label}}"{{else}}autofocus{{end}}>
 
-            <label for="qa-message">Message</label>
-            <textarea id="qa-message" name="message" placeholder="e.g. @bobot turn on the AC in the living room" required maxlength="2000" rows="4">{{if .QuickAction}}{{.QuickAction.Message}}{{end}}</textarea>
+            <label for="qa-message">{{t .Lang "quick_actions.message"}}</label>
+            <textarea id="qa-message" name="message" placeholder="{{t .Lang "quick_actions.message_placeholder"}}" required maxlength="2000" rows="4">{{if .QuickAction}}{{.QuickAction.Message}}{{end}}</textarea>
 
-            <label>Mode</label>
+            <label>{{t .Lang "quick_actions.mode"}}</label>
             <div class="radio-group">
                 <label class="radio-label">
                     <input type="radio" name="mode" value="send" {{if or (not .QuickAction) (eq .QuickAction.Mode "send")}}checked{{end}}>
-                    <span>Send immediately</span>
+                    <span>{{t .Lang "quick_actions.mode_send"}}</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="mode" value="fill" {{if and .QuickAction (eq .QuickAction.Mode "fill")}}checked{{end}}>
-                    <span>Fill input for editing</span>
+                    <span>{{t .Lang "quick_actions.mode_fill"}}</span>
                 </label>
             </div>
 
             <div class="skill-form-actions">
                 {{if .QuickAction}}
-                <button type="button" class="danger-btn" hx-delete="/quickactions/{{.QuickAction.ID}}" hx-confirm="Delete quick action '{{.QuickAction.Label}}'?" hx-target="body">Delete</button>
+                <button type="button" class="danger-btn" hx-delete="/quickactions/{{.QuickAction.ID}}" hx-confirm="{{t .Lang "quick_actions.delete_confirm" .QuickAction.Label}}" hx-target="body">{{t .Lang "quick_actions.delete"}}</button>
                 <div class="skill-form-actions-right">
-                    <button type="button" hx-get="/quickactions?topic_id={{.TopicID}}" hx-target="body">Cancel</button>
-                    <button type="submit" class="primary-btn">Save</button>
+                    <button type="button" hx-get="/quickactions?topic_id={{.TopicID}}" hx-target="body">{{t .Lang "quick_actions.cancel"}}</button>
+                    <button type="submit" class="primary-btn">{{t .Lang "quick_actions.save"}}</button>
                 </div>
                 {{else}}
                 <div></div>
                 <div class="skill-form-actions-right">
-                    <button type="button" hx-get="/quickactions?topic_id={{.TopicID}}" hx-target="body">Cancel</button>
-                    <button type="submit" class="primary-btn">Create</button>
+                    <button type="button" hx-get="/quickactions?topic_id={{.TopicID}}" hx-target="body">{{t .Lang "quick_actions.cancel"}}</button>
+                    <button type="submit" class="primary-btn">{{t .Lang "quick_actions.create_btn"}}</button>
                 </div>
                 {{end}}
             </div>

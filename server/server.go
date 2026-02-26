@@ -149,6 +149,7 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /chats/{id}", s.sessionMiddleware(s.handleTopicChatPage))
 	s.router.HandleFunc("GET /settings", s.sessionMiddleware(s.handleSettingsPage))
 	s.router.HandleFunc("POST /api/user/display-name", s.sessionMiddleware(s.handleUpdateDisplayName))
+	s.router.HandleFunc("POST /api/user/language", s.sessionMiddleware(s.handleUpdateLanguage))
 
 	// Service worker (must be served at root scope)
 	s.router.HandleFunc("GET /sw.js", func(w http.ResponseWriter, r *http.Request) {
@@ -218,16 +219,24 @@ func (s *Server) sessionMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 
-			// Reissue token
-			newToken, err := s.session.CreateToken(token.UserID, token.Role)
+			// Reissue token with language from DB
+			newToken, err := s.session.CreateToken(token.UserID, user.Role, user.Language)
 			if err == nil {
 				s.setSessionCookie(w, newToken)
+				token.Language = user.Language
 			}
 		}
 
+		// Default language for old tokens that don't have it
+		lang := token.Language
+		if lang == "" {
+			lang = "pt-BR"
+		}
+
 		ctx := auth.ContextWithUserData(r.Context(), auth.UserData{
-			UserID: token.UserID,
-			Role:   token.Role,
+			UserID:   token.UserID,
+			Role:     token.Role,
+			Language: lang,
 		})
 		next(w, r.WithContext(ctx))
 	}

@@ -43,7 +43,7 @@ func (s *Server) handleAdminPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	s.render(w, "admin", PageData{
+	s.render(w, r, "admin", PageData{
 		Title:      "Admin",
 		IsAdmin:    true,
 		AdminUsers: adminUsers,
@@ -179,7 +179,7 @@ func (s *Server) handleAdminUserPage(w http.ResponseWriter, r *http.Request) {
 		displayName = user.Username
 	}
 
-	s.render(w, "admin_user", PageData{
+	s.render(w, r, "admin_user", PageData{
 		Title:   "User - " + displayName,
 		IsAdmin: true,
 		AdminUserDetail: &AdminUserDetailView{
@@ -265,7 +265,7 @@ func (s *Server) handleAdminTopicContextPage(w http.ResponseWriter, r *http.Requ
 
 	pageData := buildContextPageData(topic.Name, inspection, s.cfg.LLM.Model, readPositions, senderNames, memberViews)
 	pageData.Context.BackURL = backURL
-	s.render(w, "admin_context", pageData)
+	s.render(w, r, "admin_context", pageData)
 }
 
 // resolveReadPosition finds the highest context message ID where msg.ID <= lastReadID.

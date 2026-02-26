@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -9,16 +8,19 @@ import (
 
 	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
+	"github.com/esnunes/bobot/i18n"
 )
 
 func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
+	lang := i18n.MatchLanguage(r.Header.Get("Accept-Language"))
+
 	// GET request - show signup form
 	if r.Method == http.MethodGet {
 		code := r.URL.Query().Get("code")
 		if code == "" {
-			s.render(w, "signup", PageData{
+			s.render(w, r, "signup", PageData{
 				Title: "Sign Up",
-				Error: "Invite code required",
+				Error: i18n.T(lang, "signup.error.invite_required"),
 			})
 			return
 		}
@@ -26,14 +28,14 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 		// Validate code exists and is valid
 		invite, err := s.db.GetInviteByCode(code)
 		if err != nil || invite.UsedBy != nil || invite.Revoked {
-			s.render(w, "signup", PageData{
+			s.render(w, r, "signup", PageData{
 				Title: "Sign Up",
-				Error: "Invalid or expired invite",
+				Error: i18n.T(lang, "signup.error.invite_invalid"),
 			})
 			return
 		}
 
-		s.render(w, "signup", PageData{
+		s.render(w, r, "signup", PageData{
 			Title: "Sign Up",
 			Code:  code,
 		})
@@ -42,7 +44,7 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 	// POST request - handle signup
 	if err := r.ParseForm(); err != nil {
-		s.render(w, "signup", PageData{Title: "Sign Up", Error: "Invalid request"})
+		s.render(w, r, "signup", PageData{Title: "Sign Up", Error: i18n.T(lang, "signup.error.invalid_request")})
 		return
 	}
 
@@ -54,39 +56,39 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	// Validate invite code
 	invite, err := s.db.GetInviteByCode(code)
 	if err != nil || invite.UsedBy != nil || invite.Revoked {
-		s.render(w, "signup", PageData{
+		s.render(w, r, "signup", PageData{
 			Title: "Sign Up",
-			Error: "Invalid or expired invite",
+			Error: i18n.T(lang, "signup.error.invite_invalid"),
 			Code:  code,
 		})
 		return
 	}
 
 	// Validate username
-	if err := validateUsername(username); err != nil {
-		s.render(w, "signup", PageData{
+	if errKey := validateUsername(username); errKey != "" {
+		s.render(w, r, "signup", PageData{
 			Title: "Sign Up",
-			Error: err.Error(),
+			Error: i18n.T(lang, errKey),
 			Code:  code,
 		})
 		return
 	}
 
 	// Validate display name
-	if err := validateDisplayName(displayName); err != nil {
-		s.render(w, "signup", PageData{
+	if errKey := validateDisplayName(displayName); errKey != "" {
+		s.render(w, r, "signup", PageData{
 			Title: "Sign Up",
-			Error: err.Error(),
+			Error: i18n.T(lang, errKey),
 			Code:  code,
 		})
 		return
 	}
 
 	// Validate password
-	if err := validatePassword(password); err != nil {
-		s.render(w, "signup", PageData{
+	if errKey := validatePassword(password); errKey != "" {
+		s.render(w, r, "signup", PageData{
 			Title: "Sign Up",
-			Error: err.Error(),
+			Error: i18n.T(lang, errKey),
 			Code:  code,
 		})
 		return
@@ -95,9 +97,9 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	// Hash password
 	passwordHash, err := auth.HashPassword(password)
 	if err != nil {
-		s.render(w, "signup", PageData{
+		s.render(w, r, "signup", PageData{
 			Title: "Sign Up",
-			Error: "Internal error",
+			Error: i18n.T(lang, "signup.error.internal"),
 			Code:  code,
 		})
 		return
@@ -106,9 +108,9 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 	// Create user
 	user, err := s.db.CreateUserFull(username, passwordHash, displayName, "user")
 	if err != nil {
-		s.render(w, "signup", PageData{
+		s.render(w, r, "signup", PageData{
 			Title: "Sign Up",
-			Error: "Username already taken",
+			Error: i18n.T(lang, "signup.error.username_taken"),
 			Code:  code,
 		})
 		return
@@ -132,20 +134,20 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 	// Mark invite as used
 	if err := s.db.UseInvite(code, user.ID); err != nil {
-		s.render(w, "signup", PageData{
+		s.render(w, r, "signup", PageData{
 			Title: "Sign Up",
-			Error: "Internal error",
+			Error: i18n.T(lang, "signup.error.internal"),
 			Code:  code,
 		})
 		return
 	}
 
-	// Create session token
-	token, err := s.session.CreateToken(user.ID, user.Role)
+	// Create session token (new user gets default language from DB)
+	token, err := s.session.CreateToken(user.ID, user.Role, user.Language)
 	if err != nil {
-		s.render(w, "signup", PageData{
+		s.render(w, r, "signup", PageData{
 			Title: "Sign Up",
-			Error: "Internal error",
+			Error: i18n.T(lang, "signup.error.internal"),
 			Code:  code,
 		})
 		return
@@ -158,26 +160,29 @@ func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
 
 var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
-func validateUsername(username string) error {
+// validateUsername returns an i18n key if validation fails, or empty string if valid.
+func validateUsername(username string) string {
 	if len(username) < 3 {
-		return fmt.Errorf("username must be at least 3 characters")
+		return "signup.error.username_min"
 	}
 	if !usernameRegex.MatchString(username) {
-		return fmt.Errorf("username can only contain letters, numbers, and underscores")
+		return "signup.error.username_chars"
 	}
-	return nil
+	return ""
 }
 
-func validatePassword(password string) error {
+// validatePassword returns an i18n key if validation fails, or empty string if valid.
+func validatePassword(password string) string {
 	if len(password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters")
+		return "signup.error.password_min"
 	}
-	return nil
+	return ""
 }
 
-func validateDisplayName(name string) error {
+// validateDisplayName returns an i18n key if validation fails, or empty string if valid.
+func validateDisplayName(name string) string {
 	if len(strings.TrimSpace(name)) < 1 {
-		return fmt.Errorf("display name is required")
+		return "signup.error.display_name_required"
 	}
-	return nil
+	return ""
 }

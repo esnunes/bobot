@@ -42,6 +42,7 @@ type User struct {
 	DisplayName  string
 	Role         string // "admin" or "user"
 	Blocked      bool
+	Language     string
 	CreatedAt    time.Time
 }
 
@@ -172,6 +173,11 @@ func (c *CoreDB) migrate() error {
 
 	// Migrate: add blocked column
 	if err := c.addColumnIfMissing("users", "blocked", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// Migrate: add language column
+	if err := c.addColumnIfMissing("users", "language", "TEXT NOT NULL DEFAULT 'pt-BR'"); err != nil {
 		return err
 	}
 
@@ -720,9 +726,9 @@ func (c *CoreDB) GetUserByUsername(username string) (*User, error) {
 	var user User
 	var blocked int
 	err := c.db.QueryRow(
-		"SELECT id, username, password_hash, display_name, role, blocked, created_at FROM users WHERE username = ?",
+		"SELECT id, username, password_hash, display_name, role, blocked, language, created_at FROM users WHERE username = ?",
 		username,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.Language, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -738,9 +744,9 @@ func (c *CoreDB) GetUserByID(id int64) (*User, error) {
 	var user User
 	var blocked int
 	err := c.db.QueryRow(
-		"SELECT id, username, password_hash, display_name, role, blocked, created_at FROM users WHERE id = ?",
+		"SELECT id, username, password_hash, display_name, role, blocked, language, created_at FROM users WHERE id = ?",
 		id,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.Language, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -1503,6 +1509,12 @@ func (c *CoreDB) GetUnreadChats(userID int64) (map[int64]bool, error) {
 // UpdateUserDisplayName updates the display name for a user.
 func (c *CoreDB) UpdateUserDisplayName(userID int64, displayName string) error {
 	_, err := c.db.Exec("UPDATE users SET display_name = ? WHERE id = ?", displayName, userID)
+	return err
+}
+
+// UpdateUserLanguage updates the language preference for a user.
+func (c *CoreDB) UpdateUserLanguage(userID int64, language string) error {
+	_, err := c.db.Exec("UPDATE users SET language = ? WHERE id = ?", language, userID)
 	return err
 }
 

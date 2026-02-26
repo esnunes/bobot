@@ -44,7 +44,7 @@ func (s *Server) handleSkillsPage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	s.render(w, "skills", PageData{
+	s.render(w, r, "skills", PageData{
 		Title:     "Skills",
 		TopicID:   topicID,
 		TopicName: topic.Name,
@@ -91,7 +91,7 @@ func (s *Server) handleSkillFormPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		s.render(w, "skill_form", PageData{
+		s.render(w, r, "skill_form", PageData{
 			Title:   "Edit Skill",
 			TopicID: skill.TopicID,
 			Skill: &SkillView{
@@ -105,7 +105,7 @@ func (s *Server) handleSkillFormPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// New skill form
-	s.render(w, "skill_form", PageData{
+	s.render(w, r, "skill_form", PageData{
 		Title:   "New Skill",
 		TopicID: topicID,
 	})
