@@ -1822,19 +1822,22 @@ header {
   box-shadow: 0 0 0 2px var(--colors-accent-light);
 }
 
-.settings-display-name-form {
+.settings-display-name-form,
+.settings-email-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
 }
 
-.settings-display-name-row {
+.settings-display-name-row,
+.settings-email-row {
   display: flex;
   gap: var(--space-1);
   align-items: center;
 }
 
-.settings-display-name-row input {
+.settings-display-name-row input,
+.settings-email-row input {
   flex: 1;
   height: var(--sizes-input-height);
   padding: 0 var(--space-2);
@@ -1843,6 +1846,14 @@ header {
   font-size: var(--font-sizes-2);
   font-family: var(--fonts-body);
   background: var(--colors-background);
+}
+
+.settings-gravatar-preview {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .settings-save-btn {

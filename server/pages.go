@@ -2,7 +2,9 @@
 package server
 
 import (
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
 	"regexp"
@@ -34,9 +36,10 @@ type MessageView struct {
 }
 
 type MemberView struct {
-	UserID      int64
-	Username    string
-	DisplayName string
+	UserID      int64  `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	GravatarURL string `json:"gravatar_url,omitempty"`
 }
 
 type SkillView struct {
@@ -190,6 +193,8 @@ type PageData struct {
 	AutoRespond     bool
 	IsBobotTopic           bool
 	DisplayName            string
+	Email                  string
+	GravatarURL            string
 	SupportedLanguages     []string
 	UserLanguage           string
 	GoogleCalendarEnabled  bool
@@ -445,7 +450,14 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 	for i := range dbMembers {
 		senderMap[dbMembers[i].UserID] = &dbMembers[i]
 	}
-	members := make([]MemberView, 0, len(dbMembers))
+	// Build members with Gravatar URLs; prepend bobot as first member for color assignment
+	members := make([]MemberView, 0, len(dbMembers)+1)
+	members = append(members, MemberView{
+		UserID:      db.BobotUserID,
+		Username:    "bobot",
+		DisplayName: "bobot",
+		GravatarURL: "/static/bobot-avatar.svg",
+	})
 	var pushMuted bool
 	var autoRead bool
 	for _, m := range dbMembers {
@@ -453,6 +465,7 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 			UserID:      m.UserID,
 			Username:    m.Username,
 			DisplayName: m.DisplayName,
+			GravatarURL: gravatarURL(m.Email, 80),
 		})
 		if m.UserID == userData.UserID {
 			pushMuted = m.Muted
@@ -511,6 +524,7 @@ func (s *Server) handleTopicChatPage(w http.ResponseWriter, r *http.Request) {
 	jsonData, _ := json.Marshal(map[string]any{
 		"current_user_id":          userData.UserID,
 		"messages":                 jsonMessages,
+		"members":                  members,
 		"auto_respond":             topic.AutoRespond,
 		"quick_actions":            jsonQuickActions,
 		"can_manage_quick_actions": canManageQA,
@@ -555,6 +569,8 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 		CurrentUserID:      userData.UserID,
 		IsAdmin:            userData.Role == "admin",
 		DisplayName:        user.DisplayName,
+		Email:              user.Email,
+		GravatarURL:        gravatarURL(user.Email, 80),
 		SupportedLanguages: i18n.SupportedLanguages(),
 		UserLanguage:       user.Language,
 	}
@@ -710,4 +726,37 @@ func (s *Server) handleUpdateLanguage(w http.ResponseWriter, r *http.Request) {
 	// Force full page reload to apply new language
 	w.Header().Set("HX-Redirect", r.Header.Get("HX-Current-URL"))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleUpdateEmail(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	email := strings.TrimSpace(strings.ToLower(r.FormValue("email")))
+	if len(email) > 254 {
+		http.Error(w, "email too long", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.db.UpdateUserEmail(userData.UserID, email); err != nil {
+		http.Error(w, "failed to update email", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"gravatar_url": gravatarURL(email, 80),
+	})
+}
+
+func gravatarURL(email string, size int) string {
+	if email == "" {
+		return fmt.Sprintf("https://www.gravatar.com/avatar/?d=mp&s=%d", size)
+	}
+	hash := md5.Sum([]byte(strings.TrimSpace(strings.ToLower(email))))
+	return fmt.Sprintf("https://www.gravatar.com/avatar/%x?d=mp&s=%d", hash, size)
 }

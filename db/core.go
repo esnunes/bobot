@@ -43,6 +43,7 @@ type User struct {
 	Role         string // "admin" or "user"
 	Blocked      bool
 	Language     string
+	Email        string
 	CreatedAt    time.Time
 }
 
@@ -81,6 +82,7 @@ type TopicMember struct {
 	UserID      int64
 	Username    string
 	DisplayName string
+	Email       string
 	JoinedAt    time.Time
 	Muted       bool
 	AutoRead    bool
@@ -178,6 +180,11 @@ func (c *CoreDB) migrate() error {
 
 	// Migrate: add language column
 	if err := c.addColumnIfMissing("users", "language", "TEXT NOT NULL DEFAULT 'pt-BR'"); err != nil {
+		return err
+	}
+
+	// Migrate: add email column
+	if err := c.addColumnIfMissing("users", "email", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
 
@@ -726,9 +733,9 @@ func (c *CoreDB) GetUserByUsername(username string) (*User, error) {
 	var user User
 	var blocked int
 	err := c.db.QueryRow(
-		"SELECT id, username, password_hash, display_name, role, blocked, language, created_at FROM users WHERE username = ?",
+		"SELECT id, username, password_hash, display_name, role, blocked, language, email, created_at FROM users WHERE username = ?",
 		username,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.Language, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.Language, &user.Email, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -744,9 +751,9 @@ func (c *CoreDB) GetUserByID(id int64) (*User, error) {
 	var user User
 	var blocked int
 	err := c.db.QueryRow(
-		"SELECT id, username, password_hash, display_name, role, blocked, language, created_at FROM users WHERE id = ?",
+		"SELECT id, username, password_hash, display_name, role, blocked, language, email, created_at FROM users WHERE id = ?",
 		id,
-	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.Language, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.DisplayName, &user.Role, &blocked, &user.Language, &user.Email, &user.CreatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -920,7 +927,7 @@ func (c *CoreDB) UnblockUser(userID int64) error {
 
 func (c *CoreDB) ListUsers() ([]User, error) {
 	rows, err := c.db.Query(`
-		SELECT id, username, password_hash, display_name, role, blocked, created_at
+		SELECT id, username, password_hash, display_name, role, blocked, language, email, created_at
 		FROM users
 		ORDER BY created_at ASC
 	`)
@@ -933,7 +940,7 @@ func (c *CoreDB) ListUsers() ([]User, error) {
 	for rows.Next() {
 		var u User
 		var blocked int
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &blocked, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &blocked, &u.Language, &u.Email, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		u.Blocked = blocked == 1
@@ -989,7 +996,7 @@ func (c *CoreDB) GetUserMessagesSince(userID int64, sinceMessageID int64) ([]Mes
 // ListActiveUsers returns all non-blocked, non-system users.
 func (c *CoreDB) ListActiveUsers() ([]User, error) {
 	rows, err := c.db.Query(`
-		SELECT id, username, password_hash, display_name, role, blocked, created_at
+		SELECT id, username, password_hash, display_name, role, blocked, language, email, created_at
 		FROM users
 		WHERE id != 0 AND blocked = 0
 		ORDER BY id ASC
@@ -1003,7 +1010,7 @@ func (c *CoreDB) ListActiveUsers() ([]User, error) {
 	for rows.Next() {
 		var u User
 		var blocked int
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &blocked, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &blocked, &u.Language, &u.Email, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		u.Blocked = blocked == 1
@@ -1189,7 +1196,7 @@ func (c *CoreDB) SoftDeleteTopic(topicID int64) error {
 // GetTopicMembers retrieves all members of a topic.
 func (c *CoreDB) GetTopicMembers(topicID int64) ([]TopicMember, error) {
 	rows, err := c.db.Query(`
-		SELECT u.id, u.username, u.display_name, tm.joined_at, tm.muted, tm.auto_read
+		SELECT u.id, u.username, u.display_name, u.email, tm.joined_at, tm.muted, tm.auto_read
 		FROM topic_members tm
 		JOIN users u ON tm.user_id = u.id
 		WHERE tm.topic_id = ?
@@ -1203,7 +1210,7 @@ func (c *CoreDB) GetTopicMembers(topicID int64) ([]TopicMember, error) {
 	var members []TopicMember
 	for rows.Next() {
 		var m TopicMember
-		if err := rows.Scan(&m.UserID, &m.Username, &m.DisplayName, &m.JoinedAt, &m.Muted, &m.AutoRead); err != nil {
+		if err := rows.Scan(&m.UserID, &m.Username, &m.DisplayName, &m.Email, &m.JoinedAt, &m.Muted, &m.AutoRead); err != nil {
 			return nil, err
 		}
 		members = append(members, m)
@@ -1515,6 +1522,12 @@ func (c *CoreDB) UpdateUserDisplayName(userID int64, displayName string) error {
 // UpdateUserLanguage updates the language preference for a user.
 func (c *CoreDB) UpdateUserLanguage(userID int64, language string) error {
 	_, err := c.db.Exec("UPDATE users SET language = ? WHERE id = ?", language, userID)
+	return err
+}
+
+// UpdateUserEmail updates the email for a user.
+func (c *CoreDB) UpdateUserEmail(userID int64, email string) error {
+	_, err := c.db.Exec("UPDATE users SET email = ? WHERE id = ?", email, userID)
 	return err
 }
 

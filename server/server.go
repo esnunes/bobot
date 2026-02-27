@@ -163,6 +163,7 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /settings", s.sessionMiddleware(s.handleSettingsPage))
 	s.router.HandleFunc("POST /api/user/display-name", s.sessionMiddleware(s.handleUpdateDisplayName))
 	s.router.HandleFunc("POST /api/user/language", s.sessionMiddleware(s.handleUpdateLanguage))
+	s.router.HandleFunc("POST /api/user/email", s.sessionMiddleware(s.handleUpdateEmail))
 
 	// Service worker (must be served at root scope)
 	s.router.HandleFunc("GET /sw.js", func(w http.ResponseWriter, r *http.Request) {
