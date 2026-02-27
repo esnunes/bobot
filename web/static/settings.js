@@ -133,6 +133,44 @@
         });
     }
 
+    // Spotify link
+    var spotifyLinkBtn = container.querySelector('[data-spotify-link]');
+    if (spotifyLinkBtn) {
+        spotifyLinkBtn.addEventListener('click', function() {
+            var spotifyTopicId = spotifyLinkBtn.getAttribute('data-topic-id');
+            spotifyLinkBtn.disabled = true;
+            fetch('/api/spotify/link?topic_id=' + spotifyTopicId, { method: 'POST' })
+                .then(function(resp) {
+                    if (resp.ok) {
+                        htmx.ajax('GET', '/settings?topic_id=' + spotifyTopicId, { target: 'body', swap: 'innerHTML' });
+                    } else {
+                        console.error('Failed to link Spotify:', resp.status);
+                    }
+                })
+                .catch(function(err) { console.error('Spotify link failed:', err); })
+                .finally(function() { spotifyLinkBtn.disabled = false; });
+        });
+    }
+
+    // Spotify unlink
+    var spotifyUnlinkBtn = container.querySelector('[data-spotify-unlink]');
+    if (spotifyUnlinkBtn) {
+        spotifyUnlinkBtn.addEventListener('click', function() {
+            var spotifyTopicId = spotifyUnlinkBtn.getAttribute('data-topic-id');
+            spotifyUnlinkBtn.disabled = true;
+            fetch('/api/spotify/link?topic_id=' + spotifyTopicId, { method: 'DELETE' })
+                .then(function(resp) {
+                    if (resp.ok) {
+                        htmx.ajax('GET', '/settings?topic_id=' + spotifyTopicId, { target: 'body', swap: 'innerHTML' });
+                    } else {
+                        console.error('Failed to unlink Spotify:', resp.status);
+                    }
+                })
+                .catch(function(err) { console.error('Spotify unlink failed:', err); })
+                .finally(function() { spotifyUnlinkBtn.disabled = false; });
+        });
+    }
+
     // Leave topic
     var leaveBtn = document.getElementById('leave-btn');
     if (leaveBtn && topicId && currentUserId) {

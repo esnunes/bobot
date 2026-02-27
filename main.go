@@ -29,6 +29,7 @@ import (
 	"github.com/esnunes/bobot/tools/task"
 	"github.com/esnunes/bobot/tools/quickaction"
 	"github.com/esnunes/bobot/tools/calendar"
+	"github.com/esnunes/bobot/tools/spotify"
 	"github.com/esnunes/bobot/tools/thinq"
 	"github.com/esnunes/bobot/tools/topic"
 	"github.com/esnunes/bobot/tools/user"
@@ -141,6 +142,18 @@ func main() {
 		registry.Register(calendarTool)
 	}
 
+	// Initialize Spotify tool (optional, only if configured)
+	var spotifyTool *spotify.SpotifyTool
+	if cfg.SpotifyClientID != "" && cfg.SpotifyClientSecret != "" {
+		spotifyDB, err := spotify.NewSpotifyDB(filepath.Join(cfg.DataDir, "tool_spotify.db"))
+		if err != nil {
+			log.Fatalf("Failed to initialize spotify database: %v", err)
+		}
+		defer spotifyDB.Close()
+		spotifyTool = spotify.NewSpotifyTool(spotifyDB, cfg.SpotifyClientID, cfg.SpotifyClientSecret, cfg.BaseURL)
+		registry.Register(spotifyTool)
+	}
+
 	// Initialize web search tool (optional, only if configured)
 	if cfg.BraveSearchAPIKey != "" {
 		registry.Register(websearch.NewTool(cfg.BraveSearchAPIKey))
@@ -180,7 +193,7 @@ func main() {
 	pipeline := server.NewChatPipeline(coreDB, engine, connections, pushSender, cfg)
 
 	// Initialize HTTP server
-	srv := server.NewWithAssistant(cfg, coreDB, engine, registry, pipeline, scheduleDB, calendarTool)
+	srv := server.NewWithAssistant(cfg, coreDB, engine, registry, pipeline, scheduleDB, calendarTool, spotifyTool)
 
 	// Create scheduler
 	sched := scheduler.New(scheduleDB, coreDB, pipeline, cfg.Schedule.Timeout)
