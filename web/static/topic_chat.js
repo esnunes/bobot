@@ -45,6 +45,19 @@ window.TopicChatClient = class TopicChatClient {
         this.quickActions = data.quick_actions || [];
         this.canManageQuickActions = !!data.can_manage_quick_actions;
 
+        // Build member map for color assignment and Gravatar URLs
+        this.memberMap = {};
+        var members = data.members || [];
+        members.forEach(function(m, index) {
+            this.memberMap[m.user_id] = {
+                displayName: m.display_name,
+                gravatarURL: m.gravatar_url,
+                colorIndex: index % 6,
+            };
+        }.bind(this));
+        // Feature is active only in group chats (more than self + bobot)
+        this.isGroupChat = members.length > 2;
+
         var messages = data.messages || [];
         messages.forEach(function(msg) {
             this.addMessage(msg, false);
@@ -151,24 +164,88 @@ window.TopicChatClient = class TopicChatClient {
         }
     }
 
-    addMessage(msg, scroll = true) {
+    _getMsgUserId(msg) {
+        var role = msg.role || msg.Role;
+        var userId = msg.user_id || msg.UserID;
+        // Assistant and system messages are from bobot (user_id=0)
+        if (role === 'assistant' || role === 'system') return 0;
+        return userId || 0;
+    }
+
+    _getMemberInfo(userId) {
+        if (this.memberMap && this.memberMap[userId]) {
+            return this.memberMap[userId];
+        }
+        // Fallback for unknown/departed members
+        return { displayName: '', gravatarURL: 'https://www.gravatar.com/avatar/?d=mp&s=80', colorIndex: -1 };
+    }
+
+    _buildMessageEl(msg) {
         const msgEl = document.createElement('div');
         const role = msg.role || msg.Role;
         const content = msg.content || msg.Content;
         const displayName = msg.display_name || msg.DisplayName;
-        const userId = msg.user_id || msg.UserID;
+        const userId = this._getMsgUserId(msg);
         const id = msg.id || msg.ID;
-        const self = (userId === this.currentUserId) ? ' self' : '';
+        const isSelf = (userId === this.currentUserId);
 
-        msgEl.className = `message ${role}${self}`;
+        msgEl.className = `message ${role}${isSelf ? ' self' : ''}`;
+        msgEl.setAttribute('data-user-id', userId);
+        msgEl.setAttribute('data-role', role);
 
-        if (displayName) {
-            const nameEl = document.createElement('div');
-            nameEl.className = 'message-sender';
-            nameEl.textContent = displayName;
-            msgEl.appendChild(nameEl);
+        // For non-self messages in group chats, add color and avatar
+        if (!isSelf && this.isGroupChat) {
+            var member = this._getMemberInfo(userId);
+            var colorVar = member.colorIndex >= 0
+                ? `var(--colors-member-${member.colorIndex})`
+                : 'var(--colors-text-secondary)';
+            msgEl.style.setProperty('--member-color', colorVar);
+
+            // Sender name
+            if (displayName) {
+                const nameEl = document.createElement('div');
+                nameEl.className = 'message-sender';
+                nameEl.textContent = displayName;
+                msgEl.appendChild(nameEl);
+            }
+
+            // Message body with avatar + content
+            const bodyEl = document.createElement('div');
+            bodyEl.className = 'message-body';
+
+            const avatarEl = document.createElement('img');
+            avatarEl.className = 'message-avatar';
+            avatarEl.src = member.gravatarURL;
+            avatarEl.loading = 'lazy';
+            avatarEl.alt = '';
+            bodyEl.appendChild(avatarEl);
+
+            const contentEl = this._renderContent(content, role, id);
+            bodyEl.appendChild(contentEl);
+            msgEl.appendChild(bodyEl);
+        } else {
+            // Self messages or non-group: simple layout (no avatar, no colored name)
+            if (displayName && !isSelf) {
+                const nameEl = document.createElement('div');
+                nameEl.className = 'message-sender';
+                nameEl.textContent = displayName;
+                msgEl.appendChild(nameEl);
+            }
+            const contentEl = this._renderContent(content, role, id);
+            msgEl.appendChild(contentEl);
         }
 
+        if (id) {
+            msgEl.setAttribute('data-message-id', id);
+        }
+
+        // Default streak class (will be updated by grouping)
+        msgEl.classList.add('streak-only');
+
+        return msgEl;
+    }
+
+    _renderContent(content, role, id) {
         const contentEl = document.createElement('div');
         contentEl.className = 'message-content';
 
@@ -176,8 +253,6 @@ window.TopicChatClient = class TopicChatClient {
         if (html !== null) {
             contentEl.innerHTML = html;
             contentEl.classList.add('markdown-content');
-            // Highlight after inserting into DOM
-            msgEl.appendChild(contentEl);
             MessageRenderer.highlightCodeBlocks(contentEl);
             MessageRenderer.processBobotTags(contentEl, (msg) => {
                 this.wsContainer.send({ content: msg, topic_id: this.topicId });
@@ -189,14 +264,63 @@ window.TopicChatClient = class TopicChatClient {
             } else {
                 contentEl.textContent = content;
             }
-            msgEl.appendChild(contentEl);
         }
+        return contentEl;
+    }
 
-        if (id) {
-            msgEl.setAttribute('data-message-id', id);
+    _isSameStreak(el1, el2) {
+        if (!el1 || !el2) return false;
+        // Typing indicator is not a real message
+        if (el1.id === 'typing-indicator' || el2.id === 'typing-indicator') return false;
+        return el1.getAttribute('data-user-id') === el2.getAttribute('data-user-id') &&
+               el1.getAttribute('data-role') === el2.getAttribute('data-role');
+    }
+
+    _updateStreakClasses(msgEl) {
+        if (!this.isGroupChat) return;
+        if (msgEl.classList.contains('self')) return;
+
+        var prev = msgEl.previousElementSibling;
+        var next = msgEl.nextElementSibling;
+        var samePrev = this._isSameStreak(prev, msgEl);
+        var sameNext = this._isSameStreak(msgEl, next);
+
+        msgEl.classList.remove('streak-only', 'streak-first', 'streak-middle', 'streak-last');
+        if (samePrev && sameNext) {
+            msgEl.classList.add('streak-middle');
+        } else if (samePrev) {
+            msgEl.classList.add('streak-last');
+        } else if (sameNext) {
+            msgEl.classList.add('streak-first');
+        } else {
+            msgEl.classList.add('streak-only');
         }
+    }
 
+    _updateGroupingOnAppend(newEl) {
+        if (!this.isGroupChat) return;
+        // Update the previous sibling's streak class (it may have changed)
+        var prev = newEl.previousElementSibling;
+        if (prev && prev.id !== 'typing-indicator') {
+            this._updateStreakClasses(prev);
+        }
+        this._updateStreakClasses(newEl);
+    }
+
+    _updateGroupingOnPrepend(newEl) {
+        if (!this.isGroupChat) return;
+        // Update the next sibling's streak class (it may have changed)
+        var next = newEl.nextElementSibling;
+        if (next && next.id !== 'typing-indicator') {
+            this._updateStreakClasses(next);
+        }
+        this._updateStreakClasses(newEl);
+    }
+
+    addMessage(msg, scroll = true) {
+        const msgEl = this._buildMessageEl(msg);
         this.messagesEl.appendChild(msgEl);
+        this._updateGroupingOnAppend(msgEl);
         if (scroll) this.scrollToBottom();
     }
 
@@ -329,49 +453,9 @@ window.TopicChatClient = class TopicChatClient {
     }
 
     prependMessage(msg) {
-        const msgEl = document.createElement('div');
-        const role = msg.role || msg.Role;
-        const content = msg.content || msg.Content;
-        const displayName = msg.display_name || msg.DisplayName;
-        const userId = msg.user_id || msg.UserID;
-        const id = msg.id || msg.ID;
-        const self = (userId === this.currentUserId) ? ' self' : '';
-        msgEl.className = `message ${role}${self}`;
-
-        if (displayName) {
-            const nameEl = document.createElement('div');
-            nameEl.className = 'message-sender';
-            nameEl.textContent = displayName;
-            msgEl.appendChild(nameEl);
-        }
-
-        const contentEl = document.createElement('div');
-        contentEl.className = 'message-content';
-
-        var html = MessageRenderer.renderMessageContent(content, role);
-        if (html !== null) {
-            contentEl.innerHTML = html;
-            contentEl.classList.add('markdown-content');
-            msgEl.appendChild(contentEl);
-            MessageRenderer.highlightCodeBlocks(contentEl);
-            MessageRenderer.processBobotTags(contentEl, (msg) => {
-                this.wsContainer.send({ content: msg, topic_id: this.topicId });
-            }, true);
-        } else {
-            var scheduled = MessageRenderer.parseScheduledMessage(content);
-            if (scheduled) {
-                contentEl.appendChild(MessageRenderer.renderScheduledMessage(scheduled));
-            } else {
-                contentEl.textContent = content;
-            }
-            msgEl.appendChild(contentEl);
-        }
-
-        if (id) {
-            msgEl.setAttribute('data-message-id', id);
-        }
-
+        const msgEl = this._buildMessageEl(msg);
         this.messagesEl.insertBefore(msgEl, this.messagesEl.firstChild);
+        this._updateGroupingOnPrepend(msgEl);
     }
 
 };

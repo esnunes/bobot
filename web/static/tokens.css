@@ -120,4 +120,14 @@
      ============================================ */
   --opacities-disabled: 0.5;
   --opacities-muted: 0.7;
+
+  /* ============================================
+     MEMBER COLORS - For group chat differentiation
+     ============================================ */
+  --colors-member-0: #d20f39; /* Red */
+  --colors-member-1: #1e66f5; /* Blue */
+  --colors-member-2: #40a02b; /* Green */
+  --colors-member-3: #fe640b; /* Peach/Orange */
+  --colors-member-4: #8839ef; /* Mauve/Purple */
+  --colors-member-5: #179299; /* Teal */
 }

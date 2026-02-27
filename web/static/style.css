@@ -444,8 +444,44 @@ header {
 .message-sender {
   font-size: var(--font-sizes-0);
   font-weight: var(--font-weights-medium);
-  color: var(--colors-text-secondary);
+  color: var(--member-color, var(--colors-text-secondary));
   margin-bottom: var(--space-0);
+  padding-left: 36px; /* avatar width (28px) + gap (8px) */
+}
+
+.message.self .message-sender,
+.message:not(:has(.message-body)) .message-sender {
+  padding-left: 0;
+}
+
+/* Message body: avatar + content side by side */
+.message-body {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.message-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* Streak grouping: hide name/avatar based on position */
+.message:not(.streak-first):not(.streak-only) .message-sender {
+  display: none;
+}
+
+.message:not(.streak-last):not(.streak-only) .message-avatar {
+  visibility: hidden;
+}
+
+/* Reduce gap between messages in the same streak */
+.message.streak-middle,
+.message.streak-last {
+  margin-top: -12px;
 }
 
 .message-content {
