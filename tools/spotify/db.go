@@ -102,8 +102,14 @@ func (s *SpotifyDB) SaveOAuthState(state OAuthState) error {
 }
 
 func (s *SpotifyDB) GetAndDeleteOAuthState(state string) (*OAuthState, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
 	var st OAuthState
-	err := s.db.QueryRow(
+	err = tx.QueryRow(
 		"SELECT state, user_id, topic_id, verifier FROM oauth_states WHERE state = ? AND created_at >= datetime('now', '-10 minutes')",
 		state,
 	).Scan(&st.State, &st.UserID, &st.TopicID, &st.Verifier)
@@ -114,7 +120,10 @@ func (s *SpotifyDB) GetAndDeleteOAuthState(state string) (*OAuthState, error) {
 		return nil, err
 	}
 
-	s.db.Exec("DELETE FROM oauth_states WHERE state = ?", state)
+	tx.Exec("DELETE FROM oauth_states WHERE state = ?", state)
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return &st, nil
 }
 
@@ -147,11 +156,6 @@ func (s *SpotifyDB) GetToken(userID int64) (*TokenRecord, error) {
 		return nil, err
 	}
 	return &t, nil
-}
-
-func (s *SpotifyDB) DeleteToken(userID int64) error {
-	_, err := s.db.Exec("DELETE FROM tokens WHERE user_id = ?", userID)
-	return err
 }
 
 func (s *SpotifyDB) HasToken(userID int64) (bool, error) {
@@ -191,24 +195,6 @@ func (s *SpotifyDB) GetTopicLink(topicID int64) (*TopicLink, error) {
 		return nil, err
 	}
 	return &link, nil
-}
-
-func (s *SpotifyDB) GetLinkedTopics(userID int64) ([]int64, error) {
-	rows, err := s.db.Query("SELECT topic_id FROM topic_links WHERE user_id = ?", userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var topics []int64
-	for rows.Next() {
-		var topicID int64
-		if err := rows.Scan(&topicID); err != nil {
-			return nil, err
-		}
-		topics = append(topics, topicID)
-	}
-	return topics, rows.Err()
 }
 
 // Disconnect removes the user's token and all their topic links in a single transaction.

@@ -117,13 +117,13 @@ func TestTokenCRUD(t *testing.T) {
 		t.Errorf("expected updated access token, got %s", got2.AccessToken)
 	}
 
-	// Delete
-	if err := db.DeleteToken(1); err != nil {
-		t.Fatalf("DeleteToken: %v", err)
+	// Disconnect (removes token + links)
+	if err := db.Disconnect(1); err != nil {
+		t.Fatalf("Disconnect: %v", err)
 	}
 	got3, _ := db.GetToken(1)
 	if got3 != nil {
-		t.Error("expected nil after delete")
+		t.Error("expected nil after disconnect")
 	}
 }
 
@@ -164,13 +164,10 @@ func TestTopicLinks(t *testing.T) {
 		t.Errorf("expected nil for nonexistent link, got %+v", link2)
 	}
 
-	// Get linked topics
-	topics, err := db.GetLinkedTopics(1)
-	if err != nil {
-		t.Fatalf("GetLinkedTopics: %v", err)
-	}
-	if len(topics) != 2 {
-		t.Errorf("expected 2 linked topics, got %d", len(topics))
+	// Verify both links exist
+	link20, _ := db.GetTopicLink(20)
+	if link20 == nil || link20.UserID != 1 {
+		t.Errorf("expected link for topic 20 to user 1, got %+v", link20)
 	}
 
 	// Unlink
@@ -182,9 +179,10 @@ func TestTopicLinks(t *testing.T) {
 		t.Error("expected nil after unlink")
 	}
 
-	topics2, _ := db.GetLinkedTopics(1)
-	if len(topics2) != 1 {
-		t.Errorf("expected 1 linked topic after unlink, got %d", len(topics2))
+	// Topic 20 should still be linked
+	link20After, _ := db.GetTopicLink(20)
+	if link20After == nil {
+		t.Error("expected topic 20 still linked after unlinking topic 10")
 	}
 }
 
@@ -216,8 +214,12 @@ func TestDisconnect(t *testing.T) {
 	}
 
 	// Links should be gone
-	topics, _ := db.GetLinkedTopics(1)
-	if len(topics) != 0 {
-		t.Errorf("expected 0 linked topics after disconnect, got %d", len(topics))
+	link10, _ := db.GetTopicLink(10)
+	if link10 != nil {
+		t.Error("expected topic 10 link gone after disconnect")
+	}
+	link20, _ := db.GetTopicLink(20)
+	if link20 != nil {
+		t.Error("expected topic 20 link gone after disconnect")
 	}
 }

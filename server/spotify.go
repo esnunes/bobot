@@ -197,12 +197,8 @@ func (s *Server) handleSpotifyDisconnect(w http.ResponseWriter, r *http.Request)
 
 	userData := auth.UserDataFromContext(r.Context())
 
-	// Best-effort revocation (Spotify has no revocation endpoint, so this is a no-op)
-	if err := s.spotifyTool.OAuth().RevokeToken(userData.UserID); err != nil {
-		slog.Error("spotify: revoke failed (continuing with cleanup)", "error", err)
-	}
-
 	// Remove local token and all topic links
+	// (Spotify has no token revocation endpoint; tokens expire naturally)
 	if err := s.spotifyTool.DB().Disconnect(userData.UserID); err != nil {
 		slog.Error("spotify: disconnect failed", "error", err)
 		http.Error(w, "failed to disconnect", http.StatusInternalServerError)

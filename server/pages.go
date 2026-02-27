@@ -666,7 +666,9 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 			}
 			hasToken, _ := s.spotifyTool.DB().HasToken(userData.UserID)
 			data.SpotifyUserHasToken = hasToken
-			data.SpotifyError = r.URL.Query().Get("spotify_error")
+			if spotifyErr := r.URL.Query().Get("spotify_error"); spotifyErr == "premium_required" {
+				data.SpotifyError = spotifyErr
+			}
 		}
 	}
 

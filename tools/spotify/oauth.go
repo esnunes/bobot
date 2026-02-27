@@ -147,23 +147,6 @@ func (o *SpotifyOAuth) GetTokenSource(userID int64) (oauth2.TokenSource, error) 
 	}, nil
 }
 
-// RevokeToken sends a best-effort revocation request to Spotify.
-// It does NOT remove local data; the caller should call DB().Disconnect() separately.
-func (o *SpotifyOAuth) RevokeToken(userID int64) error {
-	record, err := o.db.GetToken(userID)
-	if err != nil {
-		return fmt.Errorf("loading token: %w", err)
-	}
-	if record == nil {
-		return nil
-	}
-
-	// Spotify doesn't have a standard revocation endpoint.
-	// We just delete local data. The token will expire naturally.
-	// If Spotify adds a revocation endpoint in the future, we can call it here.
-	return nil
-}
-
 // CheckPremium calls the Spotify /v1/me endpoint and checks if the user has Premium.
 func CheckPremium(ctx context.Context, accessToken string) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.spotify.com/v1/me", nil)
@@ -179,7 +162,7 @@ func CheckPremium(ctx context.Context, accessToken string) (bool, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return false, fmt.Errorf("Spotify API error %d: %s", resp.StatusCode, body)
 	}
 

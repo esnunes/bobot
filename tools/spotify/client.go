@@ -59,11 +59,6 @@ type Playlist struct {
 	TrackCount int
 }
 
-// User represents basic Spotify user info.
-type User struct {
-	Product string
-}
-
 // Search searches for tracks by query.
 func (c *Client) Search(ctx context.Context, query string) ([]Track, error) {
 	u := c.baseURL + "/search?type=track&limit=5&q=" + url.QueryEscape(query)
@@ -379,7 +374,7 @@ func checkResponse(resp *http.Response) error {
 		return nil
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 
 	switch resp.StatusCode {
 	case 401:
