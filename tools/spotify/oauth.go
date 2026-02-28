@@ -22,7 +22,7 @@ var spotifyEndpoint = oauth2.Endpoint{
 	TokenURL: "https://accounts.spotify.com/api/token",
 }
 
-const spotifyScopes = "user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative"
+const spotifyScopes = "user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative"
 
 // SpotifyOAuth holds the OAuth2 configuration for Spotify.
 type SpotifyOAuth struct {

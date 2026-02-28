@@ -123,9 +123,11 @@ To enable the Spotify tool, create an app in the Spotify Developer Dashboard:
 1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
 2. Click **Create app**.
 3. Fill in the app name and description.
-4. Add `<your-base-url>/api/spotify/callback` as a **Redirect URI** (e.g. `http://localhost:8080/api/spotify/callback`).
+4. Add `<your-base-url>/api/spotify/callback` as a **Redirect URI** (e.g. `http://127.0.0.1:8080/api/spotify/callback`). **Note:** Spotify does not allow `localhost` in redirect URIs — use `127.0.0.1` for local development.
 5. Check the **Web API** checkbox under **Which API/SDKs are you planning to use?**.
 6. Save and copy the **Client ID** and **Client Secret** into `BOBOT_SPOTIFY_CLIENT_ID` and `BOBOT_SPOTIFY_CLIENT_SECRET`.
+
+For local development, set `BOBOT_BASE_URL=http://127.0.0.1:8080` so the OAuth redirect URL matches.
 
 **Note:** Spotify playback control requires a **Spotify Premium** account. Free-tier users will see an error when attempting to connect.
 
