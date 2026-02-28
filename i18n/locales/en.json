@@ -68,6 +68,8 @@
   "settings.leave_topic": "Leave Topic",
   "settings.account": "Account",
   "settings.display_name": "Display name",
+  "settings.email": "Email",
+  "settings.email_desc": "Used for your Gravatar avatar in group chats",
   "settings.save": "Save",
   "settings.saved": "Saved",
   "settings.push_notifications": "Push Notifications",

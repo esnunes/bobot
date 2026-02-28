@@ -52,6 +52,49 @@
         });
     }
 
+    // Email form
+    var emailForm = document.getElementById('email-form');
+    if (emailForm) {
+        emailForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var input = document.getElementById('email-input');
+            var savedMsg = document.getElementById('email-saved');
+            var preview = document.getElementById('gravatar-preview');
+            var submitBtn = emailForm.querySelector('button[type="submit"]');
+            var email = input.value.trim();
+
+            submitBtn.disabled = true;
+            fetch('/api/user/email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'email=' + encodeURIComponent(email)
+            })
+            .then(function(resp) {
+                if (resp.ok) {
+                    return resp.json().then(function(data) {
+                        if (preview && data.gravatar_url) {
+                            preview.src = data.gravatar_url;
+                        }
+                        savedMsg.style.display = '';
+                        savedMsg.style.opacity = '1';
+                        setTimeout(function() {
+                            savedMsg.style.opacity = '0';
+                            setTimeout(function() { savedMsg.style.display = 'none'; }, 300);
+                        }, 2000);
+                    });
+                } else {
+                    console.error('Failed to update email:', resp.status);
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to update email:', err);
+            })
+            .finally(function() {
+                submitBtn.disabled = false;
+            });
+        });
+    }
+
     // Auto-read toggle
     var autoReadBtn = container.querySelector('[data-auto-read-toggle]');
     if (autoReadBtn) {

@@ -68,6 +68,8 @@
   "settings.leave_topic": "Sair do T\u00f3pico",
   "settings.account": "Conta",
   "settings.display_name": "Nome de exibi\u00e7\u00e3o",
+  "settings.email": "Email",
+  "settings.email_desc": "Usado para o avatar Gravatar em conversas em grupo",
   "settings.save": "Salvar",
   "settings.saved": "Salvo",
   "settings.push_notifications": "Notifica\u00e7\u00f5es Push",

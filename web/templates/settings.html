@@ -143,6 +143,16 @@
                     <span class="settings-saved-msg" id="display-name-saved" style="display:none">{{t .Lang "settings.saved"}}</span>
                 </form>
 
+                <form class="settings-email-form" id="email-form">
+                    <label class="settings-row-label" for="email-input">{{t .Lang "settings.email"}}</label>
+                    <div class="settings-email-row">
+                        <img class="settings-gravatar-preview" id="gravatar-preview" src="{{.GravatarURL}}" alt="" width="32" height="32">
+                        <input type="email" id="email-input" name="email" value="{{.Email}}" autocomplete="email" maxlength="254" placeholder="you@example.com">
+                        <button type="submit" class="settings-save-btn">{{t .Lang "settings.save"}}</button>
+                    </div>
+                    <span class="settings-saved-msg" id="email-saved" style="display:none">{{t .Lang "settings.saved"}}</span>
+                </form>
+
                 <form class="settings-language-form" id="language-form" hx-post="/api/user/language" hx-target="body">
                     <label class="settings-row-label" for="language-select">{{t .Lang "settings.language"}}</label>
                     <select id="language-select" name="language" onchange="this.form.requestSubmit()">
