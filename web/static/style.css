@@ -404,7 +404,9 @@ header {
 
 .message:not(.self) {
   align-self: flex-start;
-  align-items: flex-start;
+  align-items: flex-end;
+  flex-direction: row;
+  gap: var(--space-1);
 }
 
 .message-meta {
@@ -428,7 +430,16 @@ header {
 }
 
 /* Legacy message styling (for messages without bubble wrapper) */
-.message:not(:has(.message-bubble)) {
+.message.self:not(:has(.message-bubble)) {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radii-lg);
+  box-shadow: var(--shadows-low);
+  background: var(--colors-accent-light);
+  line-height: var(--line-heights-normal);
+  overflow-wrap: anywhere;
+}
+
+.message:not(.self):not(:has(.message-bubble)) .message-inner > .message-content {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radii-lg);
   box-shadow: var(--shadows-low);
@@ -437,36 +448,38 @@ header {
   overflow-wrap: anywhere;
 }
 
-.message.self:not(:has(.message-bubble)) {
-  background: var(--colors-accent-light);
+/* Non-self messages without inner wrapper (fallback for history messages) */
+.message:not(.self):not(:has(.message-inner)):not(:has(.message-bubble)) {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radii-lg);
+  box-shadow: var(--shadows-low);
+  background: var(--colors-surface);
+  line-height: var(--line-heights-normal);
+  overflow-wrap: anywhere;
 }
 
-.message-sender {
-  font-size: var(--font-sizes-0);
-  font-weight: var(--font-weights-medium);
-  color: var(--member-color, var(--colors-text-secondary));
-  margin-bottom: var(--space-0);
-  padding-left: 36px; /* avatar width (28px) + gap (8px) */
-}
-
-.message.self .message-sender,
-.message:not(:has(.message-body)) .message-sender {
-  padding-left: 0;
-}
-
-/* Message body: avatar + content side by side */
-.message-body {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-1);
-}
-
+/* Avatar sits outside the bubble, aligned to the bottom */
 .message-avatar {
   width: 28px;
   height: 28px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
+  align-self: flex-end;
+}
+
+/* Inner wrapper: name + content stacked vertically */
+.message-inner {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.message-sender {
+  font-size: var(--font-sizes-1);
+  font-weight: var(--font-weights-bold);
+  color: var(--member-color, var(--colors-text-secondary));
+  margin-bottom: var(--space-0);
 }
 
 /* Streak grouping: hide name/avatar based on position */
@@ -1228,7 +1241,12 @@ header {
   color: #fe640b;
 }
 
-.message:has(.message-scheduled--reminder) {
+.message.self:has(.message-scheduled--reminder) {
+  background: #fef0e4;
+  border-left: 3px solid #fe640b;
+}
+
+.message:not(.self) .message-content:has(.message-scheduled--reminder) {
   background: #fef0e4;
   border-left: 3px solid #fe640b;
 }
@@ -1237,7 +1255,12 @@ header {
   color: #179299;
 }
 
-.message:has(.message-scheduled--cron) {
+.message.self:has(.message-scheduled--cron) {
+  background: #e0f5f5;
+  border-left: 3px solid #179299;
+}
+
+.message:not(.self) .message-content:has(.message-scheduled--cron) {
   background: #e0f5f5;
   border-left: 3px solid #179299;
 }

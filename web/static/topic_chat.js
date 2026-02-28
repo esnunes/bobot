@@ -55,8 +55,7 @@ window.TopicChatClient = class TopicChatClient {
                 colorIndex: index % 6,
             };
         }.bind(this));
-        // Feature is active only in group chats (more than self + bobot)
-        this.isGroupChat = members.length > 2;
+
 
         var messages = data.messages || [];
         messages.forEach(function(msg) {
@@ -193,44 +192,38 @@ window.TopicChatClient = class TopicChatClient {
         msgEl.setAttribute('data-user-id', userId);
         msgEl.setAttribute('data-role', role);
 
-        // For non-self messages in group chats, add color and avatar
-        if (!isSelf && this.isGroupChat) {
+        // For non-self messages, add color and avatar outside the bubble
+        if (!isSelf) {
             var member = this._getMemberInfo(userId);
             var colorVar = member.colorIndex >= 0
                 ? `var(--colors-member-${member.colorIndex})`
                 : 'var(--colors-text-secondary)';
             msgEl.style.setProperty('--member-color', colorVar);
 
-            // Sender name
-            if (displayName) {
-                const nameEl = document.createElement('div');
-                nameEl.className = 'message-sender';
-                nameEl.textContent = displayName;
-                msgEl.appendChild(nameEl);
-            }
-
-            // Message body with avatar + content
-            const bodyEl = document.createElement('div');
-            bodyEl.className = 'message-body';
-
+            // Avatar (outside the bubble, left-aligned)
             const avatarEl = document.createElement('img');
             avatarEl.className = 'message-avatar';
             avatarEl.src = member.gravatarURL;
             avatarEl.loading = 'lazy';
             avatarEl.alt = '';
-            bodyEl.appendChild(avatarEl);
+            msgEl.appendChild(avatarEl);
 
-            const contentEl = this._renderContent(content, role, id);
-            bodyEl.appendChild(contentEl);
-            msgEl.appendChild(bodyEl);
-        } else {
-            // Self messages or non-group: simple layout (no avatar, no colored name)
-            if (displayName && !isSelf) {
+            // Inner wrapper for name + bubble
+            const innerEl = document.createElement('div');
+            innerEl.className = 'message-inner';
+
+            if (displayName) {
                 const nameEl = document.createElement('div');
                 nameEl.className = 'message-sender';
                 nameEl.textContent = displayName;
-                msgEl.appendChild(nameEl);
+                innerEl.appendChild(nameEl);
             }
+
+            const contentEl = this._renderContent(content, role, id);
+            innerEl.appendChild(contentEl);
+            msgEl.appendChild(innerEl);
+        } else {
+            // Self messages: simple layout (no avatar, no colored name)
             const contentEl = this._renderContent(content, role, id);
             msgEl.appendChild(contentEl);
         }
@@ -277,7 +270,6 @@ window.TopicChatClient = class TopicChatClient {
     }
 
     _updateStreakClasses(msgEl) {
-        if (!this.isGroupChat) return;
         if (msgEl.classList.contains('self')) return;
 
         var prev = msgEl.previousElementSibling;
@@ -298,7 +290,6 @@ window.TopicChatClient = class TopicChatClient {
     }
 
     _updateGroupingOnAppend(newEl) {
-        if (!this.isGroupChat) return;
         // Update the previous sibling's streak class (it may have changed)
         var prev = newEl.previousElementSibling;
         if (prev && prev.id !== 'typing-indicator') {
@@ -308,7 +299,6 @@ window.TopicChatClient = class TopicChatClient {
     }
 
     _updateGroupingOnPrepend(newEl) {
-        if (!this.isGroupChat) return;
         // Update the next sibling's streak class (it may have changed)
         var next = newEl.nextElementSibling;
         if (next && next.id !== 'typing-indicator') {
