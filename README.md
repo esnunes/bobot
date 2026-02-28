@@ -10,6 +10,7 @@ A self-hosted personal AI assistant with multi-user support, topic-based convers
 - **Skills** — custom per-chat skills that shape assistant behavior
 - **Scheduling** — one-shot reminders and recurring cron-based prompts
 - **Push notifications** — Web Push (VAPID) for real-time alerts
+- **Spotify** — optional Spotify playback control (search, play, pause, skip, volume, devices, playlists)
 - **Smart home** — optional LG ThinQ device control
 - **Web search** — optional Brave Search integration
 - **User profiles** — auto-generated user profiles from conversation history
@@ -92,6 +93,8 @@ Generate keys with `bobot generate-vapid-keys`.
 | `BRAVE_SEARCH_API_KEY` | Brave Search API key for web search tool |
 | `BOBOT_GOOGLE_CLIENT_ID` | Google OAuth2 client ID for Calendar integration |
 | `BOBOT_GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret for Calendar integration |
+| `BOBOT_SPOTIFY_CLIENT_ID` | Spotify OAuth2 client ID for Spotify integration |
+| `BOBOT_SPOTIFY_CLIENT_SECRET` | Spotify OAuth2 client secret for Spotify integration |
 | `THINQ_TOKEN` | LG ThinQ API token |
 | `THINQ_COUNTRY` | ThinQ country code |
 | `THINQ_CLIENT_ID` | ThinQ client ID |
@@ -112,6 +115,21 @@ To enable the Google Calendar tool, create OAuth2 credentials in the Google Clou
 5. Copy the **Client ID** and **Client Secret** into `BOBOT_GOOGLE_CLIENT_ID` and `BOBOT_GOOGLE_CLIENT_SECRET`.
 
 Once configured, topic owners can connect a Google Calendar from the topic settings page.
+
+#### Spotify setup
+
+To enable the Spotify tool, create an app in the Spotify Developer Dashboard:
+
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
+2. Click **Create app**.
+3. Fill in the app name and description.
+4. Add `<your-base-url>/api/spotify/callback` as a **Redirect URI** (e.g. `http://localhost:8080/api/spotify/callback`).
+5. Check the **Web API** checkbox under **Which API/SDKs are you planning to use?**.
+6. Save and copy the **Client ID** and **Client Secret** into `BOBOT_SPOTIFY_CLIENT_ID` and `BOBOT_SPOTIFY_CLIENT_SECRET`.
+
+**Note:** Spotify playback control requires a **Spotify Premium** account. Free-tier users will see an error when attempting to connect.
+
+Once configured, users can connect their Spotify account from any topic's settings page. A single connection can be linked to multiple topics.
 
 ## CLI commands
 
@@ -153,6 +171,7 @@ The assistant has access to these tools during conversations:
 | `cron` | Manage recurring scheduled prompts on a cron schedule |
 | `web_search` | Search the web via Brave Search (when configured) |
 | `calendar` | Manage Google Calendar events (when configured) |
+| `spotify` | Control Spotify playback — search, play, pause, skip, volume, devices, playlists (when configured) |
 | `thinq` | Control LG ThinQ smart home devices (when configured) |
 
 ## Ideas
