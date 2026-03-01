@@ -191,20 +191,23 @@ func TestErrorResponses(t *testing.T) {
 	tests := []struct {
 		name     string
 		status   int
+		body     string
 		contains string
 	}{
-		{"unauthorized", 401, "expired or was revoked"},
-		{"forbidden", 403, "Premium is required"},
-		{"not found", 404, "No active playback"},
-		{"rate limited", 429, "rate-limited"},
-		{"server error", 500, "temporarily unavailable"},
+		{"unauthorized", 401, "error", "expired or was revoked"},
+		{"forbidden premium", 403, `{"error":{"status":403,"message":"Player command failed: Premium required","reason":"PREMIUM_REQUIRED"}}`, "Premium is required"},
+		{"forbidden other", 403, `{"error":{"status":403,"message":"Restricted device","reason":"FORBIDDEN"}}`, "Restricted device"},
+		{"forbidden no json", 403, "error", "403"},
+		{"not found", 404, "error", "No active playback"},
+		{"rate limited", 429, "error", "rate-limited"},
+		{"server error", 500, "error", "temporarily unavailable"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.status)
-				w.Write([]byte("error"))
+				w.Write([]byte(tt.body))
 			}))
 
 			err := client.Pause(context.Background())

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 const spotifyAPIBase = "https://api.spotify.com/v1"
@@ -380,7 +381,7 @@ func checkResponse(resp *http.Response) error {
 	case 401:
 		return fmt.Errorf("Spotify access expired or was revoked. Reconnect from topic settings.")
 	case 403:
-		return fmt.Errorf("Spotify Premium is required for playback control. Your account may have been downgraded.")
+		return parseForbiddenError(body)
 	case 404:
 		return fmt.Errorf("No active playback session. Try playing a song first.")
 	case 429:
@@ -392,4 +393,20 @@ func checkResponse(resp *http.Response) error {
 	}
 
 	return fmt.Errorf("Spotify API error %d: %s", resp.StatusCode, body)
+}
+
+func parseForbiddenError(body []byte) error {
+	var apiErr struct {
+		Error struct {
+			Reason  string `json:"reason"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &apiErr) == nil && apiErr.Error.Reason != "" {
+		if strings.EqualFold(apiErr.Error.Reason, "PREMIUM_REQUIRED") {
+			return fmt.Errorf("Spotify Premium is required for playback control. Your account may have been downgraded.")
+		}
+		return fmt.Errorf("Spotify error: %s", apiErr.Error.Message)
+	}
+	return fmt.Errorf("Spotify request forbidden (403): %s", body)
 }
