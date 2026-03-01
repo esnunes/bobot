@@ -16,6 +16,7 @@ import (
 	"github.com/esnunes/bobot/tools"
 	"github.com/esnunes/bobot/tools/calendar"
 	"github.com/esnunes/bobot/tools/schedule"
+	"github.com/esnunes/bobot/tools/spotify"
 	"github.com/esnunes/bobot/web"
 )
 
@@ -24,6 +25,7 @@ type Server struct {
 	db           *db.CoreDB
 	scheduleDB   *schedule.ScheduleDB
 	calendarTool *calendar.CalendarTool
+	spotifyTool  *spotify.SpotifyTool
 	session      *auth.SessionService
 	engine       *assistant.Engine
 	registry     *tools.Registry
@@ -35,10 +37,10 @@ type Server struct {
 }
 
 func New(cfg *config.Config, coreDB *db.CoreDB) *Server {
-	return NewWithAssistant(cfg, coreDB, nil, nil, nil, nil, nil)
+	return NewWithAssistant(cfg, coreDB, nil, nil, nil, nil, nil, nil)
 }
 
-func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.Engine, registry *tools.Registry, pipeline *ChatPipeline, scheduleDB *schedule.ScheduleDB, calendarTool *calendar.CalendarTool) *Server {
+func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.Engine, registry *tools.Registry, pipeline *ChatPipeline, scheduleDB *schedule.ScheduleDB, calendarTool *calendar.CalendarTool, spotifyTool *spotify.SpotifyTool) *Server {
 	session := auth.NewSessionService(
 		cfg.JWT.Secret,
 		cfg.Session.Duration,
@@ -51,6 +53,7 @@ func NewWithAssistant(cfg *config.Config, coreDB *db.CoreDB, engine *assistant.E
 		db:           coreDB,
 		scheduleDB:   scheduleDB,
 		calendarTool: calendarTool,
+		spotifyTool:  spotifyTool,
 		session:      session,
 		engine:       engine,
 		registry:     registry,
@@ -138,6 +141,13 @@ func (s *Server) routes() {
 	s.router.HandleFunc("GET /calendar/pick", s.sessionMiddleware(s.handleCalendarPickPage))
 	s.router.HandleFunc("POST /calendar/pick", s.sessionMiddleware(s.handleCalendarPickSubmit))
 	s.router.HandleFunc("DELETE /api/calendar", s.sessionMiddleware(s.handleCalendarDisconnect))
+
+	// Spotify routes (require auth)
+	s.router.HandleFunc("GET /api/spotify/auth", s.sessionMiddleware(s.handleSpotifyAuth))
+	s.router.HandleFunc("GET /api/spotify/callback", s.sessionMiddleware(s.handleSpotifyCallback))
+	s.router.HandleFunc("POST /api/spotify/link", s.sessionMiddleware(s.handleSpotifyLink))
+	s.router.HandleFunc("DELETE /api/spotify/link", s.sessionMiddleware(s.handleSpotifyUnlink))
+	s.router.HandleFunc("DELETE /api/spotify", s.sessionMiddleware(s.handleSpotifyDisconnect))
 
 	// Admin routes (require auth + admin role)
 	s.router.HandleFunc("GET /admin", s.sessionMiddleware(s.adminMiddleware(s.handleAdminPage)))

@@ -23,6 +23,8 @@ type Config struct {
 	BraveSearchAPIKey  string
 	GoogleClientID     string
 	GoogleClientSecret string
+	SpotifyClientID     string
+	SpotifyClientSecret string
 }
 
 type VAPIDConfig struct {
@@ -113,6 +115,8 @@ func Load() (*Config, error) {
 		BraveSearchAPIKey:  os.Getenv("BRAVE_SEARCH_API_KEY"),
 		GoogleClientID:     os.Getenv("BOBOT_GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("BOBOT_GOOGLE_CLIENT_SECRET"),
+		SpotifyClientID:     os.Getenv("BOBOT_SPOTIFY_CLIENT_ID"),
+		SpotifyClientSecret: os.Getenv("BOBOT_SPOTIFY_CLIENT_SECRET"),
 	}
 
 	if err := cfg.validate(); err != nil {

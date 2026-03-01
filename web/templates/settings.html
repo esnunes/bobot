@@ -114,6 +114,29 @@
                     {{end}}
                 </div>
                 {{end}}
+                {{if .SpotifyEnabled}}
+                <div class="settings-nav-item settings-spotify-row">
+                    <div class="settings-nav-info">
+                        <span class="settings-nav-label">{{t .Lang "settings.spotify"}}</span>
+                        {{if .SpotifyLinked}}
+                        <span class="settings-nav-detail">{{t .Lang "settings.connected"}}</span>
+                        {{else if .SpotifyError}}
+                        <span class="settings-nav-detail settings-row-empty">{{t .Lang "settings.spotify_premium_required"}}</span>
+                        {{else}}
+                        <span class="settings-nav-detail settings-row-empty">{{t .Lang "settings.not_connected"}}</span>
+                        {{end}}
+                    </div>
+                    {{if or (eq .OwnerID .CurrentUserID) .IsAdmin}}
+                        {{if .SpotifyLinked}}
+                        <button class="settings-disconnect-btn" data-spotify-unlink data-topic-id="{{.TopicID}}">{{t .Lang "settings.unlink"}}</button>
+                        {{else if .SpotifyUserHasToken}}
+                        <button class="settings-connect-btn" data-spotify-link data-topic-id="{{.TopicID}}">{{t .Lang "settings.link"}}</button>
+                        {{else}}
+                        <a href="/api/spotify/auth?topic_id={{.TopicID}}" class="settings-connect-btn">{{t .Lang "settings.connect"}}</a>
+                        {{end}}
+                    {{end}}
+                </div>
+                {{end}}
             </div>
         </details>
 

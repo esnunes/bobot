@@ -201,6 +201,10 @@ type PageData struct {
 	CalendarConnected      bool
 	CalendarName           string
 	CalendarsPick          []CalendarPickView
+	SpotifyEnabled         bool
+	SpotifyLinked          bool
+	SpotifyUserHasToken    bool
+	SpotifyError           string
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
@@ -666,6 +670,20 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 			if cal != nil {
 				data.CalendarConnected = true
 				data.CalendarName = cal.CalendarName
+			}
+		}
+
+		// Load Spotify status
+		if s.spotifyTool != nil {
+			data.SpotifyEnabled = true
+			link, _ := s.spotifyTool.DB().GetTopicLink(topicID)
+			if link != nil {
+				data.SpotifyLinked = true
+			}
+			hasToken, _ := s.spotifyTool.DB().HasToken(userData.UserID)
+			data.SpotifyUserHasToken = hasToken
+			if spotifyErr := r.URL.Query().Get("spotify_error"); spotifyErr == "premium_required" {
+				data.SpotifyError = spotifyErr
 			}
 		}
 	}
