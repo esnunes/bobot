@@ -376,6 +376,19 @@ func (t *CalendarTool) execUpdate(ctx context.Context, ts oauth2.TokenSource, ca
 }
 
 func (t *CalendarTool) updateSingleInstance(ctx context.Context, ts oauth2.TokenSource, cal *TopicCalendar, eventID string, input map[string]any) (string, error) {
+	// Guard: if the event ID is a recurring master, updating it would affect all
+	// instances. Fetch the event to check.
+	raw, err := GetRawEvent(ctx, ts, cal.CalendarID, eventID)
+	if err != nil {
+		return "", err
+	}
+	if len(raw.Recurrence) > 0 {
+		return "This is a recurring event series. To update a single occurrence, first list events " +
+			"to get the specific instance ID, then update that instance. " +
+			"To update all occurrences, use scope='all'. " +
+			"To update this and all future occurrences, use scope='this_and_future'.", nil
+	}
+
 	updates := buildUpdates(input)
 
 	event, err := UpdateEvent(ctx, ts, cal.CalendarID, eventID, updates, cal.Timezone)
@@ -551,6 +564,19 @@ func (t *CalendarTool) execDelete(ctx context.Context, ts oauth2.TokenSource, ca
 }
 
 func (t *CalendarTool) deleteSingleInstance(ctx context.Context, ts oauth2.TokenSource, cal *TopicCalendar, eventID string) (string, error) {
+	// Guard: if the event ID is a recurring master, deleting it would remove the
+	// entire series. Fetch the event to check.
+	raw, err := GetRawEvent(ctx, ts, cal.CalendarID, eventID)
+	if err != nil {
+		return "", err
+	}
+	if len(raw.Recurrence) > 0 {
+		return "This is a recurring event series. To delete a single occurrence, first list events " +
+			"to get the specific instance ID, then delete that instance. " +
+			"To delete all occurrences, use scope='all'. " +
+			"To delete this and all future occurrences, use scope='this_and_future'.", nil
+	}
+
 	if err := DeleteEvent(ctx, ts, cal.CalendarID, eventID); err != nil {
 		return "", err
 	}
