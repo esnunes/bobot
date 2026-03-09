@@ -220,11 +220,16 @@ func (t *CalendarTool) execList(ctx context.Context, ts oauth2.TokenSource, cal 
 			end := formatEventTime(e.End)
 			sb.WriteString(fmt.Sprintf("- **%s** (%s - %s)", e.Title, start, end))
 		}
+		sb.WriteString(fmt.Sprintf(" [ID: %s]\n", e.ID))
 		if e.Location != "" {
-			sb.WriteString(fmt.Sprintf(" @ %s", e.Location))
+			sb.WriteString(fmt.Sprintf("  Location: %s\n", e.Location))
 		}
-		sb.WriteString(fmt.Sprintf(" [ID: %s]", e.ID))
-		sb.WriteString("\n")
+		if e.Description != "" {
+			sb.WriteString(fmt.Sprintf("  Description: %s\n", e.Description))
+		}
+		if e.HTMLLink != "" {
+			sb.WriteString(fmt.Sprintf("  Link: %s\n", e.HTMLLink))
+		}
 	}
 
 	return sb.String(), nil
