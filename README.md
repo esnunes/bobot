@@ -8,8 +8,10 @@ A self-hosted personal AI assistant with multi-user support, topic-based convers
 - **Topics** — organize conversations into named topics with member management
 - **Tasks** — built-in task/project management via natural language
 - **Skills** — custom per-chat skills that shape assistant behavior
+- **Quick actions** — configurable UI shortcut buttons that send or pre-fill messages
 - **Scheduling** — one-shot reminders and recurring cron-based prompts
 - **Push notifications** — Web Push (VAPID) for real-time alerts
+- **Google Calendar** — optional Google Calendar integration with recurring event support
 - **Spotify** — optional Spotify playback control (search, play, pause, skip, volume, devices, playlists)
 - **Smart home** — optional LG ThinQ device control
 - **Web search** — optional Brave Search integration
@@ -169,10 +171,11 @@ The assistant has access to these tools during conversations:
 | `topic` | Create, delete, and manage conversation topics and members |
 | `user` | Invite, block/unblock, and list users (admin only) |
 | `skill` | Create, update, delete, and list custom per-chat skills |
+| `quickaction` | Create, update, delete, and list UI shortcut buttons |
 | `remind` | Create one-shot reminders that fire at a specific time |
 | `cron` | Manage recurring scheduled prompts on a cron schedule |
 | `web_search` | Search the web via Brave Search (when configured) |
-| `calendar` | Manage Google Calendar events (when configured) |
+| `calendar` | Manage Google Calendar events with recurring event support (when configured) |
 | `spotify` | Control Spotify playback — search, play, pause, skip, volume, devices, playlists (when configured) |
 | `thinq` | Control LG ThinQ smart home devices (when configured) |
 
