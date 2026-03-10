@@ -24,14 +24,15 @@ type CalendarInfo struct {
 
 // EventInfo represents a Google Calendar event.
 type EventInfo struct {
-	ID          string
-	Title       string
-	Description string
-	Location    string
-	Start       string
-	End         string
-	AllDay      bool
-	HTMLLink    string
+	ID               string
+	Title            string
+	Description      string
+	Location         string
+	Start            string
+	End              string
+	AllDay           bool
+	HTMLLink         string
+	IsRecurring bool
 }
 
 // ListCalendars fetches the user's calendar list.
@@ -90,7 +91,7 @@ func ListEvents(ctx context.Context, ts oauth2.TokenSource, calendarID string, t
 }
 
 // CreateEvent creates a new event in the calendar.
-func CreateEvent(ctx context.Context, ts oauth2.TokenSource, calendarID string, title, description, location string, start, end time.Time, allDay bool, timezone string) (*EventInfo, error) {
+func CreateEvent(ctx context.Context, ts oauth2.TokenSource, calendarID string, title, description, location string, start, end time.Time, allDay bool, timezone string, recurrence []string) (*EventInfo, error) {
 	srv, err := gcalendar.NewService(ctx, option.WithTokenSource(ts))
 	if err != nil {
 		return nil, fmt.Errorf("creating calendar service: %w", err)
@@ -100,6 +101,10 @@ func CreateEvent(ctx context.Context, ts oauth2.TokenSource, calendarID string, 
 		Summary:     title,
 		Description: description,
 		Location:    location,
+	}
+
+	if len(recurrence) > 0 {
+		event.Recurrence = recurrence
 	}
 
 	if allDay {
@@ -186,7 +191,50 @@ func DeleteEvent(ctx context.Context, ts oauth2.TokenSource, calendarID, eventID
 	return nil
 }
 
+// GetRawEvent fetches a raw Google Calendar event by ID.
+func GetRawEvent(ctx context.Context, ts oauth2.TokenSource, calendarID, eventID string) (*gcalendar.Event, error) {
+	srv, err := gcalendar.NewService(ctx, option.WithTokenSource(ts))
+	if err != nil {
+		return nil, fmt.Errorf("creating calendar service: %w", err)
+	}
+
+	event, err := srv.Events.Get(calendarID, eventID).Do()
+	if err != nil {
+		return nil, mapAPIError(err)
+	}
+	return event, nil
+}
+
+// UpdateRawEvent updates a raw Google Calendar event.
+func UpdateRawEvent(ctx context.Context, ts oauth2.TokenSource, calendarID, eventID string, event *gcalendar.Event) (*gcalendar.Event, error) {
+	srv, err := gcalendar.NewService(ctx, option.WithTokenSource(ts))
+	if err != nil {
+		return nil, fmt.Errorf("creating calendar service: %w", err)
+	}
+
+	updated, err := srv.Events.Update(calendarID, eventID, event).SendUpdates("none").Do()
+	if err != nil {
+		return nil, mapAPIError(err)
+	}
+	return updated, nil
+}
+
+// masterEventID derives the master event ID from an instance ID.
+// Instance IDs have the format "{masterId}_{YYYYMMDDTHHMMSSZ}" or "{masterId}_{YYYYMMDD}".
+func masterEventID(eventID string) string {
+	if idx := strings.LastIndex(eventID, "_"); idx > 0 {
+		suffix := eventID[idx+1:]
+		// Check if suffix looks like a timestamp (8+ digits starting with a digit)
+		if len(suffix) >= 8 && suffix[0] >= '0' && suffix[0] <= '9' {
+			return eventID[:idx]
+		}
+	}
+	return eventID
+}
+
 // FindEventByTitle searches for events matching a title (case-insensitive).
+// Recurring event instances sharing the same master are deduplicated, returning
+// only the first instance.
 func FindEventByTitle(ctx context.Context, ts oauth2.TokenSource, calendarID, title string) ([]EventInfo, error) {
 	srv, err := gcalendar.NewService(ctx, option.WithTokenSource(ts))
 	if err != nil {
@@ -209,10 +257,19 @@ func FindEventByTitle(ctx context.Context, ts oauth2.TokenSource, calendarID, ti
 	}
 
 	var result []EventInfo
+	seen := make(map[string]bool) // track recurring master IDs to deduplicate
 	for _, item := range events.Items {
-		if strings.Contains(strings.ToLower(item.Summary), strings.ToLower(title)) {
-			result = append(result, eventToInfo(item))
+		if !strings.Contains(strings.ToLower(item.Summary), strings.ToLower(title)) {
+			continue
 		}
+		// Deduplicate recurring event instances: keep only the first occurrence
+		if item.RecurringEventId != "" {
+			if seen[item.RecurringEventId] {
+				continue
+			}
+			seen[item.RecurringEventId] = true
+		}
+		result = append(result, eventToInfo(item))
 	}
 	return result, nil
 }
@@ -240,6 +297,11 @@ func eventToInfo(e *gcalendar.Event) EventInfo {
 		} else {
 			info.End = e.End.DateTime
 		}
+	}
+
+	// Recurrence metadata
+	if len(e.Recurrence) > 0 || e.RecurringEventId != "" {
+		info.IsRecurring = true
 	}
 
 	return info
@@ -284,6 +346,8 @@ func mapAPIError(err error) error {
 	}
 
 	switch apiErr.Code {
+	case 400:
+		return fmt.Errorf("Invalid request. If creating a recurring event, check the recurrence rule format (e.g., RRULE:FREQ=WEEKLY;BYDAY=TU).")
 	case 401:
 		return fmt.Errorf("Google Calendar access expired or was revoked. The topic owner needs to reconnect from settings.")
 	case 404:
