@@ -83,7 +83,8 @@ func (t *CalendarTool) Schema() any {
 					"Examples: RRULE:FREQ=DAILY, RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR, " +
 					"RRULE:FREQ=MONTHLY;BYMONTHDAY=1, RRULE:FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=9, " +
 					"RRULE:FREQ=WEEKLY;BYDAY=TU;COUNT=10, RRULE:FREQ=DAILY;UNTIL=20261231T235959Z. " +
-					"Must start with RRULE: prefix. Used only with create command.",
+					"Must start with RRULE: prefix. Used with create to set up recurring events, " +
+					"or with update (scope='all' or 'this_and_future') to change the recurrence rule.",
 			},
 			"scope": map[string]any{
 				"type":        "string",
@@ -128,6 +129,11 @@ func (t *CalendarTool) ParseArgs(raw string) (map[string]any, error) {
 				if len(kv) == 2 {
 					result["recurrence"] = kv[1]
 				}
+			} else if strings.HasPrefix(p, "--location=") {
+				kv := strings.SplitN(p, "=", 2)
+				if len(kv) == 2 {
+					result["location"] = kv[1]
+				}
 			} else if !strings.HasPrefix(p, "--") {
 				descWords = append(descWords, p)
 			}
@@ -157,6 +163,8 @@ func (t *CalendarTool) ParseArgs(raw string) (map[string]any, error) {
 				result["end"] = kv[1]
 			case "description":
 				result["description"] = kv[1]
+			case "location":
+				result["location"] = kv[1]
 			case "recurrence":
 				result["recurrence"] = kv[1]
 			case "scope":
@@ -354,12 +362,14 @@ func (t *CalendarTool) execCreate(ctx context.Context, ts oauth2.TokenSource, ca
 }
 
 func (t *CalendarTool) execUpdate(ctx context.Context, ts oauth2.TokenSource, cal *TopicCalendar, input map[string]any) (string, error) {
-	eventID, err := t.resolveEventID(ctx, ts, cal, input)
+	eventID, msg, err := t.resolveEventID(ctx, ts, cal, input)
 	if err != nil {
 		return "", err
 	}
+	if msg != "" {
+		return msg, nil
+	}
 	if eventID == "" {
-		// resolveEventID returned a user-facing message via error=nil
 		return "", fmt.Errorf("event_id or title is required for update")
 	}
 
@@ -406,6 +416,11 @@ func (t *CalendarTool) updateAllInstances(ctx context.Context, ts oauth2.TokenSo
 
 	// Handle recurrence changes on the master event
 	if rec, ok := input["recurrence"].(string); ok {
+		if rec != "" {
+			if err := validateRRULE(rec); err != nil {
+				return "", err
+			}
+		}
 		updates["recurrence"] = rec
 	}
 
@@ -510,21 +525,25 @@ func (t *CalendarTool) updateThisAndFuture(ctx context.Context, ts oauth2.TokenS
 	}
 	if startStr, ok := input["start"].(string); ok && startStr != "" {
 		parsed, err := parseFlexibleTime(startStr, cal.Timezone)
-		if err == nil {
-			newStart = parsed
+		if err != nil {
+			return "", fmt.Errorf("invalid start time: %w", err)
 		}
+		newStart = parsed
 	}
 	if endStr, ok := input["end"].(string); ok && endStr != "" {
 		parsed, err := parseFlexibleTime(endStr, cal.Timezone)
-		if err == nil {
-			newEnd = parsed
+		if err != nil {
+			return "", fmt.Errorf("invalid end time: %w", err)
 		}
+		newEnd = parsed
 	}
 	if rec, ok := input["recurrence"].(string); ok && rec != "" {
+		if err := validateRRULE(rec); err != nil {
+			return "", err
+		}
 		newRecurrence = []string{rec}
 	}
 
-	// Remove any UNTIL/COUNT from new recurrence to let it continue
 	allDay := instance.Start != nil && instance.Start.Date != ""
 
 	created, err := CreateEvent(ctx, ts, cal.CalendarID, title, description, location, newStart, newEnd, allDay, cal.Timezone, newRecurrence)
@@ -543,9 +562,12 @@ func (t *CalendarTool) updateThisAndFuture(ctx context.Context, ts oauth2.TokenS
 }
 
 func (t *CalendarTool) execDelete(ctx context.Context, ts oauth2.TokenSource, cal *TopicCalendar, input map[string]any) (string, error) {
-	eventID, err := t.resolveEventID(ctx, ts, cal, input)
+	eventID, msg, err := t.resolveEventID(ctx, ts, cal, input)
 	if err != nil {
 		return "", err
+	}
+	if msg != "" {
+		return msg, nil
 	}
 	if eventID == "" {
 		return "", fmt.Errorf("event_id or title is required for delete")
@@ -631,24 +653,25 @@ func (t *CalendarTool) deleteThisAndFuture(ctx context.Context, ts oauth2.TokenS
 }
 
 // resolveEventID resolves an event ID from input, either directly or by title search.
-// Returns the event ID and a user-facing message if multiple matches are found.
-func (t *CalendarTool) resolveEventID(ctx context.Context, ts oauth2.TokenSource, cal *TopicCalendar, input map[string]any) (string, error) {
+// Returns (eventID, "", nil) on success, ("", message, nil) for user-facing guidance,
+// or ("", "", error) on actual errors.
+func (t *CalendarTool) resolveEventID(ctx context.Context, ts oauth2.TokenSource, cal *TopicCalendar, input map[string]any) (string, string, error) {
 	eventID, _ := input["event_id"].(string)
 	if eventID != "" {
-		return eventID, nil
+		return eventID, "", nil
 	}
 
 	title, _ := input["title"].(string)
 	if title == "" {
-		return "", nil
+		return "", "", nil
 	}
 
 	matches, err := FindEventByTitle(ctx, ts, cal.CalendarID, title)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if len(matches) == 0 {
-		return "", fmt.Errorf("no event found matching '%s'", title)
+		return "", fmt.Sprintf("No event found matching '%s'.", title), nil
 	}
 	if len(matches) > 1 {
 		var sb strings.Builder
@@ -656,9 +679,9 @@ func (t *CalendarTool) resolveEventID(ctx context.Context, ts oauth2.TokenSource
 		for _, m := range matches {
 			sb.WriteString(fmt.Sprintf("- %s (%s) [ID: %s]\n", m.Title, formatEventTime(m.Start), m.ID))
 		}
-		return "", fmt.Errorf("%s", sb.String())
+		return "", sb.String(), nil
 	}
-	return matches[0].ID, nil
+	return matches[0].ID, "", nil
 }
 
 func extractScope(input map[string]any) string {

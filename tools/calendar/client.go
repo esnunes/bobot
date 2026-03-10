@@ -32,9 +32,7 @@ type EventInfo struct {
 	End              string
 	AllDay           bool
 	HTMLLink         string
-	IsRecurring      bool
-	RecurringEventID string   // master event ID (populated on instances)
-	Recurrence       []string // RRULE strings (populated on master events)
+	IsRecurring bool
 }
 
 // ListCalendars fetches the user's calendar list.
@@ -302,13 +300,8 @@ func eventToInfo(e *gcalendar.Event) EventInfo {
 	}
 
 	// Recurrence metadata
-	if len(e.Recurrence) > 0 {
+	if len(e.Recurrence) > 0 || e.RecurringEventId != "" {
 		info.IsRecurring = true
-		info.Recurrence = e.Recurrence
-	}
-	if e.RecurringEventId != "" {
-		info.IsRecurring = true
-		info.RecurringEventID = e.RecurringEventId
 	}
 
 	return info
