@@ -7,9 +7,9 @@
   --colors-surface: #e6e9ef;          /* Mantle */
   --colors-text: #4c4f69;             /* Text */
   --colors-text-secondary: #6c6f85;   /* Subtext0 */
-  --colors-accent: #1e66f5;           /* Blue */
-  --colors-accent-hover: #7287fd;     /* Lavender */
-  --colors-accent-light: #dce1fb;     /* Light Lavender tint */
+  --colors-accent: #df8e1d;           /* Yellow */
+  --colors-accent-hover: #e6a336;     /* Light Yellow (hover) */
+  --colors-accent-light: #faf0db;     /* Pale Yellow tint */
   --colors-border: #ccd0da;           /* Surface0 */
   --colors-border-strong: #acb0be;    /* Surface2 */
   --colors-border-accent: #7287fd;    /* Lavender */
