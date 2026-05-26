@@ -232,6 +232,47 @@ func TestAdminUpdateUserPassword_NonNumericID(t *testing.T) {
 	}
 }
 
+func getAdminUserPage(srv *Server, adminID, targetID int64) *httptest.ResponseRecorder {
+	token, _ := srv.session.CreateToken(adminID, "admin")
+	req := httptest.NewRequest("GET", fmt.Sprintf("/admin/users/%d", targetID), nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: token})
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	return w
+}
+
+func TestAdminUserPage_RendersPasswordForm(t *testing.T) {
+	srv := setupTestServer(t)
+	admin, _ := srv.db.CreateUserFull("admin", "hash", "Admin", "admin")
+	target, _ := srv.db.CreateUserFull("target", "hash", "Target", "user")
+
+	w := getAdminUserPage(srv, admin.ID, target.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `id="admin-password-form"`) {
+		t.Error("expected the password form to be rendered")
+	}
+	// Resetting another user is not a self-reset.
+	if !strings.Contains(body, `data-self-reset="false"`) {
+		t.Error("expected data-self-reset=\"false\" when admin resets another user")
+	}
+}
+
+func TestAdminUserPage_SelfResetFlag(t *testing.T) {
+	srv := setupTestServer(t)
+	admin, _ := srv.db.CreateUserFull("admin", "hash", "Admin", "admin")
+
+	w := getAdminUserPage(srv, admin.ID, admin.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `data-self-reset="true"`) {
+		t.Error("expected data-self-reset=\"true\" when admin views their own page")
+	}
+}
+
 // TestAdminUpdateUserPassword_RevokesTargetSessions exercises the full eventual
 // revocation path through sessionMiddleware. It builds a server whose
 // RefreshThreshold >= Duration so every request hits the reissue branch, which
