@@ -1,7 +1,7 @@
 ---
 title: "feat: Admin change a user's password"
 type: feat
-status: active
+status: completed
 date: 2026-05-26
 deepened: 2026-05-26
 origin: docs/brainstorms/2026-05-26-admin-change-user-password-requirements.md
@@ -77,7 +77,7 @@ There is currently no in-app way to change a user's password; it can only be set
 
 - **Endpoint shape**: `POST /admin/users/{id}/password`, wrapped `sessionMiddleware(adminMiddleware(...))`, handler `handleAdminUpdateUserPassword` in `server/admin.go`. Rationale: consistent with the existing `/admin/users/{id}` route and admin handler location; `adminMiddleware` already gives R4's 403.
 - **Reuse `validatePassword` directly** (not a copied `8` literal). Rationale: same package, single source of truth — satisfies R6 and resolves the brainstorm's "duplicated literal" concern without inventing a new constant/convention.
-- **Existence check satisfies R9's 404 clause; the origin's "zero-row = error" clause is consciously amended.** The handler loads the target via `GetUserByID` (404 on miss) and guards `BobotUserID` *before* the update, so on the happy path the `Exec` can never hit zero rows. `UpdateUserPassword` therefore mirrors its siblings (no `RowsAffected` check), keeping `db/core.go` consistent. **Amendment:** the origin's R9 asked the DB layer itself to treat a zero-row UPDATE as an error; this plan enforces existence at the handler instead. The only residual gap is a TOCTOU window — the target row deleted between `GetUserByID` and `UpdateUserPassword` would report success with no change. Accepted: single-binary local SQLite, low-frequency admin action, no concurrent/remote user-deletion path exists today. Revisit (add a `RowsAffected` check) if user deletion ever becomes concurrent.
+- **Existence check satisfies R9's 404 clause; the origin's "zero-row = error" clause is consciously amended.** The handler loads the target via `GetUserByID` (404 on miss) and guards `BobotUserID` *before* the update, so on the happy path the write can never hit a missing user. **Amendment:** the origin's R9 asked the DB layer itself to treat a zero-row UPDATE as an error; this plan enforces existence at the handler instead. The TOCTOU window the origin worried about (target deleted between `GetUserByID` and the update reporting a silent no-op) is closed by the code-review change: the update and revocation run in one transaction (`UpdateUserPasswordAndRevokeSessions`), and a deleted target makes the revocation INSERT violate the `session_revocations` foreign key, rolling the whole transaction back and returning 500 rather than a silent success.
 - **Revoke with reason `"admin_password_reset"`** after a successful update. Rationale: matches the existing `session_revocations` mechanism (R8); distinct reason aids future debugging.
 - **Eventual revocation accepted** (per origin): no per-request revocation check, no WebSocket teardown. Rationale: low-frequency admin action; immediate cut-off isn't worth the per-request DB cost and connection-teardown logic.
 - **Frontend = vanilla `fetch` + inline feedback** (settings.js style), not full-page HTMX re-render (signup style). Rationale: `admin_user.html` is data-heavy; re-rendering re-runs all its DB lookups on every submit/error. A scoped `fetch` returning 204/text avoids that. Confirm-password mismatch is checked client-side (signup idiom) and again server-side (source of truth).
@@ -111,7 +111,7 @@ There is currently no in-app way to change a user's password; it can only be set
 
 ## Implementation Units
 
-- [ ] **Unit 1: `UpdateUserPassword` DB method**
+- [x] **Unit 1: `UpdateUserPassword` DB method**
 
 **Goal:** Persist a new bcrypt hash for a user.
 
@@ -136,7 +136,7 @@ There is currently no in-app way to change a user's password; it can only be set
 **Verification:**
 - `db` package tests pass; stored `password_hash` reflects the new value.
 
-- [ ] **Unit 2: Admin password-change handler + route**
+- [x] **Unit 2: Admin password-change handler + route**
 
 **Goal:** Server-side endpoint that validates input, updates the hash, and revokes the target's sessions.
 
@@ -180,7 +180,7 @@ There is currently no in-app way to change a user's password; it can only be set
 **Verification:**
 - `server` package tests pass; all status codes and the revocation side effect hold as enumerated.
 
-- [ ] **Unit 3: Admin user-detail UI (form, confirm, inline feedback, i18n)**
+- [x] **Unit 3: Admin user-detail UI (form, confirm, inline feedback, i18n)**
 
 **Goal:** Let an admin enter and submit a new password from the user detail page, with a confirmation step and visible success/error feedback.
 
@@ -219,7 +219,7 @@ There is currently no in-app way to change a user's password; it can only be set
 
 - **Interaction graph:** Reuses `sessionMiddleware` + `adminMiddleware` unchanged. New write path: handler → `UpdateUserPassword` → `CreateSessionRevocation`. First admin-side mutation — establishes the pattern future admin actions (e.g. the unwired `BlockUser`/`UnblockUser`) can follow.
 - **Error propagation:** Validation/authz/target errors surface as HTTP status + text the client renders inline; DB errors return 500 with a generic message (no internals leaked).
-- **State lifecycle risks:** `UpdateUserPassword` and `CreateSessionRevocation` are two separate `Exec`s (no transaction), matching existing convention. If the revocation insert fails after the hash update, the handler returns 500 while the password is already changed; acceptable (the new password works; only the forced-logout side effect is missing) — documented under Risks.
+- **State lifecycle risks:** the hash update and the revocation insert run in a single transaction (`UpdateUserPasswordAndRevokeSessions`, added during code review), so they commit or roll back together — a failed revocation no longer leaves the password changed with sessions still valid. A target deleted between the existence check and the write now fails loudly via the `session_revocations` foreign key (500) instead of silently no-op'ing.
 - **API surface parity:** Admin-only; no user-facing self-service endpoint is added (out of scope). The unwired `BlockUser`/`UnblockUser` are not addressed here.
 - **Integration coverage:** The token-issued-before-change → rejected-on-reissue scenario (Unit 2) is the cross-layer behavior unit-level mocks wouldn't prove.
 - **Unchanged invariants:** Login, signup, the `Blocked` check, session encryption, and all existing admin read routes are untouched. Revocation timing semantics are unchanged (still reissue-path only).
@@ -234,8 +234,8 @@ There is currently no in-app way to change a user's password; it can only be set
 | Plaintext password in the request body / logs | **HTTPS required in production** (see Key Technical Decisions): the `Secure` cookie + TLS in transit both depend on `BaseURL` being https; over http the password and cookie are exposed. Handler must never log the password/confirm/hash/body — only ids + outcome. |
 | One admin can reset another admin's password (lateral takeover), with no audit trail | Accepted: the app trusts all admins equally and has no audit infra (out of scope per origin). `adminMiddleware` still gates the endpoint. Revisit if admin-role separation or audit logging is introduced. |
 | Oversized request body / overlong password exhausts memory or feeds unbounded input to bcrypt | `http.MaxBytesReader(w, r.Body, 4096)` caps the body and a server-side 72-byte max-length bounds the hashed input (Unit 2); `maxlength="72"` mirrors it client-side (Unit 3). |
-| Non-transactional hash-update + revocation could partially apply | Low impact (new password still valid); documented. Could wrap in a transaction later if desired. |
-| `UpdateUserPassword` no-ops silently on a bad id (or a target deleted mid-request) | Prevented on the happy path by `GetUserByID`/`BobotUserID` guards before the update. Residual TOCTOU window (target deleted between check and update) accepted — see the R9 amendment in Key Technical Decisions. |
+| Non-transactional hash-update + revocation could partially apply | **Resolved in code review:** both writes run in one transaction (`UpdateUserPasswordAndRevokeSessions`), so they commit or roll back together. |
+| Password update no-ops silently on a bad id (or a target deleted mid-request) | Prevented on the happy path by `GetUserByID`/`BobotUserID` guards before the update; the TOCTOU window is now closed by the atomic transaction — a deleted target trips the `session_revocations` foreign key and rolls back with a 500 (see the R9 amendment in Key Technical Decisions). |
 
 ## Documentation / Operational Notes
 
