@@ -328,6 +328,35 @@ func TestCoreDB_BlockUser(t *testing.T) {
 	}
 }
 
+func TestCoreDB_UpdateUserPassword(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUserFull("pwuser", "oldhash", "PW User", "user")
+
+	if err := db.UpdateUserPassword(user.ID, "newhash"); err != nil {
+		t.Fatalf("failed to update password: %v", err)
+	}
+
+	updated, _ := db.GetUserByID(user.ID)
+	if updated.PasswordHash != "newhash" {
+		t.Errorf("expected password hash %q, got %q", "newhash", updated.PasswordHash)
+	}
+}
+
+func TestCoreDB_UpdateUserPasswordUnknownID(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	// Updating a non-existent user is not an error at the DB layer; the
+	// handler is responsible for verifying the user exists first.
+	if err := db.UpdateUserPassword(99999, "newhash"); err != nil {
+		t.Errorf("expected no error for unknown user id, got %v", err)
+	}
+}
+
 func TestCoreDB_UnblockUser(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))

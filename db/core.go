@@ -1531,6 +1531,12 @@ func (c *CoreDB) UpdateUserEmail(userID int64, email string) error {
 	return err
 }
 
+// UpdateUserPassword updates the password hash for a user.
+func (c *CoreDB) UpdateUserPassword(userID int64, passwordHash string) error {
+	_, err := c.db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", passwordHash, userID)
+	return err
+}
+
 // GetLatestTopicMessageID returns the ID of the most recent message in a topic.
 func (c *CoreDB) GetLatestTopicMessageID(topicID int64) (int64, error) {
 	var id int64
