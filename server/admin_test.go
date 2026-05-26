@@ -193,6 +193,29 @@ func TestAdminUpdateUserPassword_TooLong(t *testing.T) {
 	}
 }
 
+func TestAdminUpdateUserPassword_OversizedBody(t *testing.T) {
+	srv := setupTestServer(t)
+	admin, _ := srv.db.CreateUserFull("admin", "hash", "Admin", "admin")
+	oldHash, _ := auth.HashPassword("oldpass12")
+	target, _ := srv.db.CreateUserFull("target", oldHash, "Target", "user")
+
+	// Body well over the 4096-byte MaxBytesReader cap: ParseForm fails and the
+	// request is rejected without touching the password or sessions.
+	huge := strings.Repeat("a", 5000)
+	w := adminPasswordRequest(srv, admin.ID, target.ID, "password="+huge+"&confirm_password="+huge)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 on oversized body, got %d", w.Code)
+	}
+	updated, _ := srv.db.GetUserByID(target.ID)
+	if !auth.CheckPassword("oldpass12", updated.PasswordHash) {
+		t.Error("password must not change when the body is rejected")
+	}
+	if hasAnyRevocation(t, srv, target.ID) {
+		t.Error("no revocation should be created when the body is rejected")
+	}
+}
+
 func TestAdminUpdateUserPassword_UnknownID(t *testing.T) {
 	srv := setupTestServer(t)
 	admin, _ := srv.db.CreateUserFull("admin", "hash", "Admin", "admin")

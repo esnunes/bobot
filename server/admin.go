@@ -261,14 +261,11 @@ func (s *Server) handleAdminUpdateUserPassword(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if err := s.db.UpdateUserPassword(userID, passwordHash); err != nil {
+	// Change the password and revoke existing sessions atomically: either both
+	// land or neither does, so a failure never leaves the password changed with
+	// sessions still valid.
+	if err := s.db.UpdateUserPasswordAndRevokeSessions(userID, passwordHash, "admin_password_reset"); err != nil {
 		slog.Error("admin: failed to update password", "adminID", userData.UserID, "targetUserID", userID, "error", err)
-		http.Error(w, i18n.T(lang, "admin_user.password_error_internal"), http.StatusInternalServerError)
-		return
-	}
-
-	if err := s.db.CreateSessionRevocation(userID, "admin_password_reset"); err != nil {
-		slog.Error("admin: failed to revoke sessions after password reset", "adminID", userData.UserID, "targetUserID", userID, "error", err)
 		http.Error(w, i18n.T(lang, "admin_user.password_error_internal"), http.StatusInternalServerError)
 		return
 	}
