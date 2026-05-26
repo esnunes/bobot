@@ -11,7 +11,9 @@ import (
 	"strings"
 
 	"github.com/esnunes/bobot/assistant"
+	"github.com/esnunes/bobot/auth"
 	"github.com/esnunes/bobot/db"
+	"github.com/esnunes/bobot/i18n"
 )
 
 func (s *Server) handleAdminPage(w http.ResponseWriter, r *http.Request) {
@@ -179,9 +181,12 @@ func (s *Server) handleAdminUserPage(w http.ResponseWriter, r *http.Request) {
 		displayName = user.Username
 	}
 
+	userData := auth.UserDataFromContext(r.Context())
+
 	s.render(w, r, "admin_user", PageData{
-		Title:   "User - " + displayName,
-		IsAdmin: true,
+		Title:         "User - " + displayName,
+		IsAdmin:       true,
+		CurrentUserID: userData.UserID,
 		AdminUserDetail: &AdminUserDetailView{
 			ID:            user.ID,
 			DisplayName:   user.DisplayName,
@@ -198,6 +203,75 @@ func (s *Server) handleAdminUserPage(w http.ResponseWriter, r *http.Request) {
 			ReadStatus:    readStatusViews,
 		},
 	})
+}
+
+// handleAdminUpdateUserPassword sets a new password for the target user and
+// revokes the user's existing sessions (eventual: enforced at next token
+// reissue). Admin-only via adminMiddleware.
+//
+// Security: never log the password, confirmation, resulting hash, or request
+// body. Only the acting admin id, target user id, and outcome are safe to log.
+func (s *Server) handleAdminUpdateUserPassword(w http.ResponseWriter, r *http.Request) {
+	userData := auth.UserDataFromContext(r.Context())
+	lang := userData.Language
+
+	// Cap the request body to defend against oversized payloads.
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+
+	userID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, i18n.T(lang, "admin_user.password_error_invalid_id"), http.StatusBadRequest)
+		return
+	}
+	if userID == db.BobotUserID {
+		http.Error(w, i18n.T(lang, "admin_user.password_error_not_found"), http.StatusNotFound)
+		return
+	}
+	if _, err := s.db.GetUserByID(userID); err != nil {
+		http.Error(w, i18n.T(lang, "admin_user.password_error_not_found"), http.StatusNotFound)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, i18n.T(lang, "admin_user.password_error_invalid_request"), http.StatusBadRequest)
+		return
+	}
+
+	password := r.FormValue("password")
+	confirm := r.FormValue("confirm_password")
+
+	if password != confirm {
+		http.Error(w, i18n.T(lang, "admin_user.password_error_mismatch"), http.StatusBadRequest)
+		return
+	}
+	if errKey := validatePassword(password); errKey != "" {
+		http.Error(w, i18n.T(lang, errKey), http.StatusBadRequest)
+		return
+	}
+	// bcrypt rejects inputs longer than 72 bytes; reject early for a clean 400.
+	if len([]byte(password)) > 72 {
+		http.Error(w, i18n.T(lang, "admin_user.password_error_too_long"), http.StatusBadRequest)
+		return
+	}
+
+	passwordHash, err := auth.HashPassword(password)
+	if err != nil {
+		slog.Error("admin: failed to hash password", "adminID", userData.UserID, "targetUserID", userID, "error", err)
+		http.Error(w, i18n.T(lang, "admin_user.password_error_internal"), http.StatusInternalServerError)
+		return
+	}
+
+	// Change the password and revoke existing sessions atomically: either both
+	// land or neither does, so a failure never leaves the password changed with
+	// sessions still valid.
+	if err := s.db.UpdateUserPasswordAndRevokeSessions(userID, passwordHash, "admin_password_reset"); err != nil {
+		slog.Error("admin: failed to update password", "adminID", userData.UserID, "targetUserID", userID, "error", err)
+		http.Error(w, i18n.T(lang, "admin_user.password_error_internal"), http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("admin: changed user password", "adminID", userData.UserID, "targetUserID", userID)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleAdminTopicContextPage(w http.ResponseWriter, r *http.Request) {

@@ -1939,6 +1939,57 @@ header {
   transition: opacity 0.3s;
 }
 
+.admin-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+}
+
+.admin-password-form label {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-text-muted, var(--colors-text));
+}
+
+.admin-password-form input[type="password"] {
+  height: var(--sizes-input-height);
+  padding: 0 var(--space-2);
+  border: var(--borders-thin);
+  border-radius: var(--radii-md);
+  font-size: var(--font-sizes-2);
+  font-family: var(--fonts-body);
+  background: var(--colors-background);
+  margin-bottom: var(--space-1);
+}
+
+.admin-password-form button[type="submit"] {
+  align-self: flex-start;
+  height: var(--sizes-input-height);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radii-pill);
+  background: var(--colors-accent);
+  color: white;
+  font-size: var(--font-sizes-2);
+  font-weight: var(--font-weights-medium);
+  cursor: pointer;
+}
+
+.admin-password-form button[type="submit"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-password-msg {
+  font-size: var(--font-sizes-1);
+  color: var(--colors-success, #40a02b);
+  font-weight: var(--font-weights-medium);
+}
+
+.admin-password-msg--error {
+  color: var(--colors-danger, #d20f39);
+}
+
 .settings-nav-item {
   display: flex;
   justify-content: space-between;

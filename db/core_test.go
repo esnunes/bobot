@@ -328,6 +328,47 @@ func TestCoreDB_BlockUser(t *testing.T) {
 	}
 }
 
+func TestCoreDB_UpdateUserPasswordAndRevokeSessions(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	user, _ := db.CreateUserFull("pwuser", "oldhash", "PW User", "user")
+	before := time.Now().Add(-time.Second)
+
+	if err := db.UpdateUserPasswordAndRevokeSessions(user.ID, "newhash", "admin_password_reset"); err != nil {
+		t.Fatalf("failed to update password: %v", err)
+	}
+
+	updated, _ := db.GetUserByID(user.ID)
+	if updated.PasswordHash != "newhash" {
+		t.Errorf("expected password hash %q, got %q", "newhash", updated.PasswordHash)
+	}
+
+	// The same transaction must have recorded a session revocation, so a token
+	// issued before the change is now revoked.
+	revoked, err := db.HasSessionRevocation(user.ID, before)
+	if err != nil {
+		t.Fatalf("HasSessionRevocation error: %v", err)
+	}
+	if !revoked {
+		t.Error("expected a session revocation to be recorded alongside the password change")
+	}
+}
+
+func TestCoreDB_UpdateUserPasswordAndRevokeSessionsUnknownID(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))
+	defer db.Close()
+
+	// For a non-existent user the revocation INSERT violates the foreign key,
+	// so the whole transaction rolls back and an error is returned. The handler
+	// verifies the user exists first, so this path is defensive.
+	if err := db.UpdateUserPasswordAndRevokeSessions(99999, "newhash", "admin_password_reset"); err == nil {
+		t.Error("expected a foreign key error for unknown user id, got nil")
+	}
+}
+
 func TestCoreDB_UnblockUser(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, _ := NewCoreDB(filepath.Join(tmpDir, "core.db"))

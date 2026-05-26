@@ -36,6 +36,23 @@
             </div>
         </div>
 
+        <details class="context-section">
+            <summary class="context-section-title">{{t .Lang "admin_user.password"}}</summary>
+            <form id="admin-password-form" class="admin-password-form"
+                  data-user-id="{{.AdminUserDetail.ID}}"
+                  data-self-reset="{{if eq .AdminUserDetail.ID .CurrentUserID}}true{{else}}false{{end}}"
+                  data-user-name="{{if .AdminUserDetail.DisplayName}}{{.AdminUserDetail.DisplayName}}{{else}}{{.AdminUserDetail.Username}}{{end}}">
+                <label for="admin-password-input">{{t .Lang "admin_user.new_password"}}</label>
+                <input type="password" id="admin-password-input" name="password"
+                       autocomplete="new-password" minlength="8" maxlength="72" required>
+                <label for="admin-password-confirm">{{t .Lang "admin_user.confirm_password"}}</label>
+                <input type="password" id="admin-password-confirm" name="confirm_password"
+                       autocomplete="new-password" minlength="8" maxlength="72" required>
+                <button type="submit">{{t .Lang "admin_user.change_password"}}</button>
+                <span id="admin-password-msg" class="admin-password-msg" role="status" aria-live="polite"></span>
+            </form>
+        </details>
+
         <details class="context-section" open>
             <summary class="context-section-title">{{t .Lang "admin_user.topics"}} ({{len .AdminUserDetail.Topics}})</summary>
             {{if .AdminUserDetail.Topics}}
@@ -114,4 +131,5 @@
         </details>
     </main>
 </div>
+<script src="/static/admin_user.js"></script>
 {{end}}

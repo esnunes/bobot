@@ -1531,6 +1531,34 @@ func (c *CoreDB) UpdateUserEmail(userID int64, email string) error {
 	return err
 }
 
+// UpdateUserPasswordAndRevokeSessions updates the user's password hash and
+// records a session revocation in a single transaction. Both writes commit
+// together or roll back together, so a successful return guarantees existing
+// sessions are marked for revocation (enforced eventually, at next token
+// reissue), and a failure leaves the password unchanged.
+//
+// If userID no longer exists, the revocation INSERT violates the
+// session_revocations foreign key, the transaction rolls back, and an error is
+// returned; callers verify existence before calling.
+func (c *CoreDB) UpdateUserPasswordAndRevokeSessions(userID int64, passwordHash, revocationReason string) error {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("UPDATE users SET password_hash = ? WHERE id = ?", passwordHash, userID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(
+		"INSERT INTO session_revocations (user_id, reason) VALUES (?, ?)",
+		userID, revocationReason,
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // GetLatestTopicMessageID returns the ID of the most recent message in a topic.
 func (c *CoreDB) GetLatestTopicMessageID(topicID int64) (int64, error) {
 	var id int64
